@@ -49,8 +49,7 @@ KEY_COLUMNS = {
 # 15 task/site planning columns — accepted as written.
 PLANNING_COLUMNS = (
     "unique_id",
-    "cumulative_road_distance_km",
-    "street_address",
+        "street_address",
     "land_use",
     "survey_no",
     "subdivision_no",
@@ -301,8 +300,7 @@ class PreviousRecordsImportService:
         row = ImportRow(row_number=row_number)
         row.values = {
             "unique_id": (record.get("unique_id") or "").strip(),
-            "cumulative_road_distance_km": (record.get("cumulative_road_distance_km") or "").strip(),
-            "coordinates": "",
+                        "coordinates": "",
             "street_address": (record.get("street_address") or "").strip(),
             "land_use": (record.get("land_use") or "").strip(),
             "survey_no": (record.get("survey_no") or "").strip(),
@@ -508,8 +506,7 @@ class PreviousRecordsImportService:
                 status="COMPLETED",
                 source="imported",
                 unique_id=values["unique_id"] or None,
-                cumulative_road_distance_km=values["cumulative_road_distance_km"] or None,
-                coordinates=values["coordinates"] or None,
+                                coordinates=values["coordinates"] or None,
                 street_address=values["street_address"] or None,
                 land_use=values["land_use"] or None,
                 survey_no=values["survey_no"] or None,

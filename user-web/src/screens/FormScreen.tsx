@@ -1070,6 +1070,51 @@ export default function FormScreen({
               )}
             </div>
 
+            {/* Construction Specs: Floors, Area, Expected Completion */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" htmlFor="no-of-floors">
+                  No. of Floors
+                </label>
+                <input
+                  id="no-of-floors"
+                  type="text"
+                  className="form-input"
+                  value={noOfFloors}
+                  onChange={(e) => setNoOfFloors(e.target.value)}
+                  placeholder="e.g. G+1, 2 Floors"
+                />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" htmlFor="built-up-area">
+                  Built-up Area
+                </label>
+                <input
+                  id="built-up-area"
+                  type="text"
+                  className="form-input"
+                  value={builtUpArea}
+                  onChange={(e) => setBuiltUpArea(e.target.value)}
+                  placeholder="e.g. 1,800 sq.ft"
+                />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" htmlFor="expected-completion">
+                  Expected Completion
+                </label>
+                <input
+                  id="expected-completion"
+                  type="text"
+                  className="form-input"
+                  value={expectedCompletion}
+                  onChange={(e) => setExpectedCompletion(e.target.value)}
+                  placeholder="e.g. Dec 2026 / Q1 2027"
+                />
+              </div>
+            </div>
+
             {/* 5. Building User / Occupant Name */}
             <div className="form-group">
               <label className="form-label" htmlFor="user-name">

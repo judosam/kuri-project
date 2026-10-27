@@ -121,7 +121,7 @@ export function recordGroupFields(groupKey: 'imported' | 'audit' | 'field', view
  * hidden because the auditor supplies that data themselves (QC panel / field
  * app), and imported bookkeeping fields add noise without aiding the decision.
  */
-const POPUP_HIDDEN_GROUPS = new Set(['audit']);
+const POPUP_HIDDEN_GROUPS = new Set(['audit', 'field']);
 const POPUP_HIDDEN_FIELDS = new Set(['id', 'street_address', 'name', 'source', 'is_manually_added', 'uploaded_by_name', 'created_at', 'staged_operator_name', 'description']);
 
 export function DetailValueCell({

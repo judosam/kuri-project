@@ -121,7 +121,6 @@ class RecordCreateRequest(BaseModel):
 class TaskDispatchItem(BaseModel):
     user_id: int
     unique_id: Optional[str] = None
-    cumulative_road_distance_km: Optional[str] = None
     coordinates: Optional[str] = None
     street_address: Optional[str] = None
     land_use: Optional[str] = None
@@ -204,7 +203,6 @@ class RecordDetail(BaseModel):
 
     # 15 Task Dispatch Planning Fields (Admin Google Sheet)
     unique_id: Optional[str] = None
-    cumulative_road_distance_km: Optional[str] = None
     coordinates: Optional[str] = None
     street_address: Optional[str] = None
     land_use: Optional[str] = None
@@ -441,7 +439,6 @@ class RecordUpdateRequest(BaseModel):
     # 15 Task Dispatch Planning Fields — editable so imported (backfilled)
     # records can be corrected from the admin portal.
     unique_id: Optional[str] = None
-    cumulative_road_distance_km: Optional[str] = None
     coordinates: Optional[str] = None
     street_address: Optional[str] = None
     land_use: Optional[str] = None

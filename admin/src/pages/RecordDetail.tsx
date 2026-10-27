@@ -632,6 +632,20 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
       commentChanged ||
       auditorChanged;
 
+    // Mandatory validation: Audit Decision, QC Comments (VHR Imagery), Street view comments
+    if (!auditStatus?.trim()) {
+      setAuditNotice({ ok: false, text: 'Audit Decision is mandatory. Please select an audit decision.' });
+      return;
+    }
+    if (!qcVhr.trim()) {
+      setAuditNotice({ ok: false, text: 'QC Comments (VHR Imagery) is mandatory. Please select a comment.' });
+      return;
+    }
+    if (!qcStreet.trim()) {
+      setAuditNotice({ ok: false, text: 'Street view comments is mandatory. Please select a comment.' });
+      return;
+    }
+
     const effectiveAuditStatus =
       auditStatus === 'RE_AUDITED' || coordsChanged || qcChanged
         ? 'RE_AUDITED'
@@ -1327,7 +1341,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <Icon name="fact_check" size={14} style={{ color: '#c2410c' }} />
                               <strong style={{ fontSize: '0.75rem', letterSpacing: '0.05em', color: '#9a3412', textTransform: 'uppercase' }}>
-                                Audit Decision
+                                Audit Decision *
                               </strong>
                             </div>
                             <CustomSelect
@@ -1573,6 +1587,8 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                 record.status === 'UPDATED_REVISITED'
               );
               const effectiveCapturedAt = capturedTime(record);
+
+              if (!canAdmin) return null;
 
               return (
                 <Section
@@ -2279,7 +2295,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
 
               {/* Saved Google Maps satellite mosaic — the same picture the
                   importer and auditor reviewed, sourced from the shared cache. */}
-              {record.coordinates && (
+              {canAdmin && record.coordinates && (
                 <div style={{ marginTop: 14 }}>
                   <GmapSatellitePanel
                     recordId={record.id}
@@ -2359,7 +2375,8 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
             </Section>
           </div>
 
-          {/* RIGHT COLUMN — Media Studio (Photo Viewport + Docked Sequence Filmstrip) */}
+          {/* RIGHT COLUMN — Media Studio (Photo Viewport + Docked Sequence Filmstrip) - Hidden in QA portal */}
+          {canAdmin && (
           <div className="record-media-card">
             {sortedImages.length === 0 ? (
               <div className="state-panel" style={{ flex: 1 }}>
@@ -2537,6 +2554,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
               </>
             )}
           </div>
+          )}
         </div>
       </div>
 

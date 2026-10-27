@@ -885,8 +885,7 @@ async def download_dispatch_template(admin: User = Depends(require_admin)):
         "no_of_floors",
         "built_up_area",
         "expected_completion",
-        "cumulative_road_distance_km",
-        "auditor_email",
+                "auditor_email",
         "operator_email",
     ]
 
@@ -908,7 +907,7 @@ async def download_dispatch_template(admin: User = Depends(require_admin)):
             "G+2",
             "2500 sq.ft",
             "Dec 2026",
-            "2.5",
+            ""
             "",
             "",
         ],
@@ -929,7 +928,7 @@ async def download_dispatch_template(admin: User = Depends(require_admin)):
             "G+3",
             "4500 sq.ft",
             "Mar 2027",
-            "5.1",
+            ""
             "",
             "",
         ],
@@ -1446,7 +1445,7 @@ async def upload_tasks_sheet(
             visit_order = int(str(raw_visit_order).strip())
 
         unique_id = row_dict.get("unique_id") or row_dict.get("uid") or ""
-        cumulative_dist = row_dict.get("cumulative_road_distance_km") or row_dict.get("distance_km") or row_dict.get("distance") or ""
+        cumulative_dist = ""
         street_address = row_dict.get("street_address") or row_dict.get("street") or ""
         land_use = row_dict.get("land_use") or ""
         survey_no = row_dict.get("survey_no") or row_dict.get("survey_number") or ""
@@ -1568,7 +1567,7 @@ async def upload_tasks_sheet(
             # the Records table labels them "Uploaded / Imported".
             source="imported" if mode == "history" else "captured",
             unique_id=unique_id,
-            cumulative_road_distance_km=cumulative_dist,
+            
             coordinates=coords_str,
             street_address=street_address,
             land_use=land_use,
@@ -1917,8 +1916,7 @@ async def upload_tasks_sheet_stream(
 
             unique_id = row_dict.get("unique_id") or row_dict.get("uid") or ""
             cumulative_dist = (
-                row_dict.get("cumulative_road_distance_km")
-                or row_dict.get("distance_km")
+                row_dict.get("distance_km")
                 or row_dict.get("distance")
                 or ""
             )
@@ -2077,7 +2075,7 @@ async def upload_tasks_sheet_stream(
                 status=record_status,
                 source="imported" if mode == "history" else "captured",
                     unique_id=unique_id,
-                cumulative_road_distance_km=cumulative_dist,
+                
                 coordinates=coords_str,
                 street_address=street_address,
                 land_use=land_use,
@@ -2232,7 +2230,7 @@ async def download_previous_template(admin: User = Depends(require_admin)):
     headers = [
         "operator_email", "unique_id", "coordinates", "site_address",
         "street_address", "village", "taluk", "district", "survey_no", "subdivision_no",
-        "land_use", "owner_name_en", "cumulative_road_distance_km", "date_of_visit",
+        "land_use", "owner_name_en", "date_of_visit",
         "construction_happening", "type_of_construction", "stage_of_construction",
         "building_user_name", "relationship_with_building", "spoken_with", "contact_number",
         "site_contractor_architect_name", "site_contractor_architect_number", "remarks",
@@ -3084,7 +3082,7 @@ async def admin_update_record(
 
     for f in [
         "name", "description", "status",
-        "unique_id", "cumulative_road_distance_km", "coordinates",
+        "unique_id", "coordinates",
         "street_address", "land_use", "survey_no", "subdivision_no", "owner_name_en",
         "site_address", "survey_number", "sub_division", "taluk", "village", "district",
         "date_of_visit", "construction_happening", "remarks", "type_of_construction",
@@ -3275,7 +3273,6 @@ def _record_to_detail(record, errors: Optional[List[str]] = None) -> RecordDetai
         updated_by_name=getattr(record, "updated_by_name", None),
         updated_by_role=getattr(record, "updated_by_role", None),
         unique_id=getattr(record, "unique_id", None),
-        cumulative_road_distance_km=getattr(record, "cumulative_road_distance_km", None),
         coordinates=getattr(record, "coordinates", None),
         street_address=getattr(record, "street_address", None),
         land_use=getattr(record, "land_use", None),

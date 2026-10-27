@@ -202,6 +202,15 @@ export function FieldVerifierInfoModal({ record, onClose }: ModalProps) {
                 {record.field_latitude && record.field_longitude ? `${record.field_latitude.toFixed(6)}, ${record.field_longitude.toFixed(6)}` : record.coordinates || 'N/A'}
               </div>
             </div>
+            <div style={{ padding: '10px 14px', background: record.follow_up_date ? '#eff6ff' : '#f8fafc', borderRadius: 8, border: `1px solid ${record.follow_up_date ? '#bfdbfe' : '#e2e8f0'}` }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, color: record.follow_up_date ? '#1d4ed8' : '#64748b', marginBottom: 4 }}>
+                Next Revisit (Auto Reassign)
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: record.follow_up_date ? '#1d4ed8' : '#0f172a', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Icon name="event" size={14} style={{ color: record.follow_up_date ? '#2563eb' : '#64748b' }} />
+                <span>{record.follow_up_date || 'None scheduled'}</span>
+              </div>
+            </div>
           </div>
 
           {/* On-Site Findings */}
@@ -220,6 +229,7 @@ export function FieldVerifierInfoModal({ record, onClose }: ModalProps) {
               <div><strong>Contact Number:</strong> {record.contact_number || '—'}</div>
               <div><strong>Contractor/Architect:</strong> {record.site_contractor_architect_name || '—'}</div>
               <div><strong>Contractor Contact:</strong> {record.site_contractor_architect_number || '—'}</div>
+              <div><strong>Data Updated By:</strong> {record.updated_by_role ? `${record.updated_by_role} (${record.updated_by_name || 'User'})` : '—'}</div>
             </div>
             {record.remarks && (
               <div style={{ marginTop: 12, padding: 10, background: '#ffffff', borderRadius: 6, border: '1px solid #e2e8f0' }}>

@@ -511,6 +511,25 @@ export default function Records({
 
   const saveQcAssessment = async () => {
     if (!detailRecord || qcSaving) return;
+
+    // Mandatory validation: Audit Decision, QC Comments (VHR Imagery), Street view comments
+    const auditStatus = qcDraft.auditStatus?.trim();
+    const vhr = qcDraft.vhr?.trim();
+    const street = qcDraft.street?.trim();
+
+    if (!auditStatus) {
+      setQcNotice({ ok: false, text: 'Audit Decision is mandatory. Please select an audit decision.' });
+      return;
+    }
+    if (!vhr) {
+      setQcNotice({ ok: false, text: 'QC Comments (VHR Imagery) is mandatory. Please select a comment.' });
+      return;
+    }
+    if (!street) {
+      setQcNotice({ ok: false, text: 'Street view comments is mandatory. Please select a comment.' });
+      return;
+    }
+
     setQcSaving(true);
     setQcNotice(null);
     try {
@@ -1867,7 +1886,6 @@ export default function Records({
     {sortHeader('District', 'district', 115, true, 125)}
     {sortHeader('Coordinates', 'coordinates', 155, true, 165)}
     <th style={{ width: 80, minWidth: 75, maxWidth: 90 }}>Map</th>
-    <th style={{ width: 64, minWidth: 64, maxWidth: 70 }} title="Google Maps satellite image saved for this location">Satellite</th>
   </>
 ) : (
   <>
@@ -1897,6 +1915,7 @@ export default function Records({
     {sortHeader('Contractor Contact', 'site_contractor_architect_number', 125, true, 135)}
     {sortHeader('Telecaller Status', 'telecaller_status', 155, true, 170, 140)}
     {sortHeader('Telecaller Comment', 'telecaller_comment', 200, false, 240, 180)}
+    {sortHeader('Follow-up Date', 'follow_up_date', 135, true, 145)}
     {sortHeader('Village', 'village', 125, true, 135)}
     {sortHeader('Taluk', 'taluk', 115, true, 125)}
     {sortHeader('District', 'district', 115, true, 125)}
@@ -1983,7 +2002,6 @@ export default function Records({
     <td><div className="rec-text-cell"><ExpandableCellText text={r.district} /></div></td>
     <CoordinatesCell record={r} />
     <MapLinkCell url={mapLink} />
-    <SatelliteCell record={r} />
   </>
 ) : (
 <>
@@ -2360,6 +2378,31 @@ export default function Records({
   <div className="rec-text-cell">
     <ExpandableCellText text={getLatestCommentSummary(r.telecaller_comment)} />
   </div>
+</td>
+{/* Follow-up / Revisit Date (Auto Reassign) */}
+<td style={{ whiteSpace: 'nowrap' }}>
+  {r.follow_up_date ? (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '2px 8px',
+        borderRadius: 999,
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        background: '#eff6ff',
+        color: '#1d4ed8',
+        border: '1px solid #bfdbfe',
+      }}
+      title={`Auto-reassigned / Follow-up scheduled for: ${r.follow_up_date}`}
+    >
+      <Icon name="event" size={13} style={{ color: '#2563eb' }} />
+      <span>{r.follow_up_date}</span>
+    </span>
+  ) : (
+    nil
+  )}
 </td>
 {/* 20-22. Village, Taluk, District */}
 <td><div className="rec-text-cell"><ExpandableCellText text={r.village} /></div></td>
@@ -3420,8 +3463,8 @@ export default function Records({
                   )}
                 </div>
 
-                {/* Field Photos */}
-                {detailRecord.images && detailRecord.images.length > 0 && (
+                {/* Field Photos - Hidden in QA / Auditor portal */}
+                {!isAuditorView && detailRecord.images && detailRecord.images.length > 0 && (
                   <div className="auditor-card auditor-photos-card">
                     <div className="auditor-card-header">
                       <div className="auditor-card-title-wrap">
@@ -3457,8 +3500,9 @@ export default function Records({
                 <RecordWorkflowDetails record={detailRecord} />
               </div>
 
-              {/* Saved Google Maps satellite mosaic for desk review, under Imported Details */}
-              <div className="auditor-card auditor-satellite-card">
+              {/* Saved Google Maps satellite mosaic - Hidden in QA / Auditor portal */}
+              {!isAuditorView && (
+                <div className="auditor-card auditor-satellite-card">
                 <div className="auditor-card-header">
                   <div className="auditor-card-title-wrap">
                     <Icon name="satellite_alt" size={15} className="auditor-card-icon" />
@@ -3485,6 +3529,7 @@ export default function Records({
                   title={`Satellite image for record ${detailRecord.unique_id || detailRecord.id}`}
                 />
               </div>
+              )}
 
               {/* QC assessment + audit decision card */}
               {canAudit && (
@@ -3522,7 +3567,7 @@ export default function Records({
                   <div className="auditor-qc-grid">
                     <div className="auditor-form-group">
                       <label className="sub-field-label" htmlFor="qc-audit-status">
-                        Audit Decision
+                        Audit Decision <span style={{ color: "#ef4444" }}>*</span>
                       </label>
                       <CustomSelect
                         value={qcDraft.auditStatus}
@@ -3539,7 +3584,7 @@ export default function Records({
                     </div>
                     <div className="auditor-form-group">
                       <label className="sub-field-label" htmlFor="qc-vhr">
-                        QC Comments (VHR Imagery)
+                        QC Comments (VHR Imagery) <span style={{ color: "#ef4444" }}>*</span>
                       </label>
                       <CustomSelect
                         value={qcDraft.vhr}
@@ -3556,7 +3601,7 @@ export default function Records({
                     </div>
                     <div className="auditor-form-group">
                       <label className="sub-field-label" htmlFor="qc-street">
-                        Street view comments
+                        Street view comments <span style={{ color: "#ef4444" }}>*</span>
                       </label>
                       <CustomSelect
                         value={qcDraft.street}

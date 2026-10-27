@@ -104,7 +104,7 @@ class TestExcelTaskDispatch:
         NULL, intended operator parked in staged_operator_id until an auditor
         approves."""
         headers = [
-            "operator_email", "visit_order", "unique_id", "cumulative_road_distance_km",
+            "operator_email", "visit_order", "unique_id",
             "coordinates", "street_address", "land_use", "survey_no", "subdivision_no",
             "owner_name_en", "site_address", "survey_number", "sub_division", "taluk",
             "village", "district"

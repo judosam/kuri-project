@@ -65,7 +65,6 @@ class CaptureRecord(Base):
 
     # 15 Task Dispatch Planning Fields (Admin Google Sheet)
     unique_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
-    cumulative_road_distance_km: Mapped[float | None] = mapped_column(String(50), nullable=True)
     coordinates: Mapped[str | None] = mapped_column(String(100), nullable=True)
     street_address: Mapped[str | None] = mapped_column(Text, nullable=True)
     land_use: Mapped[str | None] = mapped_column(String(100), nullable=True)

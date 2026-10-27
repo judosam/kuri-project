@@ -124,7 +124,7 @@ SECTION_FIELD_MAP = {
         "id", "unique_id", "name", "source", "created_at", "coordinates",
         "site_address", "street_address", "admin_formatted_address",
         "village", "taluk", "district", "survey_no", "subdivision_no",
-        "land_use", "owner_name_en", "stage_of_construction", "no_of_floors", "built_up_area", "expected_completion", "cumulative_road_distance_km",
+        "land_use", "owner_name_en", "stage_of_construction", "no_of_floors", "built_up_area", "expected_completion",
         "staged_operator_name", "uploaded_by_name",
     ],
     # 2. DC Data
@@ -140,6 +140,7 @@ SECTION_FIELD_MAP = {
         "field_latitude", "field_longitude", "field_location_accuracy",
         "deviation_meters", "deviation_formatted", "deviation_status",
         "construction_happening", "type_of_construction", "stage_of_construction",
+        "no_of_floors", "built_up_area", "expected_completion",
         "building_user_name", "relationship_with_building", "spoken_with", "contact_number",
         "site_contractor_architect_name", "site_contractor_architect_number",
         "remarks", "photo_count", "captured_at",
@@ -153,6 +154,7 @@ SECTION_FIELD_MAP = {
     "reassign": [
         "reassigned_to_name", "reassigned_at", "revisit_status",
         "updated_coordinates", "updated_information", "follow_up_date",
+        "updated_by_role", "updated_by_name", "updated_at",
     ],
 }
 
@@ -174,8 +176,7 @@ REPORT_LABELS = {
     "subdivision_no": "Subdivision No",
     "land_use": "Land Use",
     "owner_name_en": "Owner Name",
-    "cumulative_road_distance_km": "Road Distance (km)",
-    "staged_operator_name": "Suggested Field Verifier",
+        "staged_operator_name": "Suggested Field Verifier",
     "uploaded_by_name": "Imported By",
     "assigned_auditor_name": "QA User",
     "audit_status": "QC Status",
@@ -207,6 +208,12 @@ REPORT_LABELS = {
     "construction_happening": "Construction Happening",
     "type_of_construction": "Type of Construction",
     "stage_of_construction": "Stage of Construction",
+    "no_of_floors": "No. of Floors",
+    "built_up_area": "Built-up Area",
+    "expected_completion": "Expected Completion",
+    "updated_by_role": "Data Updated By (Role)",
+    "updated_by_name": "Data Updated By (Name)",
+    "updated_at": "Data Updated Date",
     "building_user_name": "Building User",
     "relationship_with_building": "Relationship with Building",
     "spoken_with": "Spoken With",
@@ -286,6 +293,19 @@ def build_records_report(
             detail["updated_coordinates"] = getattr(record, "updated_coordinates", None)
         if "updated_information" not in detail or not detail["updated_information"]:
             detail["updated_information"] = getattr(record, "updated_information", None)
+        if "updated_by_role" not in detail or not detail["updated_by_role"]:
+            detail["updated_by_role"] = getattr(record, "updated_by_role", None)
+        if "updated_by_name" not in detail or not detail["updated_by_name"]:
+            detail["updated_by_name"] = getattr(record, "updated_by_name", None)
+        if "updated_at" not in detail or not detail["updated_at"]:
+            up_at = getattr(record, "updated_at", None)
+            detail["updated_at"] = up_at.isoformat() if hasattr(up_at, "isoformat") else (str(up_at) if up_at else None)
+        if "no_of_floors" not in detail or not detail["no_of_floors"]:
+            detail["no_of_floors"] = getattr(record, "no_of_floors", None)
+        if "built_up_area" not in detail or not detail["built_up_area"]:
+            detail["built_up_area"] = getattr(record, "built_up_area", None)
+        if "expected_completion" not in detail or not detail["expected_completion"]:
+            detail["expected_completion"] = getattr(record, "expected_completion", None)
 
         # Telecaller data fallbacks
         if "assigned_telecaller_name" not in detail or not detail["assigned_telecaller_name"]:

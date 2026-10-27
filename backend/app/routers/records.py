@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, datetime as dt, timezone as dt_timezone
+from datetime import datetime, timezone, datetime as dt, timezone as dt_timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Query, UploadFile, status
@@ -254,9 +254,18 @@ async def create_record(
                     update_data["formatted_address"] = formatted_address
                 if place_id:
                     update_data["place_id"] = place_id
+            # Auto reassign when field verification sets follow-up / revisit date
+            if request.follow_up_date and str(request.follow_up_date).strip():
+                clean_fdate = str(request.follow_up_date).strip()
+                update_data["follow_up_date"] = clean_fdate
+                update_data["revisit_status"] = "PENDING_REVISIT"
+                update_data["reassigned_at"] = datetime.now(timezone.utc)
+                update_data["reassigned_to_id"] = user.id
+
             update_data["updated_by_id"] = user.id
             update_data["updated_by_name"] = user.full_name or user.username
             update_data["updated_by_role"] = user.role.value if hasattr(user.role, 'value') else str(user.role)
+            update_data["updated_at"] = datetime.now(timezone.utc)
             record = record_service.record_repo.update(record, **update_data)
         else:
             raise HTTPException(status_code=404, detail="Assigned task is unavailable. Refresh your records before retrying.")
@@ -269,6 +278,7 @@ async def create_record(
         manual_remarks = (request.remarks.strip() or None) if (request.remarks and isinstance(request.remarks, str)) else None
         if manual_remarks and request.description and manual_remarks == request.description.strip():
             manual_remarks = None
+        f_date = str(request.follow_up_date).strip() if (request.follow_up_date and str(request.follow_up_date).strip()) else None
         record = record_service.create_record(
             user_id=user.id,
             name=request.name,
@@ -294,7 +304,13 @@ async def create_record(
             site_contractor_architect_name=request.site_contractor_architect_name,
             site_contractor_architect_number=request.site_contractor_architect_number,
             spoken_with=request.spoken_with,
-            follow_up_date=request.follow_up_date,
+            follow_up_date=f_date,
+            revisit_status="PENDING_REVISIT" if f_date else None,
+            reassigned_to_id=user.id if f_date else None,
+            reassigned_at=datetime.now(timezone.utc) if f_date else None,
+            updated_by_id=user.id,
+            updated_by_name=user.full_name or user.username,
+            updated_by_role="FIELD_VERIFIER" if (hasattr(user.role, 'value') and user.role.value == "FIELD_VERIFIER") else str(user.role),
             field_captured_at=capture_dt,
             field_latitude=cur_lat,
             field_longitude=cur_lon,
@@ -975,8 +991,7 @@ def _record_to_detail(record, errors=None) -> RecordDetail:
         status=getattr(record, "status", "NOT_COMPLETED") or "NOT_COMPLETED",
         source=getattr(record, "source", "captured") or "captured",
         unique_id=getattr(record, "unique_id", None),
-        cumulative_road_distance_km=getattr(record, "cumulative_road_distance_km", None),
-        coordinates=getattr(record, "coordinates", None),
+                coordinates=getattr(record, "coordinates", None),
         street_address=getattr(record, "street_address", None),
         land_use=getattr(record, "land_use", None),
         survey_no=getattr(record, "survey_no", None),

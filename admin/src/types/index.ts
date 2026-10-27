@@ -72,7 +72,6 @@ export interface CaptureRecord {
 
   // 15 Task Dispatch Planning Fields
   unique_id?: string;
-  cumulative_road_distance_km?: string;
   coordinates?: string;
   street_address?: string;
   land_use?: string;

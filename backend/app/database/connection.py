@@ -72,7 +72,6 @@ CREATE TABLE capture_records_new (
     field_location_accuracy FLOAT,
     field_captured_at TIMESTAMP,
     unique_id VARCHAR(100),
-    cumulative_road_distance_km VARCHAR(50),
     coordinates VARCHAR(100),
     street_address TEXT,
     land_use VARCHAR(100),

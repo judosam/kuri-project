@@ -173,3 +173,84 @@ def test_telecaller_history_table_format(db, client):
     assert saved_comment.startswith("| Date & Time | Caller |")
     assert "Testing automated table format saving" in saved_comment
     assert "Connected Follow Up" in saved_comment
+
+
+def test_auto_reassign_on_field_follow_up_date(client, db):
+    """When field verifier sets follow_up_date, record must auto-reassign for revisit."""
+    auth_svc = AuthService(db)
+    verifier = db.query(User).filter(User.role == UserRole.FIELD_VERIFIER).first()
+    if not verifier:
+        verifier = db.query(User).filter(User.role == UserRole.USER).first()
+    token = auth_svc.create_token(verifier)
+
+    record = CaptureRecord(
+        user_id=verifier.id,
+        name="Auto Reassign Test Site",
+        source="captured",
+        unique_id="TEST-AUTOREASSIGN-001",
+        status="NOT_COMPLETED",
+        coordinates="11.012345, 76.987654",
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
+    try:
+        res = client.post(
+            "/api/records",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "task_id": record.id,
+                "name": "Auto Reassign Test Site",
+                "date_of_visit": "2026-10-27",
+                "stage_of_construction": "Roof slab",
+                "no_of_floors": "G+2",
+                "built_up_area": "3,200 sq.ft",
+                "expected_completion": "Dec 2026",
+                "follow_up_date": "2026-11-15",
+                "remarks": "Site progressing well, revisit scheduled",
+                "photos": [],
+            },
+        )
+        assert res.status_code == 201
+        db.refresh(record)
+        assert record.follow_up_date == "2026-11-15"
+        assert record.revisit_status == "PENDING_REVISIT"
+        assert record.reassigned_to_id == verifier.id
+        assert record.reassigned_at is not None
+        assert record.no_of_floors == "G+2"
+        assert record.built_up_area == "3,200 sq.ft"
+        assert record.expected_completion == "Dec 2026"
+        assert record.updated_by_id == verifier.id
+    finally:
+        db.delete(record)
+        db.commit()
+
+
+def test_cumulative_road_distance_km_removed():
+    """cumulative_road_distance_km must be completely removed from CaptureRecord model."""
+    assert not hasattr(CaptureRecord, "cumulative_road_distance_km")
+
+
+def test_excel_export_updater_attribution_and_floors(client, db):
+    """Excel export must include No. of Floors, Built-up Area, Expected Completion, and Updater Attribution."""
+    admin = db.query(User).filter(User.role == UserRole.ADMIN).first()
+    auth_svc = AuthService(db)
+    token = auth_svc.create_token(admin)
+
+    res = client.get(
+        "/api/admin/records/export",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 200
+    wb = openpyxl.load_workbook(io.BytesIO(res.content))
+    sheet = wb["Inspections Report"]
+    headers = [cell.value for cell in sheet[1]]
+
+    assert "No. of Floors" in headers
+    assert "Built-up Area" in headers
+    assert "Expected Completion" in headers
+    assert "Data Updated By (Role)" in headers
+    assert "Data Updated By (Name)" in headers
+    assert "Data Updated Date" in headers
+    assert "Road Distance (km)" not in headers

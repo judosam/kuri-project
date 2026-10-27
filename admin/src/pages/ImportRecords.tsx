@@ -464,7 +464,7 @@ export default function ImportRecords({ canImportHistory = false }: { canImportH
             </div>
             <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6, color: '#475569' }}>
               <li>
-                <strong>Template Columns:</strong> <code>unique_id</code>, <code>coordinates</code> (lat, lng), <code>site_address</code>, <code>street_address</code>, <code>village</code>, <code>taluk</code>, <code>district</code>, <code>survey_no</code>, <code>subdivision_no</code>, <code>land_use</code>, <code>owner_name_en</code>, <code>visit_order</code>, <code>cumulative_road_distance_km</code>, <code>auditor_email</code>, <code>operator_email</code>.
+                <strong>Template Columns:</strong> <code>unique_id</code>, <code>coordinates</code> (lat, lng), <code>site_address</code>, <code>street_address</code>, <code>village</code>, <code>taluk</code>, <code>district</code>, <code>survey_no</code>, <code>subdivision_no</code>, <code>land_use</code>, <code>owner_name_en</code>, <code>visit_order</code>, <code>auditor_email</code>, <code>operator_email</code>.
               </li>
               <li>
                 <strong>Optional Assignments:</strong> Both <code>auditor_email</code> and <code>operator_email</code> are optional. If left blank, tasks are imported into the QA pool as unassigned pending records, ready for assignment at any time.

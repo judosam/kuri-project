@@ -48,7 +48,6 @@ export interface CaptureRecord {
   // 15 Planning fields
   visit_order?: number;
   unique_id?: string;
-  cumulative_road_distance_km?: string;
   coordinates?: string;
   street_address?: string;
   land_use?: string;
