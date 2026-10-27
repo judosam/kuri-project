@@ -271,6 +271,10 @@ export default function FormScreen({
       }
     }
 
+    if (constructionHappening === 'No' && (!remarks || !remarks.trim())) {
+      newErrors.remarks = 'Remarks are mandatory when construction is not happening.';
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setFieldErrors(newErrors);
       if (newErrors.photos) {
@@ -1241,16 +1245,31 @@ export default function FormScreen({
             {/* 9. Field Remarks / Notes */}
             <div className="form-group">
               <label className="form-label" htmlFor="field-remarks">
-                9. Field Remarks & Observations
+                9. Field Remarks & Observations {constructionHappening === 'No' && <span style={{ color: '#ef4444' }}>* (Mandatory when construction is No)</span>}
               </label>
               <textarea
                 id="field-remarks"
-                className="form-input"
+                className={`form-input ${fieldErrors.remarks ? 'input-error' : ''}`}
+                style={fieldErrors.remarks ? { borderColor: '#ef4444' } : undefined}
                 rows={3}
                 value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder="Observations regarding progress, weather, site access, deviations..."
+                onChange={(e) => {
+                  setRemarks(e.target.value);
+                  if (fieldErrors.remarks) {
+                    setFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.remarks;
+                      return next;
+                    });
+                  }
+                }}
+                placeholder={constructionHappening === 'No' ? 'Please explain why construction is not happening (Mandatory)...' : 'Observations regarding progress, weather, site access, deviations...'}
               />
+              {fieldErrors.remarks && (
+                <span style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem', display: 'block' }}>
+                  {fieldErrors.remarks}
+                </span>
+              )}
             </div>
 
             {/* 10. Follow-up Date (Next Revisit) */}

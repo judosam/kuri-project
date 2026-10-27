@@ -228,6 +228,9 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
     date_of_visit: '',
     type_of_construction: '',
     stage_of_construction: '',
+    no_of_floors: '',
+    built_up_area: '',
+    expected_completion: '',
     relationship_with_building: '',
     building_user_name: '',
     spoken_with: '',
@@ -550,6 +553,9 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
           date_of_visit: data.date_of_visit || '',
           type_of_construction: data.type_of_construction || '',
           stage_of_construction: data.stage_of_construction || '',
+          no_of_floors: data.no_of_floors || '',
+          built_up_area: data.built_up_area || '',
+          expected_completion: data.expected_completion || '',
           relationship_with_building: data.relationship_with_building || '',
           building_user_name: data.building_user_name || '',
           spoken_with: data.spoken_with || '',
@@ -692,6 +698,9 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
         date_of_visit: fieldDraft.date_of_visit || undefined,
         type_of_construction: fieldDraft.type_of_construction.trim() || undefined,
         stage_of_construction: fieldDraft.stage_of_construction.trim() || undefined,
+        no_of_floors: fieldDraft.no_of_floors.trim() || undefined,
+        built_up_area: fieldDraft.built_up_area.trim() || undefined,
+        expected_completion: fieldDraft.expected_completion.trim() || undefined,
         relationship_with_building: fieldDraft.relationship_with_building.trim() || undefined,
         building_user_name: fieldDraft.building_user_name.trim() || undefined,
         spoken_with: fieldDraft.spoken_with.trim() || undefined,
@@ -1673,6 +1682,9 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                               date_of_visit: record.date_of_visit || '',
                               type_of_construction: record.type_of_construction || '',
                               stage_of_construction: record.stage_of_construction || '',
+                              no_of_floors: record.no_of_floors || '',
+                              built_up_area: record.built_up_area || '',
+                              expected_completion: record.expected_completion || '',
                               relationship_with_building: record.relationship_with_building || '',
                               building_user_name: record.building_user_name || '',
                               spoken_with: record.spoken_with || '',
@@ -1809,6 +1821,48 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                               onChange={(e) => setFieldDraft((d) => ({ ...d, stage_of_construction: e.target.value }))}
                             />
                           )}
+                        </div>
+
+                        <div>
+                          <label className="sub-field-label" htmlFor="fld-no-floors" style={{ display: 'block', marginBottom: 4 }}>
+                            No. of Floors
+                          </label>
+                          <input
+                            id="fld-no-floors"
+                            type="text"
+                            className="fld"
+                            placeholder="e.g. G+1, G+2..."
+                            value={fieldDraft.no_of_floors}
+                            onChange={(e) => setFieldDraft((d) => ({ ...d, no_of_floors: e.target.value }))}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="sub-field-label" htmlFor="fld-built-up-area" style={{ display: 'block', marginBottom: 4 }}>
+                            Built-up Area (Sq.ft)
+                          </label>
+                          <input
+                            id="fld-built-up-area"
+                            type="text"
+                            className="fld"
+                            placeholder="e.g. 2400 sq.ft"
+                            value={fieldDraft.built_up_area}
+                            onChange={(e) => setFieldDraft((d) => ({ ...d, built_up_area: e.target.value }))}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="sub-field-label" htmlFor="fld-expected-completion" style={{ display: 'block', marginBottom: 4 }}>
+                            Expected Completion
+                          </label>
+                          <input
+                            id="fld-expected-completion"
+                            type="text"
+                            className="fld"
+                            placeholder="e.g. Dec 2025"
+                            value={fieldDraft.expected_completion}
+                            onChange={(e) => setFieldDraft((d) => ({ ...d, expected_completion: e.target.value }))}
+                          />
                         </div>
 
                         <div>

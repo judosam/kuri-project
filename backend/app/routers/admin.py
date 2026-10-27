@@ -3087,6 +3087,7 @@ async def admin_update_record(
         "site_address", "survey_number", "sub_division", "taluk", "village", "district",
         "date_of_visit", "construction_happening", "remarks", "type_of_construction",
         "relationship_with_building", "building_user_name", "spoken_with", "contact_number", "stage_of_construction",
+        "no_of_floors", "built_up_area", "expected_completion",
         "site_contractor_architect_name", "site_contractor_architect_number", "follow_up_date",
         "audit_status", "audit_comment",
         "qc_vhr_comment", "qc_street_details", "qc_builder_contact", "qc_sqfeet",

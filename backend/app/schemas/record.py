@@ -51,6 +51,9 @@ class RecordCreateRequest(BaseModel):
     building_user_name: Optional[str] = None
     contact_number: Optional[str] = None
     stage_of_construction: Optional[str] = None
+    no_of_floors: Optional[str] = None
+    built_up_area: Optional[str] = None
+    expected_completion: Optional[str] = None
     site_contractor_architect_name: Optional[str] = None
     site_contractor_architect_number: Optional[str] = None
     spoken_with: Optional[str] = None
@@ -461,6 +464,9 @@ class RecordUpdateRequest(BaseModel):
     building_user_name: Optional[str] = None
     contact_number: Optional[str] = None
     stage_of_construction: Optional[str] = None
+    no_of_floors: Optional[str] = None
+    built_up_area: Optional[str] = None
+    expected_completion: Optional[str] = None
     site_contractor_architect_name: Optional[str] = None
     site_contractor_architect_number: Optional[str] = None
     spoken_with: Optional[str] = None

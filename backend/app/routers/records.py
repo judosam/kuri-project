@@ -96,6 +96,12 @@ async def create_record(
             raise HTTPException(status_code=404, detail="Assigned task is unavailable. Refresh your records before retrying.")
         was_completed = existing.status == "COMPLETED"
 
+    if (
+        getattr(request, "construction_happening", None) in ("No", "NO", "no")
+        and not (getattr(request, "remarks", None) and getattr(request, "remarks", "").strip())
+    ):
+        raise HTTPException(status_code=400, detail="Remarks are mandatory when construction is not happening.")
+
     # Resolve location from first photo's GPS; inspections completed without
     # photos send a standalone device fix instead.
     location_name = formatted_address = place_id = None

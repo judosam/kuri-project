@@ -180,7 +180,7 @@ def test_auto_reassign_on_field_follow_up_date(client, db):
     auth_svc = AuthService(db)
     verifier = db.query(User).filter(User.role == UserRole.FIELD_VERIFIER).first()
     if not verifier:
-        verifier = db.query(User).filter(User.role == UserRole.USER).first()
+        verifier = db.query(User).filter(User.role.in_([UserRole.FIELD_VERIFIER, UserRole.USER])).first()
     token = auth_svc.create_token(verifier)
 
     record = CaptureRecord(
@@ -254,3 +254,84 @@ def test_excel_export_updater_attribution_and_floors(client, db):
     assert "Data Updated By (Name)" in headers
     assert "Data Updated Date" in headers
     assert "Road Distance (km)" not in headers
+
+
+def test_mandatory_remarks_when_construction_not_happening(client, db):
+    """When construction_happening == 'No', remarks must be strictly mandatory."""
+    verifier = db.query(User).filter(User.role.in_([UserRole.FIELD_VERIFIER, UserRole.USER])).first()
+    auth_svc = AuthService(db)
+    token = auth_svc.create_token(verifier)
+
+    rec = CaptureRecord(
+        name="Test No Construction",
+        user_id=verifier.id,
+        status="PENDING",
+    )
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+
+    try:
+        # Attempt without remarks -> HTTP 400
+        res = client.post(
+            "/api/records",
+            json={
+                "task_id": rec.id,
+                "name": "Test No Construction",
+                "construction_happening": "No",
+                "remarks": "",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert res.status_code == 400
+        assert "Remarks are mandatory" in res.json()["detail"]
+
+        # Attempt with valid remarks -> HTTP 200/201
+        res2 = client.post(
+            "/api/records",
+            json={
+                "task_id": rec.id,
+                "name": "Test No Construction",
+                "construction_happening": "No",
+                "remarks": "Site is currently vacant, foundation work not started yet.",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert res2.status_code in (200, 201)
+    finally:
+        db.delete(rec)
+        db.commit()
+
+
+def test_admin_update_floors_and_specs(client, db):
+    """Admin update endpoint must persist no_of_floors, built_up_area, expected_completion."""
+    admin = db.query(User).filter(User.role == UserRole.ADMIN).first()
+    auth_svc = AuthService(db)
+    token = auth_svc.create_token(admin)
+
+    rec = CaptureRecord(
+        name="Test Floors Spec",
+        status="COMPLETED",
+    )
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+
+    try:
+        res = client.put(
+            f"/api/admin/records/{rec.id}",
+            json={
+                "no_of_floors": "G+3",
+                "built_up_area": "4200 sq.ft",
+                "expected_completion": "March 2026",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["no_of_floors"] == "G+3"
+        assert data["built_up_area"] == "4200 sq.ft"
+        assert data["expected_completion"] == "March 2026"
+    finally:
+        db.delete(rec)
+        db.commit()

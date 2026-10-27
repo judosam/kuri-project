@@ -1889,7 +1889,6 @@ export default function Records({
   </>
 ) : (
   <>
-    <th style={{ width: 175, minWidth: 165, maxWidth: 195, textAlign: 'center' }}>Quick Modals</th>
     {sortHeader('Unique ID', 'unique_id', 135, true, 140)}
     {sortHeader('Last Modified Date', 'last_modified_at', 172, true, 185, 165)}
     {sortHeader('QC Status', 'qc_status', 125, true, 135, 115)}
@@ -1922,6 +1921,7 @@ export default function Records({
     {sortHeader('Coordinates', 'coordinates', 155, true, 165)}
     <th style={{ width: 145, minWidth: 140, maxWidth: 155 }}>Location Verification</th>
     <th style={{ width: 64, minWidth: 64, maxWidth: 70 }} title="Google Maps satellite image saved for this location">Satellite</th>
+    <th style={{ width: 175, minWidth: 165, maxWidth: 195, textAlign: 'center' }}>Quick Modals</th>
   </>
 )}
 </tr>
@@ -2018,88 +2018,6 @@ export default function Records({
                           title="Select this record"
                         />
                       </td>}
-{/* Quick Modals Column with 3 dedicated buttons */}
-<td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
-  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-    <button
-      type="button"
-      className="btn btn-secondary btn-sm"
-      style={{
-        padding: '3px 8px',
-        fontSize: '0.72rem',
-        fontWeight: 600,
-        height: 28,
-        minHeight: 28,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        background: r.telecaller_status ? '#eff6ff' : '#f8fafc',
-        border: `1px solid ${r.telecaller_status ? '#bfdbfe' : '#e2e8f0'}`,
-        color: r.telecaller_status ? '#1d4ed8' : '#475569',
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        setTelecallingModalRecord(r);
-      }}
-      title="View Telecalling Information"
-    >
-      <Icon name="call" size={13} style={{ color: r.telecaller_status ? '#2563eb' : '#64748b' }} />
-      <span>Telecalling</span>
-    </button>
-
-    <button
-      type="button"
-      className="btn btn-secondary btn-sm"
-      style={{
-        padding: '3px 8px',
-        fontSize: '0.72rem',
-        fontWeight: 600,
-        height: 28,
-        minHeight: 28,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        background: isComplete ? '#ecfdf5' : '#f8fafc',
-        border: `1px solid ${isComplete ? '#a7f3d0' : '#e2e8f0'}`,
-        color: isComplete ? '#047857' : '#475569',
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        setVerifierModalRecord(r);
-      }}
-      title="View Field Verifier Information"
-    >
-      <Icon name="photo_camera" size={13} style={{ color: isComplete ? '#059669' : '#64748b' }} />
-      <span>Verifier</span>
-    </button>
-
-    <button
-      type="button"
-      className="btn btn-secondary btn-sm"
-      style={{
-        padding: '3px 8px',
-        fontSize: '0.72rem',
-        fontWeight: 600,
-        height: 28,
-        minHeight: 28,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        background: r.audit_status === 'APPROVAL' ? '#ecfdf5' : r.audit_status === 'DISAPPROVAL' ? '#fef2f2' : '#f8fafc',
-        border: `1px solid ${r.audit_status === 'APPROVAL' ? '#a7f3d0' : r.audit_status === 'DISAPPROVAL' ? '#fecaca' : '#e2e8f0'}`,
-        color: r.audit_status === 'APPROVAL' ? '#047857' : r.audit_status === 'DISAPPROVAL' ? '#b91c1c' : '#475569',
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        setQaModalRecord(r);
-      }}
-      title="View QA & Audit Information"
-    >
-      <Icon name="fact_check" size={13} style={{ color: r.audit_status === 'APPROVAL' ? '#059669' : r.audit_status === 'DISAPPROVAL' ? '#dc2626' : '#64748b' }} />
-      <span>QA</span>
-    </button>
-  </div>
-</td>
 {/* 1. Unique ID — the record key operators quote on the phone. */}
 <td className="col-unique-id">
   {r.unique_id ? (
@@ -2454,6 +2372,88 @@ export default function Records({
 </td>
 {/* 25. Satellite — the saved Google Maps mosaic for this location. */}
 <SatelliteCell record={r} />
+{/* Quick Modals Column with 3 dedicated buttons */}
+<td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+    <button
+      type="button"
+      className="btn btn-secondary btn-sm"
+      style={{
+        padding: '3px 8px',
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        height: 28,
+        minHeight: 28,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        background: r.telecaller_status ? '#eff6ff' : '#f8fafc',
+        border: `1px solid ${r.telecaller_status ? '#bfdbfe' : '#e2e8f0'}`,
+        color: r.telecaller_status ? '#1d4ed8' : '#475569',
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        setTelecallingModalRecord(r);
+      }}
+      title="View Telecalling Information"
+    >
+      <Icon name="call" size={13} style={{ color: r.telecaller_status ? '#2563eb' : '#64748b' }} />
+      <span>Telecalling</span>
+    </button>
+
+    <button
+      type="button"
+      className="btn btn-secondary btn-sm"
+      style={{
+        padding: '3px 8px',
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        height: 28,
+        minHeight: 28,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        background: isComplete ? '#ecfdf5' : '#f8fafc',
+        border: `1px solid ${isComplete ? '#a7f3d0' : '#e2e8f0'}`,
+        color: isComplete ? '#047857' : '#475569',
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        setVerifierModalRecord(r);
+      }}
+      title="View Field Verifier Information"
+    >
+      <Icon name="photo_camera" size={13} style={{ color: isComplete ? '#059669' : '#64748b' }} />
+      <span>Verifier</span>
+    </button>
+
+    <button
+      type="button"
+      className="btn btn-secondary btn-sm"
+      style={{
+        padding: '3px 8px',
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        height: 28,
+        minHeight: 28,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        background: r.audit_status === 'APPROVAL' ? '#ecfdf5' : r.audit_status === 'DISAPPROVAL' ? '#fef2f2' : '#f8fafc',
+        border: `1px solid ${r.audit_status === 'APPROVAL' ? '#a7f3d0' : r.audit_status === 'DISAPPROVAL' ? '#fecaca' : '#e2e8f0'}`,
+        color: r.audit_status === 'APPROVAL' ? '#047857' : r.audit_status === 'DISAPPROVAL' ? '#b91c1c' : '#475569',
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        setQaModalRecord(r);
+      }}
+      title="View QA & Audit Information"
+    >
+      <Icon name="fact_check" size={13} style={{ color: r.audit_status === 'APPROVAL' ? '#059669' : r.audit_status === 'DISAPPROVAL' ? '#dc2626' : '#64748b' }} />
+      <span>QA</span>
+    </button>
+  </div>
+</td>
 </>
 )}
                     </tr>
