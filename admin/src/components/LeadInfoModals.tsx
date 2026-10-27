@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { CaptureRecord } from '../types';
 import { Icon } from './ui';
 import { TelecallerHistoryTable } from './TelecallerHistoryTable';
@@ -9,10 +10,41 @@ interface ModalProps {
 }
 
 export function TelecallingInfoModal({ record, onClose }: ModalProps) {
-  return (
-    <div className="fos-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="fos-modal-card" style={{ maxWidth: 760, width: '95%' }} onClick={(e) => e.stopPropagation()}>
-        <div className="fos-modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+  return createPortal(
+    <div
+      className="fos-modal-overlay"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(3px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: 16,
+      }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="fos-modal-card"
+        style={{
+          background: '#ffffff',
+          borderRadius: 14,
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          maxWidth: 780,
+          width: '100%',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          border: '1px solid #e2e8f0',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ display: 'flex', padding: 8, borderRadius: 8, background: '#eff6ff', color: '#2563eb' }}>
               <Icon name="call" size={20} />
@@ -22,14 +54,14 @@ export function TelecallingInfoModal({ record, onClose }: ModalProps) {
               <div style={{ fontSize: 12, color: '#64748b' }}>Lead: {record.unique_id || record.id} • {record.name || 'Site Lead'}</div>
             </div>
           </div>
-          <button type="button" className="btn-icon" onClick={onClose} title="Close" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} title="Close" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b', padding: 4 }}>
             <Icon name="close" size={20} />
           </button>
         </div>
 
-        <div className="fos-modal-body" style={{ padding: '20px', maxHeight: '75vh', overflowY: 'auto' }}>
+        <div style={{ padding: '20px', maxHeight: '75vh', overflowY: 'auto' }}>
           {/* Key Info Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 20 }}>
             <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, color: '#64748b', marginBottom: 4 }}>Telecaller</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{record.assigned_telecaller_name || record.telecaller_by_name || 'Unassigned'}</div>
@@ -59,7 +91,7 @@ export function TelecallingInfoModal({ record, onClose }: ModalProps) {
           {/* Construction details synced */}
           <div style={{ padding: '12px 14px', background: '#f1f5f9', borderRadius: 8, marginBottom: 20 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 8 }}>Synced Construction Details</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, fontSize: 12 }}>
               <div><strong>Stage:</strong> {record.stage_of_construction || '—'}</div>
               <div><strong>Floors:</strong> {record.no_of_floors || '—'}</div>
               <div><strong>Built-up Area:</strong> {record.built_up_area || '—'}</div>
@@ -81,11 +113,12 @@ export function TelecallingInfoModal({ record, onClose }: ModalProps) {
           </div>
         </div>
 
-        <div className="fos-modal-footer" style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', background: '#f8fafc' }}>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', background: '#f8fafc' }}>
           <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -93,10 +126,41 @@ export function FieldVerifierInfoModal({ record, onClose }: ModalProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const images = record.images || [];
 
-  return (
-    <div className="fos-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="fos-modal-card" style={{ maxWidth: 720, width: '95%' }} onClick={(e) => e.stopPropagation()}>
-        <div className="fos-modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+  return createPortal(
+    <div
+      className="fos-modal-overlay"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(3px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: 16,
+      }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="fos-modal-card"
+        style={{
+          background: '#ffffff',
+          borderRadius: 14,
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          maxWidth: 780,
+          width: '100%',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          border: '1px solid #e2e8f0',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ display: 'flex', padding: 8, borderRadius: 8, background: '#ecfdf5', color: '#059669' }}>
               <Icon name="photo_camera" size={20} />
@@ -106,14 +170,14 @@ export function FieldVerifierInfoModal({ record, onClose }: ModalProps) {
               <div style={{ fontSize: 12, color: '#64748b' }}>Lead: {record.unique_id || record.id} • {record.name || 'Site Lead'}</div>
             </div>
           </div>
-          <button type="button" className="btn-icon" onClick={onClose} title="Close" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} title="Close" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b', padding: 4 }}>
             <Icon name="close" size={20} />
           </button>
         </div>
 
-        <div className="fos-modal-body" style={{ padding: '20px', maxHeight: '75vh', overflowY: 'auto' }}>
+        <div style={{ padding: '20px', maxHeight: '75vh', overflowY: 'auto' }}>
           {/* Key Info Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 20 }}>
             <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, color: '#64748b', marginBottom: 4 }}>Field Verifier</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{record.user_name || 'Unassigned'}</div>
@@ -196,7 +260,19 @@ export function FieldVerifierInfoModal({ record, onClose }: ModalProps) {
 
         {/* Full Image Preview Overlay */}
         {selectedImage && (
-          <div className="fos-modal-overlay" style={{ zIndex: 999 }} onClick={() => setSelectedImage(null)}>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.85)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 100000,
+              padding: 20,
+            }}
+            onClick={() => setSelectedImage(null)}
+          >
             <div style={{ maxWidth: '90vw', maxHeight: '90vh', position: 'relative' }}>
               <img src={selectedImage} alt="Full preview" style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: 8 }} />
               <button
@@ -211,21 +287,53 @@ export function FieldVerifierInfoModal({ record, onClose }: ModalProps) {
           </div>
         )}
 
-        <div className="fos-modal-footer" style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', background: '#f8fafc' }}>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', background: '#f8fafc' }}>
           <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
 export function QaInfoModal({ record, onClose }: ModalProps) {
   const qcRefImg = record.qc_reference_image_url;
 
-  return (
-    <div className="fos-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="fos-modal-card" style={{ maxWidth: 640, width: '95%' }} onClick={(e) => e.stopPropagation()}>
-        <div className="fos-modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+  return createPortal(
+    <div
+      className="fos-modal-overlay"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(3px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: 16,
+      }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="fos-modal-card"
+        style={{
+          background: '#ffffff',
+          borderRadius: 14,
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          maxWidth: 700,
+          width: '100%',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          border: '1px solid #e2e8f0',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ display: 'flex', padding: 8, borderRadius: 8, background: '#fef3c7', color: '#d97706' }}>
               <Icon name="fact_check" size={20} />
@@ -235,14 +343,14 @@ export function QaInfoModal({ record, onClose }: ModalProps) {
               <div style={{ fontSize: 12, color: '#64748b' }}>Lead: {record.unique_id || record.id} • {record.name || 'Site Lead'}</div>
             </div>
           </div>
-          <button type="button" className="btn-icon" onClick={onClose} title="Close" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} title="Close" style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b', padding: 4 }}>
             <Icon name="close" size={20} />
           </button>
         </div>
 
-        <div className="fos-modal-body" style={{ padding: '20px', maxHeight: '75vh', overflowY: 'auto' }}>
+        <div style={{ padding: '20px', maxHeight: '75vh', overflowY: 'auto' }}>
           {/* Key Info Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 20 }}>
             <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, color: '#64748b', marginBottom: 4 }}>QA Auditor</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{record.assigned_auditor_name || record.audited_by_name || 'Unassigned'}</div>
@@ -314,10 +422,11 @@ export function QaInfoModal({ record, onClose }: ModalProps) {
           )}
         </div>
 
-        <div className="fos-modal-footer" style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', background: '#f8fafc' }}>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', background: '#f8fafc' }}>
           <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
