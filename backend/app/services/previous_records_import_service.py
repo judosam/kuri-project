@@ -48,7 +48,6 @@ KEY_COLUMNS = {
 
 # 15 task/site planning columns — accepted as written.
 PLANNING_COLUMNS = (
-    "visit_order",
     "unique_id",
     "cumulative_road_distance_km",
     "street_address",
@@ -176,7 +175,6 @@ class ImportRow:
             "operator_email": self.operator_email,
             "operator_name": self.operator_name,
             "unique_id": self.values.get("unique_id", ""),
-            "visit_order": self.values.get("visit_order"),
             "site_address": self.values.get("site_address") or self.values.get("street_address", ""),
             "street_address": self.values.get("street_address", ""),
             "survey_no": self.values.get("survey_no", ""),
@@ -303,7 +301,6 @@ class PreviousRecordsImportService:
         row = ImportRow(row_number=row_number)
         row.values = {
             "unique_id": (record.get("unique_id") or "").strip(),
-            "visit_order": self._parse_int(record.get("visit_order")),
             "cumulative_road_distance_km": (record.get("cumulative_road_distance_km") or "").strip(),
             "coordinates": "",
             "street_address": (record.get("street_address") or "").strip(),
@@ -510,7 +507,6 @@ class PreviousRecordsImportService:
                 description=description,
                 status="COMPLETED",
                 source="imported",
-                visit_order=values["visit_order"],
                 unique_id=values["unique_id"] or None,
                 cumulative_road_distance_km=values["cumulative_road_distance_km"] or None,
                 coordinates=values["coordinates"] or None,

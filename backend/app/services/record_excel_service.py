@@ -124,7 +124,7 @@ SECTION_FIELD_MAP = {
         "id", "unique_id", "name", "source", "created_at", "coordinates",
         "site_address", "street_address", "admin_formatted_address",
         "village", "taluk", "district", "survey_no", "subdivision_no",
-        "land_use", "owner_name_en", "visit_order", "cumulative_road_distance_km",
+        "land_use", "owner_name_en", "stage_of_construction", "no_of_floors", "built_up_area", "expected_completion", "cumulative_road_distance_km",
         "staged_operator_name", "uploaded_by_name",
     ],
     # 2. DC Data
@@ -174,7 +174,6 @@ REPORT_LABELS = {
     "subdivision_no": "Subdivision No",
     "land_use": "Land Use",
     "owner_name_en": "Owner Name",
-    "visit_order": "Visit Order",
     "cumulative_road_distance_km": "Road Distance (km)",
     "staged_operator_name": "Suggested Field Verifier",
     "uploaded_by_name": "Imported By",

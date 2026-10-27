@@ -852,12 +852,13 @@ export default function RecordsScreen({
 
                     <button
                       type="button"
-                      className="btn btn-secondary btn-sm"
-                      style={{ padding: '4px 7px', fontSize: '0.74rem', minHeight: 30, height: 30, justifyContent: 'center' }}
+                      className="btn btn-secondary btn-sm mark-status-touch-btn"
+                      style={{ padding: '6px 12px', fontSize: '0.82rem', fontWeight: 600, minHeight: 38, height: 38, display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 8, background: '#f8fafc', border: '1.5px solid #cbd5e1', color: '#334155' }}
                       onClick={() => setMarkStatusRecord(item)}
                       title="Mark Status (Not Interested / Duplicate / Finished)"
                     >
-                      <Icon name="label" size={14} color="#64748b" />
+                      <Icon name="label" size={15} color="#475569" />
+                      <span>Status</span>
                     </button>
                   </div>
                 ) : (
@@ -897,13 +898,13 @@ export default function RecordsScreen({
                     )}
                     <button
                       type="button"
-                      className="btn btn-secondary btn-sm"
+                      className="btn btn-secondary btn-sm mark-status-touch-btn"
                       onClick={() => setMarkStatusRecord(item)}
-                      style={{ justifyContent: 'center', fontSize: '0.74rem', minHeight: 30, height: 30, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                      style={{ flex: 1, justifyContent: 'center', fontSize: '0.82rem', fontWeight: 600, minHeight: 38, height: 38, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 8, background: '#f8fafc', border: '1.5px solid #cbd5e1', color: '#334155' }}
                       title="Mark or Change Status"
                     >
-                      <Icon name="label" size={14} color="#64748b" />
-                      <span>Status</span>
+                      <Icon name="label" size={15} color="#475569" />
+                      <span>Mark Status</span>
                     </button>
                   </div>
                 )}

@@ -22,7 +22,7 @@ FILTER_FIELDS = {
     "unique_id", "coordinates", "assigned_at", "qc_completed_at", "last_modified_at", "follow_up_date", "revisit_status",
 }
 SORT_KEYS = FILTER_FIELDS | {
-    "id", "user_id", "visit_order", "created_at",
+    "id", "user_id", "created_at",
     "qc_edited_at", "audited_at", "telecaller_called_at",
     "updated_at",
 }
@@ -58,7 +58,7 @@ def filter_column(field: str):
     if field == "status":
         is_completed = or_(
             CaptureRecord.status.in_(["COMPLETED", "Updated Revisited", "UPDATED_REVISITED"]),
-            CaptureRecord.revisit_status == "COMPLETED",
+            func.coalesce(CaptureRecord.revisit_status, "") == "COMPLETED",
         )
         is_revisited = and_(
             is_completed,
@@ -208,7 +208,7 @@ def filtered_query(db, **filters):
         st = filters["status"].upper()
         is_completed = or_(
             CaptureRecord.status.in_(["COMPLETED", "Updated Revisited", "UPDATED_REVISITED"]),
-            CaptureRecord.revisit_status == "COMPLETED",
+            func.coalesce(CaptureRecord.revisit_status, "") == "COMPLETED",
         )
         is_not_interested = or_(
             CaptureRecord.status.in_(["NOT_INTERESTED", "Not Interested"]),

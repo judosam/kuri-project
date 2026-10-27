@@ -192,7 +192,7 @@ async def create_record(
                 "status": target_status,
                 "field_captured_at": capture_dt,
             }
-            if cur_lat is not None and cur_lon is not None and (cur_lat != 0 or cur_lon != 0):
+            if not request.photos and cur_lat is not None and cur_lon is not None and (cur_lat != 0 or cur_lon != 0):
                 update_data["field_latitude"] = cur_lat
                 update_data["field_longitude"] = cur_lon
                 if cur_acc is not None:
@@ -254,6 +254,9 @@ async def create_record(
                     update_data["formatted_address"] = formatted_address
                 if place_id:
                     update_data["place_id"] = place_id
+            update_data["updated_by_id"] = user.id
+            update_data["updated_by_name"] = user.full_name or user.username
+            update_data["updated_by_role"] = user.role.value if hasattr(user.role, 'value') else str(user.role)
             record = record_service.record_repo.update(record, **update_data)
         else:
             raise HTTPException(status_code=404, detail="Assigned task is unavailable. Refresh your records before retrying.")
@@ -719,6 +722,11 @@ async def mark_record_status(
             else:
                 record.remarks = f"[Status: {canonical_status}] {cleaned_remarks}"
 
+    record.updated_by_id = user.id
+    record.updated_by_name = user.full_name or user.username
+    record.updated_by_role = user.role.value if hasattr(user.role, 'value') else str(user.role)
+    record.updated_at = datetime.now(timezone.utc)
+
     db.commit()
     db.refresh(record)
 
@@ -821,11 +829,25 @@ async def serve_record_qc_reference_image(
     if not record.qc_reference_image_key:
         raise HTTPException(status_code=404, detail="QC reference image not found")
 
+    import os
+    from pathlib import Path
     local = LocalStorageService()
     file_path = local.get_thumbnail_path(record.qc_reference_image_key) if thumb else None
     if not file_path:
         file_path = local.get_file_path(record.qc_reference_image_key)
-    if not file_path:
+    if not file_path or not os.path.exists(file_path):
+        try:
+            drive = GoogleDriveService()
+            if drive.service:
+                filename = Path(record.qc_reference_image_key).name
+                file_bytes = drive.download_file_by_name(filename, folder_path="qc_reference")
+                if file_bytes:
+                    saved_path = local.save_file(file_bytes, filename, folder="qc_reference")
+                    file_path = local.get_file_path(saved_path)
+        except Exception as e:
+            logger.warning(f"Google Drive fallback failed for QC ref image: {e}")
+
+    if not file_path or not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Reference image file not found on disk")
 
     return FileResponse(
@@ -952,7 +974,6 @@ def _record_to_detail(record, errors=None) -> RecordDetail:
         field_captured_at=getattr(record, "field_captured_at", None),
         status=getattr(record, "status", "NOT_COMPLETED") or "NOT_COMPLETED",
         source=getattr(record, "source", "captured") or "captured",
-        visit_order=getattr(record, "visit_order", None),
         unique_id=getattr(record, "unique_id", None),
         cumulative_road_distance_km=getattr(record, "cumulative_road_distance_km", None),
         coordinates=getattr(record, "coordinates", None),
@@ -1020,6 +1041,9 @@ def _record_to_detail(record, errors=None) -> RecordDetail:
         revisit_status=getattr(record, "revisit_status", None),
         updated_coordinates=getattr(record, "updated_coordinates", None),
         updated_information=getattr(record, "updated_information", None),
+        updated_by_id=getattr(record, "updated_by_id", None),
+        updated_by_name=getattr(record, "updated_by_name", None),
+        updated_by_role=getattr(record, "updated_by_role", None),
         gmap_image_url=f"/api/records/{record.id}/gmap-image" if getattr(record, "gmap_image_key", None) else None,
         gmap_zoom=getattr(record, "gmap_zoom", None),
         gmap_captured_at=getattr(record, "gmap_captured_at", None),

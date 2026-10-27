@@ -108,7 +108,7 @@ def test_legacy_manual_classification_excludes_import_and_task_metadata(client, 
     db_session.add_all([
         CaptureRecord(user_id=test_user.id, name='Legacy manual', source='captured', coordinates='11.04, 77.03', status='COMPLETED'),
         CaptureRecord(user_id=test_user.id, name='Imported history', source='imported', status='COMPLETED'),
-        CaptureRecord(user_id=test_user.id, name='Legacy dispatched', coordinates='11.04, 77.03', visit_order=1, status='COMPLETED'),
+        CaptureRecord(user_id=test_user.id, name='Legacy dispatched', coordinates='11.04, 77.03', site_address='Dispatched Site', status='COMPLETED'),
     ])
     db_session.commit()
     stats = client.get('/api/records/dashboard', headers=auth_header(user_token)).json()

@@ -96,13 +96,6 @@ class UserResetPasswordRequest(BaseModel):
     new_password: Optional[str] = None
     must_change_password: Optional[bool] = None
 
-    @field_validator("new_password")
-    @classmethod
-    def validate_new_password(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and len(v) < 8:
-            raise ValueError("New password must be at least 8 characters long")
-        return v
-
 
 
 class UserDetail(BaseModel):

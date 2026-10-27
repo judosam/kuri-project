@@ -478,8 +478,8 @@ class RecordService:
     ) -> CaptureRecord:
         """Route/reassign a record to a QC user (auditor) for review."""
         record.assigned_auditor_id = auditor_id
-        if not record.audit_status:
-            record.audit_status = "PENDING"
+        record.audit_status = "PENDING"
+        record.status = "NOT_COMPLETED"
         record.updated_at = datetime.now(timezone.utc)
         # Preserve all QC details, comments, and inspection data intact.
         self.db.commit()
@@ -549,7 +549,7 @@ class RecordService:
         from app.repositories.record_repository import record_date_column, local_day_bounds, BUSINESS_TZ
         from datetime import datetime, timedelta, timezone
         query = self.db.query(CaptureRecord)
-        is_completed = or_(CaptureRecord.status.in_(('COMPLETED', 'Updated Revisited', 'UPDATED_REVISITED')), CaptureRecord.revisit_status == 'COMPLETED')
+        is_completed = or_(CaptureRecord.status.in_(('COMPLETED', 'Updated Revisited', 'UPDATED_REVISITED')), func.coalesce(CaptureRecord.revisit_status, '') == 'COMPLETED')
         is_closed = or_(
             CaptureRecord.status.in_(["NOT_INTERESTED", "Not Interested", "DUPLICATE", "Duplicate", "CONSTRUCTION_FINISHED", "Construction Finished"]),
             CaptureRecord.status.ilike("%not_interested%"),
@@ -576,7 +576,7 @@ class RecordService:
         total, completed, pending, construction = query.with_entities(
             func.count(CaptureRecord.id),
             func.sum(case((is_completed, 1), else_=0)),
-            func.sum(case((and_(not_(is_completed), not_(is_closed)), 1), else_=0)),
+            func.sum(case((and_(not_(is_completed), not_(is_closed), or_(CaptureRecord.audit_status.is_(None), CaptureRecord.audit_status != 'DISAPPROVAL')), 1), else_=0)),
             func.sum(case((func.lower(func.trim(CaptureRecord.construction_happening)) == 'yes', 1), else_=0)),
         ).one()
         numbers = set()
@@ -623,7 +623,7 @@ class RecordService:
             return []
         stamp = record_date_column('assigned_at' if status == 'NOT_COMPLETED' else 'captured_at')
         day = func.date(stamp, '+330 minutes')
-        is_completed = or_(CaptureRecord.status.in_(('COMPLETED', 'Updated Revisited', 'UPDATED_REVISITED')), CaptureRecord.revisit_status == 'COMPLETED')
+        is_completed = or_(CaptureRecord.status.in_(('COMPLETED', 'Updated Revisited', 'UPDATED_REVISITED')), func.coalesce(CaptureRecord.revisit_status, '') == 'COMPLETED')
         is_closed = or_(
             CaptureRecord.status.in_(["NOT_INTERESTED", "Not Interested", "DUPLICATE", "Duplicate", "CONSTRUCTION_FINISHED", "Construction Finished"]),
             CaptureRecord.status.ilike("%not_interested%"),
@@ -733,7 +733,7 @@ class RecordService:
             q_base = q_base.filter(CaptureRecord.district == district)
         is_completed = or_(
             CaptureRecord.status.in_(("COMPLETED", "Updated Revisited", "UPDATED_REVISITED")),
-            CaptureRecord.revisit_status == "COMPLETED",
+            func.coalesce(CaptureRecord.revisit_status, "") == "COMPLETED",
         )
         is_closed = or_(
             CaptureRecord.status.in_(["NOT_INTERESTED", "Not Interested", "DUPLICATE", "Duplicate", "CONSTRUCTION_FINISHED", "Construction Finished"]),
@@ -773,10 +773,16 @@ class RecordService:
         completed_verifications = q_base.filter(
             or_(
                 CaptureRecord.status.in_(("COMPLETED", "Updated Revisited", "UPDATED_REVISITED")),
-                CaptureRecord.revisit_status == "COMPLETED",
+                func.coalesce(CaptureRecord.revisit_status, "") == "COMPLETED",
             )
         ).count()
-        pending_verifications = max(0, total_records - completed_verifications)
+        closed_verifications = q_base.filter(is_closed).count()
+        disapproved_records = q_base.filter(CaptureRecord.audit_status == "DISAPPROVAL").count()
+        pending_verifications = q_base.filter(
+            not_(is_completed),
+            not_(is_closed),
+            or_(CaptureRecord.audit_status.is_(None), CaptureRecord.audit_status != "DISAPPROVAL"),
+        ).count()
         completion_rate = round(completed_verifications / total_records * 100, 1) if total_records else 0.0
 
         confirmed_construction = q_base.filter(
@@ -800,6 +806,8 @@ class RecordService:
             "sent_to_field": sent_to_field,
             "unassigned_properties": unassigned_properties,
             "completed_verifications": completed_verifications,
+            "closed_verifications": closed_verifications,
+            "disapproved_verifications": disapproved_records,
             "pending_verifications": pending_verifications,
             "completion_rate": completion_rate,
             "confirmed_construction": confirmed_construction,

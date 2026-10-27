@@ -59,6 +59,10 @@ export interface CaptureRecord {
   images: CapturedImage[];
   errors?: string[]; // upload warnings returned by the server
 
+  updated_by_id?: number | null;
+  updated_by_name?: string | null;
+  updated_by_role?: string | null;
+
   // Status tracking
   status: 'NOT_COMPLETED' | 'COMPLETED' | string;
 
@@ -67,7 +71,6 @@ export interface CaptureRecord {
   source?: 'captured' | 'imported' | string;
 
   // 15 Task Dispatch Planning Fields
-  visit_order?: number;
   unique_id?: string;
   cumulative_road_distance_km?: string;
   coordinates?: string;
@@ -312,7 +315,6 @@ export interface LocationPoint {
   user_name?: string;
   status?: string;
   unique_id?: string;
-  visit_order?: number;
   site_address?: string;
   survey_no?: string;
   district?: string;
@@ -343,3 +345,5 @@ export interface ActivityLog {
   total: number;
   summary: ActivitySummary;
 }
+
+export type RecordDetail = CaptureRecord;

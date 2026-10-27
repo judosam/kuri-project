@@ -151,7 +151,7 @@ async def auditor_directory(
 ):
     # Directory of active auditors and admins for QC review / reassignment
     auditors = db.query(User).filter(
-        User.role.in_((UserRole.AUDITOR, UserRole.ADMIN)),
+        User.role == UserRole.AUDITOR,
         User.is_active.is_(True),
     ).order_by(User.full_name, User.id).all()
     return [{"id": u.id, "full_name": u.full_name, "email": u.email, "role": u.role.value if hasattr(u.role, "value") else str(u.role), "is_active": True} for u in auditors]
@@ -879,7 +879,11 @@ async def download_dispatch_template(admin: User = Depends(require_admin)):
         "subdivision_no",
         "land_use",
         "owner_name_en",
-        "visit_order",
+        "contact_number",
+        "stage_of_construction",
+        "no_of_floors",
+        "built_up_area",
+        "expected_completion",
         "cumulative_road_distance_km",
         "auditor_email",
         "operator_email",
@@ -898,7 +902,11 @@ async def download_dispatch_template(admin: User = Depends(require_admin)):
             "1",
             "Residential",
             "Ramesh Kumar",
-            1,
+            "9876543210",
+            "Plastering",
+            "G+2",
+            "2500 sq.ft",
+            "Dec 2026",
             "2.5",
             "",
             "",
@@ -915,7 +923,11 @@ async def download_dispatch_template(admin: User = Depends(require_admin)):
             "2",
             "Commercial",
             "Suresh Reddy",
-            2,
+            "9845123456",
+            "Roof Slab",
+            "G+3",
+            "4500 sq.ft",
+            "Mar 2027",
             "5.1",
             "",
             "",
@@ -969,6 +981,228 @@ async def download_dispatch_template(admin: User = Depends(require_admin)):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="task_dispatch_template.xlsx"'},
     )
+
+
+
+@router.get("/records/bulk-edit/template")
+async def download_bulk_edit_template(admin: User = Depends(require_admin)):
+    """Return styled Microsoft Excel (.xlsx) template for bulk updating existing leads.
+    
+    unique_id is mandatory to match and update each existing lead.
+    """
+    import io
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Bulk Edit Leads"
+    ws.views.sheetView[0].showGridLines = True
+
+    headers = [
+        "unique_id",
+        "company_name",
+        "site_address",
+        "street_address",
+        "village",
+        "taluk",
+        "district",
+        "owner_name_en",
+        "contact_number",
+        "site_contractor_architect_name",
+        "site_contractor_architect_number",
+        "stage_of_construction",
+        "no_of_floors",
+        "built_up_area",
+        "expected_completion",
+        "construction_happening",
+        "type_of_construction",
+        "status",
+        "remarks",
+    ]
+
+    sample_rows = [
+        [
+            "CBE-110154-769878",
+            "Sri Lakshmi Builders",
+            "Pappanaickenpalayam, Coimbatore",
+            "Kamraj Road",
+            "Pappanaickenpalayam",
+            "Coimbatore North",
+            "Coimbatore",
+            "R. Senthil",
+            "9876543210",
+            "M. Natarajan",
+            "9845123456",
+            "Brickwork",
+            "G+2",
+            "3200 sq.ft",
+            "Jan 2027",
+            "Yes",
+            "RCC Framed",
+            "COMPLETED",
+            "Verified on site",
+        ],
+    ]
+
+    header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
+    header_font = Font(name="Segoe UI", size=10, bold=True, color="FFFFFF")
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=False)
+
+    ws.append(headers)
+    ws.row_dimensions[1].height = 28
+
+    for col_num in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_alignment
+
+    data_font = Font(name="Segoe UI", size=10)
+    data_alignment = Alignment(vertical="center")
+    cell_border = Border(
+        left=Side(style="thin", color="E2E8F0"),
+        right=Side(style="thin", color="E2E8F0"),
+        top=Side(style="thin", color="E2E8F0"),
+        bottom=Side(style="thin", color="E2E8F0"),
+    )
+
+    for r_idx, row in enumerate(sample_rows, start=2):
+        ws.append(row)
+        ws.row_dimensions[r_idx].height = 22
+        for col_num in range(1, len(row) + 1):
+            cell = ws.cell(row=r_idx, column=col_num)
+            cell.font = data_font
+            cell.alignment = data_alignment
+            cell.border = cell_border
+
+    ws.freeze_panes = "A2"
+
+    for col in ws.columns:
+        col_letter = get_column_letter(col[0].column)
+        max_len = max(len(str(cell.value or "")) for cell in col)
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 14)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="bulk_edit_leads_template.xlsx"'},
+    )
+
+
+@router.post("/records/bulk-edit")
+async def bulk_edit_leads(
+    file: UploadFile = File(...),
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Bulk update existing leads from an uploaded Excel file using unique_id."""
+    import openpyxl
+    import io
+
+    if not file.filename.lower().endswith((".xlsx", ".xlsm", ".xltx")):
+        raise HTTPException(status_code=400, detail="Only Excel (.xlsx) files are supported")
+
+    content = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+    ws = wb.active
+
+    headers = [str(cell.value).strip().lower() if cell.value is not None else "" for cell in ws[1]]
+    if "unique_id" not in headers:
+        raise HTTPException(
+            status_code=400,
+            detail="Header 'unique_id' is required to match leads for bulk update.",
+        )
+
+    uid_idx = headers.index("unique_id")
+    field_map = {
+        "company_name": "name",
+        "project_name": "name",
+        "name": "name",
+        "site_address": "site_address",
+        "street_address": "street_address",
+        "village": "village",
+        "taluk": "taluk",
+        "district": "district",
+        "owner_name_en": "owner_name_en",
+        "contact_number": "contact_number",
+        "site_contractor_architect_name": "site_contractor_architect_name",
+        "site_contractor_architect_number": "site_contractor_architect_number",
+        "stage_of_construction": "stage_of_construction",
+        "no_of_floors": "no_of_floors",
+        "built_up_area": "built_up_area",
+        "expected_completion": "expected_completion",
+        "construction_happening": "construction_happening",
+        "type_of_construction": "type_of_construction",
+        "status": "status",
+        "remarks": "remarks",
+    }
+
+    updated_count = 0
+    not_found = []
+    errors = []
+    now = datetime.now(timezone.utc)
+
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not any(row):
+            continue
+        uid_val = str(row[uid_idx]).strip() if uid_idx < len(row) and row[uid_idx] is not None else ""
+        if not uid_val:
+            continue
+
+        record = db.query(CaptureRecord).filter(CaptureRecord.unique_id == uid_val).first()
+        if not record:
+            not_found.append(uid_val)
+            continue
+
+        has_changes = False
+        for col_idx, col_name in enumerate(headers):
+            if col_idx >= len(row) or col_name == "unique_id":
+                continue
+            val = row[col_idx]
+            if val is None:
+                continue
+            val_str = str(val).strip()
+            if not val_str:
+                continue
+
+            attr = field_map.get(col_name)
+            if attr and hasattr(record, attr):
+                setattr(record, attr, val_str)
+                has_changes = True
+
+        if has_changes:
+            record.updated_by_id = admin.id
+            record.updated_by_name = admin.full_name or admin.username
+            record.updated_by_role = admin.role.value if hasattr(admin.role, "value") else str(admin.role)
+            record.updated_at = now
+            updated_count += 1
+
+    db.commit()
+
+    log_activity(
+        db=db,
+        action_type="bulk_edit_leads",
+        type="record",
+        title="Bulk lead update via Excel",
+        detail=f"{updated_count} lead(s) updated by {admin.full_name}",
+        user_id=admin.id,
+        user_name=admin.full_name,
+        status="success",
+    )
+
+    return {
+        "status": "success",
+        "updated_count": updated_count,
+        "not_found_count": len(not_found),
+        "not_found": not_found[:50],
+        "errors": errors,
+    }
 
 
 @router.get("/records/export")
@@ -1332,7 +1566,6 @@ async def upload_tasks_sheet(
             # Backfilled rows are admin-uploaded history, not app captures, so
             # the Records table labels them "Uploaded / Imported".
             source="imported" if mode == "history" else "captured",
-            visit_order=visit_order,
             unique_id=unique_id,
             cumulative_road_distance_km=cumulative_dist,
             coordinates=coords_str,
@@ -1842,8 +2075,7 @@ async def upload_tasks_sheet_stream(
                 description=record_desc,
                 status=record_status,
                 source="imported" if mode == "history" else "captured",
-                visit_order=visit_order,
-                unique_id=unique_id,
+                    unique_id=unique_id,
                 cumulative_road_distance_km=cumulative_dist,
                 coordinates=coords_str,
                 street_address=street_address,
@@ -1997,7 +2229,7 @@ async def download_previous_template(admin: User = Depends(require_admin)):
     ws.title = "Previous Records"
     ws.views.sheetView[0].showGridLines = True
     headers = [
-        "operator_email", "visit_order", "unique_id", "coordinates", "site_address",
+        "operator_email", "unique_id", "coordinates", "site_address",
         "street_address", "village", "taluk", "district", "survey_no", "subdivision_no",
         "land_use", "owner_name_en", "cumulative_road_distance_km", "date_of_visit",
         "construction_happening", "type_of_construction", "stage_of_construction",
@@ -2282,7 +2514,7 @@ async def admin_get_record(record_id: int, admin: User = Depends(require_record_
 async def audit_record(
     record_id: int,
     payload: AuditDecisionRequest,
-    auditor: User = Depends(require_admin_or_manager),
+    auditor: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """Apply an auditor decision to a record.
@@ -2367,7 +2599,7 @@ async def audit_record(
 @router.post("/records/bulk-audit", response_model=RecordBulkAuditResponse)
 async def bulk_audit_records(
     request: RecordBulkAuditRequest,
-    auditor: User = Depends(require_admin_or_manager),
+    auditor: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """Apply an audit decision in bulk to selected records.
@@ -2468,6 +2700,11 @@ async def bulk_status_records(
         record.status = canonical_status
         if canonical_status == "COMPLETED" and record.revisit_status in ("REASSIGNED", "PENDING_REVISIT"):
             record.revisit_status = "COMPLETED"
+
+        record.updated_by_id = user.id
+        record.updated_by_name = user.full_name or user.username
+        record.updated_by_role = user.role.value if hasattr(user.role, "value") else str(user.role)
+        record.updated_at = now
 
         if request.remarks:
             cleaned = request.remarks.strip()
@@ -2833,6 +3070,9 @@ async def admin_update_record(
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
 
+    if admin.role.value == "MANAGER":
+        raise HTTPException(status_code=403, detail="Managers can only view and assign records")
+
     if admin.role.value == "AUDITOR":
         if record.assigned_auditor_id not in (None, admin.id) and ("assigned_auditor_id" not in request.model_fields_set or request.assigned_auditor_id != admin.id):
             raise HTTPException(status_code=403, detail="This record is assigned to another QA reviewer")
@@ -2843,7 +3083,7 @@ async def admin_update_record(
 
     for f in [
         "name", "description", "status",
-        "visit_order", "unique_id", "cumulative_road_distance_km", "coordinates",
+        "unique_id", "cumulative_road_distance_km", "coordinates",
         "street_address", "land_use", "survey_no", "subdivision_no", "owner_name_en",
         "site_address", "survey_number", "sub_division", "taluk", "village", "district",
         "date_of_visit", "construction_happening", "remarks", "type_of_construction",
@@ -2898,6 +3138,10 @@ async def admin_update_record(
         update_kwargs["audited_by_id"] = admin.id
 
     if update_kwargs:
+        update_kwargs["updated_by_id"] = admin.id
+        update_kwargs["updated_by_name"] = admin.full_name or admin.username
+        update_kwargs["updated_by_role"] = admin.role.value if hasattr(admin.role, 'value') else str(admin.role)
+        update_kwargs["updated_at"] = datetime.now(timezone.utc)
         record = record_service.record_repo.update(record, touch_updated_at=False, **update_kwargs)
 
     # Auto-route to telecaller if phone contact exists and sole active telecaller is present
@@ -3024,7 +3268,9 @@ def _record_to_detail(record, errors: Optional[List[str]] = None) -> RecordDetai
         errors=errors,
         source=getattr(record, "source", "captured") or "captured",
         status=getattr(record, "status", "NOT_COMPLETED") or "NOT_COMPLETED",
-        visit_order=getattr(record, "visit_order", None),
+        updated_by_id=getattr(record, "updated_by_id", None),
+        updated_by_name=getattr(record, "updated_by_name", None),
+        updated_by_role=getattr(record, "updated_by_role", None),
         unique_id=getattr(record, "unique_id", None),
         cumulative_road_distance_km=getattr(record, "cumulative_road_distance_km", None),
         coordinates=getattr(record, "coordinates", None),

@@ -42,7 +42,7 @@ def record_date_column(field):
     return {'created_at': CaptureRecord.created_at,
             'assigned_at': func.coalesce(CaptureRecord.assigned_at, CaptureRecord.created_at),
             'qc_completed_at': CaptureRecord.qc_completed_at,
-            'captured_at': latest_capture,
+            'captured_at': cap_and_field,
             'completed_at': completed}.get(field, CaptureRecord.created_at)
 
 
@@ -139,7 +139,7 @@ class RecordRepository:
             from sqlalchemy import and_, not_, or_
             is_completed = or_(
                 CaptureRecord.status.in_(["COMPLETED", "Updated Revisited", "UPDATED_REVISITED"]),
-                CaptureRecord.revisit_status == "COMPLETED",
+                func.coalesce(CaptureRecord.revisit_status, "") == "COMPLETED",
             )
             is_not_interested = or_(
                 CaptureRecord.status.in_(["NOT_INTERESTED", "Not Interested"]),
@@ -267,7 +267,6 @@ class RecordRepository:
             "name": CaptureRecord.name,
             "id": CaptureRecord.id,
             "status": filter_column("status"),
-            "visit_order": CaptureRecord.visit_order,
             "unique_id": CaptureRecord.unique_id,
             "owner_name_en": CaptureRecord.owner_name_en,
             "land_use": CaptureRecord.land_use,
@@ -352,6 +351,11 @@ class RecordRepository:
             if getattr(rec, 'property_type', None) in ('Commercial Property', 'COMMERCIAL_PROPERTY') or rec.audit_status == 'COMMERCIAL_PROPERTY':
                 skipped += 1
                 continue
+            if rec.status == 'COMPLETED':
+                skipped += 1
+                continue
+            if rec.user_id == target_user_id:
+                continue
             rec.user_id = target_user_id
             rec.staged_operator_id = target_user_id
             rec.reassigned_to_id = target_user_id
@@ -427,7 +431,7 @@ class RecordRepository:
         from sqlalchemy import and_, not_, or_
         is_completed = or_(
             CaptureRecord.status.in_(["COMPLETED", "Updated Revisited", "UPDATED_REVISITED"]),
-            CaptureRecord.revisit_status == "COMPLETED",
+            func.coalesce(CaptureRecord.revisit_status, "") == "COMPLETED",
         )
         is_closed = or_(
             CaptureRecord.status.in_(["NOT_INTERESTED", "Not Interested", "DUPLICATE", "Duplicate", "CONSTRUCTION_FINISHED", "Construction Finished"]),
@@ -570,7 +574,6 @@ class RecordRepository:
                             "user_name": user_name,
                             "status": getattr(r, "status", "NOT_COMPLETED") or "NOT_COMPLETED",
                             "unique_id": getattr(r, "unique_id", None),
-                            "visit_order": getattr(r, "visit_order", None),
                             "site_address": getattr(r, "site_address", None),
                             "survey_no": getattr(r, "survey_no", None),
                             "district": getattr(r, "district", None),
@@ -593,7 +596,6 @@ class RecordRepository:
                     "user_name": user_name,
                     "status": getattr(r, "status", "NOT_COMPLETED") or "NOT_COMPLETED",
                     "unique_id": getattr(r, "unique_id", None),
-                    "visit_order": getattr(r, "visit_order", None),
                     "site_address": getattr(r, "site_address", None),
                     "survey_no": getattr(r, "survey_no", None),
                     "district": getattr(r, "district", None),

@@ -42,14 +42,14 @@ const NAV: NavItem[] = [
   { to: '/telecaller/dashboard', label: 'Dashboard', icon: 'dashboard', match: '/telecaller/dashboard', roles: ['TELECALLER'] },
   { to: '/telecaller/records', label: 'Calling Queue', icon: 'call', match: '/telecaller/records', roles: ['TELECALLER'] },
   // Auditor portal
-  { to: '/audit/dashboard', label: 'QC Dashboard', icon: 'dashboard', match: '/audit/dashboard', roles: ['AUDITOR'] },
-  { to: '/audit', label: 'QA Queue', icon: 'fact_check', match: '/audit', roles: ['AUDITOR'] },
+  { to: '/auditor/dashboard', label: 'QC Dashboard', icon: 'dashboard', match: '/auditor/dashboard', roles: ['AUDITOR'] },
+  { to: '/auditor/records', label: 'QA Queue', icon: 'fact_check', match: '/auditor/records', roles: ['AUDITOR'] },
   // Admin & Manager navigation
-  { to: '/', label: 'Dashboard', icon: 'dashboard', match: '/', roles: ['ADMIN'] },
-  { to: '/records', label: 'Records', icon: 'folder_open', match: '/records', roles: ['ADMIN', 'MANAGER'] },
-  { to: '/map', label: 'Map', icon: 'pin_drop', match: '/map', roles: ['ADMIN', 'MANAGER', 'AUDITOR'] },
-  { to: '/logs', label: 'Logs', icon: 'receipt_long', match: '/logs', roles: ['ADMIN'] },
-  { to: '/settings', label: 'Settings', icon: 'settings', match: '/settings', roles: ['ADMIN'] },
+  { to: '/admin', label: 'Dashboard', icon: 'dashboard', match: '/admin', roles: ['ADMIN'] },
+  { to: '/admin/records', label: 'Records', icon: 'folder_open', match: '/admin/records', roles: ['ADMIN', 'MANAGER'] },
+  { to: '/admin/users', label: 'Users', icon: 'group', match: '/admin/users', roles: ['ADMIN'] },
+  { to: '/admin/map', label: 'Map', icon: 'pin_drop', match: '/admin/map', roles: ['ADMIN', 'MANAGER', 'AUDITOR'] },
+  { to: '/admin/logs', label: 'Logs', icon: 'receipt_long', match: '/admin/logs', roles: ['ADMIN'] },
 ];
 
 const STANDALONE_PAGE_ROUTES = [
@@ -75,8 +75,19 @@ function AppShell() {
   const [authError, setAuthError] = useState(false);
   const [authAttempt, setAuthAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar_collapsed') === 'true';
+  });
   const location = useLocation();
   const isRecordDetail = location.pathname.startsWith('/records/') && location.pathname !== '/records';
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('sidebar_collapsed', String(next));
+      return next;
+    });
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -160,53 +171,72 @@ function AppShell() {
   }
 
   return (
-    <div className={`fos-shell ${isRecordDetail ? 'fos-shell-fixed' : ''}`}>
-      <Sidebar user={user} onLogout={handleLogout} onUpdateUser={setUser} />
-      <div className={`fos-main ${isRecordDetail ? 'fos-main-fixed' : ''}`}>
-        <TopBar user={user} />
+    <div className={`fos-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${isRecordDetail ? 'fos-shell-fixed' : ''}`}>
+      <Sidebar
+        user={user}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
+        onLogout={handleLogout}
+        onUpdateUser={setUser}
+      />
+      <div className={`fos-main ${sidebarCollapsed ? 'collapsed' : ''} ${isRecordDetail ? 'fos-main-fixed' : ''}`}>
+        <TopBar user={user} isCollapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} />
         <main className={`fos-content ${isRecordDetail ? 'fos-content-fixed' : ''}`}>
           <Routes>
+            {/* Direct portal landing route */}
             <Route
               path="/"
               element={
                 user.role === 'ADMIN' ? (
-                  <Dashboard />
+                  <Navigate to="/admin" replace />
                 ) : user.role === 'AUDITOR' ? (
-                  <Navigate to="/audit/dashboard" replace />
+                  <Navigate to="/auditor/dashboard" replace />
                 ) : user.role === 'TELECALLER' ? (
                   <Navigate to="/telecaller/dashboard" replace />
                 ) : (
-                  <Navigate to="/records" replace />
+                  <Navigate to="/verifier" replace />
                 )
               }
             />
-            {/* Dedicated role routes */}
-            <Route path="/admin" element={user.role === 'ADMIN' ? <Dashboard /> : <Navigate to={user.role === 'TELECALLER' ? '/telecaller/dashboard' : '/records'} replace />} />
-            <Route path="/telecaller/dashboard" element={<TelecallerDashboard />} />
-            <Route path="/telecaller/records" element={<TelecallerRecords />} />
+
+            {/* Admin Portal Routes */}
+            <Route path="/admin" element={user.role === 'ADMIN' ? <Dashboard /> : <Navigate to={user.role === 'AUDITOR' ? '/auditor/dashboard' : user.role === 'TELECALLER' ? '/telecaller/dashboard' : '/verifier'} replace />} />
+            <Route path="/admin/dashboard" element={<Navigate to="/admin" replace />} />
+            <Route path="/admin/records" element={user.role === 'ADMIN' ? <Records key={`admin-${user.id}`} storageKey={`pc_admin_records_${user.id}`} canAdmin={true} canAudit={true} canRoute={true} /> : <Navigate to="/" replace />} />
+            <Route path="/admin/users" element={user.role === 'ADMIN' ? <Users /> : <Navigate to="/" replace />} />
+            <Route path="/admin/map" element={user.role === 'ADMIN' ? <MapPage /> : <Navigate to="/" replace />} />
+            <Route path="/admin/logs" element={user.role === 'ADMIN' ? <Logs /> : <Navigate to="/" replace />} />
+
+            {/* Auditor Portal Routes */}
+            <Route path="/auditor" element={<Navigate to="/auditor/dashboard" replace />} />
+            <Route path="/auditor/dashboard" element={user.role === 'AUDITOR' || user.role === 'ADMIN' ? <QaDashboard /> : <Navigate to="/" replace />} />
+            <Route path="/auditor/records" element={user.role === 'AUDITOR' || user.role === 'ADMIN' ? <Records key={`qa-${user.id}`} storageKey={`pc_qa_records_${user.id}`} canAdmin={false} auditOnly={true} canAudit={true} canRoute={false} pageTitle="QA Records" roleBadge="QA" /> : <Navigate to="/" replace />} />
+            <Route path="/audit/dashboard" element={<Navigate to="/auditor/dashboard" replace />} />
+            <Route path="/audit" element={<Navigate to="/auditor/records" replace />} />
+
+            {/* Telecaller Portal Routes */}
             <Route path="/telecaller" element={<Navigate to="/telecaller/dashboard" replace />} />
-            <Route path="/audit/dashboard" element={user.role === 'AUDITOR' ? <QaDashboard /> : <Navigate to="/" replace />} />
-            <Route
-              path="/audit"
-              element={user.role === 'AUDITOR' ?
-                <Records key={`qa-${user.id}`} storageKey={`pc_qa_records_${user.id}`} canAdmin={false} auditOnly={true} canAudit={true} canRoute={false} pageTitle="QA Records" roleBadge="QA" />
-                : <Navigate to="/records" replace />}
-            />
-            <Route path="/auditor" element={<Navigate to="/audit/dashboard" replace />} />
+            <Route path="/telecaller/dashboard" element={user.role === 'TELECALLER' || user.role === 'ADMIN' ? <TelecallerDashboard /> : <Navigate to="/" replace />} />
+            <Route path="/telecaller/records" element={user.role === 'TELECALLER' || user.role === 'ADMIN' ? <TelecallerRecords /> : <Navigate to="/" replace />} />
+
+            {/* Field Verifier Portal Routes */}
+            <Route path="/app" element={<FieldVerifierPortal />} />
+            <Route path="/app/*" element={<FieldVerifierPortal />} />
             <Route path="/verifier" element={<FieldVerifierPortal />} />
             <Route path="/field-verifier" element={<Navigate to="/verifier" replace />} />
 
-            <Route path="/users" element={<Navigate to="/settings/users" replace />} />
-            <Route path="/settings" element={<Navigate to="/settings/users" replace />} />
-            <Route path="/settings/users" element={user.role === 'ADMIN' ? <Users /> : <Navigate to={user.role === 'TELECALLER' ? '/telecaller/records' : '/records'} replace />} />
-            <Route path="/records" element={user.role === 'AUDITOR' ? <Navigate to="/audit" replace /> : user.role === 'TELECALLER' ? <Navigate to="/telecaller/records" replace /> : <Records key={`admin-${user.id}`} storageKey={`pc_admin_records_${user.id}`} canAdmin={user.role === 'ADMIN'} canAudit={user.role === 'ADMIN'} canRoute={user.role === 'ADMIN'} />} />
-            <Route path="/records/import" element={user.role === 'ADMIN' ? <ImportRecords canImportHistory={user.role === 'ADMIN'} /> : <Navigate to={user.role === 'TELECALLER' ? '/telecaller/records' : '/records'} replace />} />
-            <Route path="/records/import-previous" element={user.role === 'ADMIN' ? <ImportPreviousRecords /> : <Navigate to={user.role === 'TELECALLER' ? '/telecaller/records' : '/records'} replace />} />
-            <Route path="/records/imported/:id" element={user.role === 'ADMIN' ? <ImportedRecordDetail /> : user.role === 'AUDITOR' ? <RecordDetail canAdmin={false} canAudit={true} /> : user.role === 'TELECALLER' ? <Navigate to="/telecaller/records" replace /> : <RecordDetail canAdmin={false} canAudit={false} />} />
+            {/* Legacy & Shared Routes */}
+            <Route path="/users" element={<Navigate to="/admin/users" replace />} />
+            <Route path="/settings" element={<Navigate to="/admin/users" replace />} />
+            <Route path="/settings/users" element={user.role === 'ADMIN' ? <Users /> : <Navigate to="/" replace />} />
+            <Route path="/records" element={user.role === 'ADMIN' ? <Navigate to="/admin/records" replace /> : user.role === 'AUDITOR' ? <Navigate to="/auditor/records" replace /> : user.role === 'TELECALLER' ? <Navigate to="/telecaller/records" replace /> : <Navigate to="/verifier" replace />} />
+            <Route path="/records/import" element={user.role === 'ADMIN' ? <ImportRecords canImportHistory={user.role === 'ADMIN'} /> : <Navigate to="/" replace />} />
+            <Route path="/records/import-previous" element={user.role === 'ADMIN' ? <ImportPreviousRecords /> : <Navigate to="/" replace />} />
+            <Route path="/records/imported/:id" element={user.role === 'ADMIN' ? <ImportedRecordDetail /> : user.role === 'AUDITOR' ? <RecordDetail canAdmin={false} canAudit={true} /> : <RecordDetail canAdmin={false} canAudit={false} />} />
             <Route path="/records/:id" element={user.role === 'AUDITOR' ? <RecordDetail canAdmin={false} canAudit={true} /> : user.role === 'TELECALLER' ? <Navigate to="/telecaller/records" replace /> : <RecordDetail canAdmin={user.role === 'ADMIN'} canAudit={user.role === 'ADMIN'} />} />
             <Route path="/map" element={user.role === 'TELECALLER' ? <Navigate to="/telecaller/records" replace /> : <MapPage />} />
-            <Route path="/logs" element={user.role === 'ADMIN' ? <Logs /> : <Navigate to={user.role === 'TELECALLER' ? '/telecaller/records' : '/records'} replace />} />
-            <Route path="*" element={<Navigate to={user.role === 'TELECALLER' ? '/telecaller/dashboard' : '/'} replace />} />
+            <Route path="/logs" element={user.role === 'ADMIN' ? <Logs /> : <Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
       </div>
@@ -215,7 +245,7 @@ function AppShell() {
   );
 }
 
-function TopBar({ user }: { user: User }) {
+function TopBar({ user }: { user: User; isCollapsed?: boolean; onToggleCollapse?: () => void }) {
   const { header } = useContext(HeaderContext);
   const location = useLocation();
   const navigate = useNavigate();
@@ -272,10 +302,14 @@ function TopBar({ user }: { user: User }) {
 
 function Sidebar({
   user,
+  isCollapsed = false,
+  onToggleCollapse,
   onLogout,
   onUpdateUser,
 }: {
   user: User;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
   onLogout: () => void;
   onUpdateUser?: (u: User) => void;
 }) {
@@ -346,18 +380,42 @@ function Sidebar({
   };
 
   return (
-    <aside className="fos-side" data-role={user.role}>
+    <aside className={`fos-side ${isCollapsed ? 'collapsed' : ''}`} data-role={user.role}>
       <div>
         <div className="fos-side-brand">
           <div className="brand-id">
             <span className="brand-mark brand-mark-image-wrap">
               <img className="brand-mark-image" src="/brand-logo.png" alt="" />
             </span>
-            <div className="brand-title-wrap">
-              <span className="brand-name">PhotoCapture</span>
-              <span className="brand-sub">Field Geotagging</span>
-            </div>
+            {!isCollapsed && (
+              <div className="brand-title-wrap">
+                <span className="brand-name">PhotoCapture</span>
+                <span className="brand-sub">Field Geotagging</span>
+              </div>
+            )}
           </div>
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            onClick={onToggleCollapse}
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+              border: '1px solid #e2e8f0',
+              background: '#ffffff',
+              color: '#64748b',
+              cursor: 'pointer',
+              padding: 0,
+              flexShrink: 0,
+            }}
+          >
+            <Icon name={isCollapsed ? "chevron_right" : "chevron_left"} size={16} />
+          </button>
         </div>
         {/* Role label — below app subheading, above main navigation */}
         <div className="side-role-bar">

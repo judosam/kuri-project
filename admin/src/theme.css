@@ -6106,3 +6106,64 @@ a.btn:focus,
   }
 }
 
+
+
+/* === Collapsible Sidebar Styles === */
+.fos-side {
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.fos-main {
+  transition: margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.fos-side.collapsed {
+  width: 68px !important;
+}
+.fos-side.collapsed .brand-title-wrap,
+.fos-side.collapsed .brand-sub,
+.fos-side.collapsed .side-role-bar,
+.fos-side.collapsed .fos-nav-label,
+.fos-side.collapsed .fos-navlink .nav-text,
+.fos-side.collapsed .fos-navlink .role-badge,
+.fos-side.collapsed .fos-user-info,
+.fos-side.collapsed .fos-user-actions,
+.fos-side.collapsed .side-portal-link .portal-text,
+.fos-side.collapsed .side-portal-link .role-badge {
+  display: none !important;
+}
+.fos-side.collapsed .fos-side-brand {
+  padding: 0 10px;
+  justify-content: center;
+  gap: 0;
+}
+.fos-side.collapsed .brand-id {
+  justify-content: center;
+  flex: none;
+}
+.fos-side.collapsed .brand-mark,
+.fos-side.collapsed .brand-mark-image-wrap {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+}
+.fos-side.collapsed .sidebar-collapse-btn {
+  position: absolute;
+  top: 14px;
+  right: -14px;
+  background: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  z-index: 70;
+}
+.fos-side.collapsed .fos-navlink {
+  justify-content: center;
+  padding: 10px 0;
+}
+.fos-side.collapsed .fos-user-card {
+  padding: 6px;
+  justify-content: center;
+}
+.fos-side.collapsed .fos-user-row {
+  justify-content: center;
+}
+.fos-main.collapsed {
+  margin-left: 68px !important;
+}

@@ -96,6 +96,15 @@ export default function FormScreen({
     stageInList ? savedStage : (savedStage ? 'Other' : '')
   );
   const [customStage, setCustomStage] = useState(stageInList ? '' : savedStage);
+  const [noOfFloors, setNoOfFloors] = useState(
+    editingRecord?.no_of_floors || inspectingRecord?.no_of_floors || ''
+  );
+  const [builtUpArea, setBuiltUpArea] = useState(
+    editingRecord?.built_up_area || inspectingRecord?.built_up_area || ''
+  );
+  const [expectedCompletion, setExpectedCompletion] = useState(
+    editingRecord?.expected_completion || inspectingRecord?.expected_completion || ''
+  );
   const [typeOfConstruction, setTypeOfConstruction] = useState(
     typeInList ? savedType : (savedType ? 'Other' : '')
   );
@@ -296,6 +305,9 @@ export default function FormScreen({
         date_of_visit: dateOfVisit.trim(),
         construction_happening: constructionHappening,
         stage_of_construction: resolvedStage,
+        no_of_floors: noOfFloors.trim() || undefined,
+        built_up_area: builtUpArea.trim() || undefined,
+        expected_completion: expectedCompletion.trim() || undefined,
         type_of_construction: resolvedType,
         relationship_with_building: relationshipWithBuilding.trim(),
         building_user_name: buildingUserName.trim(),

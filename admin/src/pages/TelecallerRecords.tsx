@@ -1,3 +1,55 @@
+
+function renderFieldStatusBadge(status?: string | null, revisitStatus?: string | null) {
+  const s = (status || '').toUpperCase();
+  const rev = (revisitStatus || '').toUpperCase();
+  if (s === 'COMPLETED' || rev === 'COMPLETED') {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 9999, fontSize: '0.70rem', fontWeight: 700, background: '#ecfdf5', color: '#059669', whiteSpace: 'nowrap' }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981' }} />
+        Completed
+      </span>
+    );
+  }
+  if (s === 'UPDATED REVISITED' || s === 'UPDATED_REVISITED' || s === 'COMPLETED_REVISITED' || rev === 'UPDATED REVISITED' || rev === 'UPDATED_REVISITED') {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 9999, fontSize: '0.70rem', fontWeight: 700, background: '#eff6ff', color: '#1d4ed8', whiteSpace: 'nowrap' }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#3b82f6' }} />
+        Revisited
+      </span>
+    );
+  }
+  if (s === 'NOT_INTERESTED' || s === 'NOT INTERESTED') {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 9999, fontSize: '0.70rem', fontWeight: 700, background: '#f1f5f9', color: '#475569', whiteSpace: 'nowrap' }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#64748b' }} />
+        Not Interested
+      </span>
+    );
+  }
+  if (s === 'DUPLICATE') {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 9999, fontSize: '0.70rem', fontWeight: 700, background: '#fffbeb', color: '#b45309', whiteSpace: 'nowrap' }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#f59e0b' }} />
+        Duplicate
+      </span>
+    );
+  }
+  if (s === 'CONSTRUCTION_FINISHED' || s === 'CONSTRUCTION FINISHED') {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 9999, fontSize: '0.70rem', fontWeight: 700, background: '#faf5ff', color: '#7e22ce', whiteSpace: 'nowrap' }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#a855f7' }} />
+        Finished
+      </span>
+    );
+  }
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 9999, fontSize: '0.70rem', fontWeight: 700, background: '#fff7ed', color: '#d97706', whiteSpace: 'nowrap' }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#f59e0b' }} />
+      Pending
+    </span>
+  );
+}
+
 import { useEffect, useState } from 'react';
 import type { CaptureRecord } from '../types';
 import { telecallerApi, SERVER_BASE } from '../services/api';
@@ -293,6 +345,7 @@ export default function TelecallerRecords() {
                   <th style={{ width: 150, minWidth: 135, maxWidth: 175, textAlign: 'left' }}>Stage / Building</th>
                   <th style={{ width: 130, minWidth: 120, maxWidth: 145, textAlign: 'left' }}>Telecaller Status</th>
                   <th style={{ width: 180, minWidth: 160, maxWidth: 220, textAlign: 'left' }}>Telecaller Notes</th>
+                  <th style={{ width: 120, minWidth: 110, maxWidth: 140, textAlign: 'left' }}>Updated By</th>
                   <th style={{ width: 105, minWidth: 95, maxWidth: 115, textAlign: 'left' }}>Action</th>
                 </tr>
               </thead>
@@ -477,37 +530,14 @@ export default function TelecallerRecords() {
 
                       {/* 7. Field Status */}
                       <td style={{ textAlign: 'left' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            padding: '2px 7px',
-                            borderRadius: 9999,
-                            fontSize: '0.70rem',
-                            fontWeight: 700,
-                            background: r.status === 'COMPLETED' ? '#ecfdf5' : '#fff7ed',
-                            color: r.status === 'COMPLETED' ? '#059669' : '#d97706',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: 5,
-                              height: 5,
-                              borderRadius: '50%',
-                              background: r.status === 'COMPLETED' ? '#10b981' : '#f59e0b',
-                            }}
-                          />
-                          {r.status === 'COMPLETED' ? 'Completed' : 'Pending'}
-                        </span>
+                        {renderFieldStatusBadge(r.status, r.revisit_status)}
                       </td>
 
                       {/* 8. Stage / Building */}
                       <td style={{ textAlign: 'left' }}>
-                        {((r.telecaller_called_at && r.stage_of_construction) || r.no_of_floors || r.built_up_area || r.expected_completion) ? (
+                        {(r.stage_of_construction || r.no_of_floors || r.built_up_area || r.expected_completion) ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            {r.telecaller_called_at && r.stage_of_construction && (
+                            {r.stage_of_construction && (
                               <div
                                 style={{
                                   fontSize: 11.5,

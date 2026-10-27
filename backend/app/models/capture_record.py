@@ -12,7 +12,6 @@ class CaptureRecord(Base):
     __table_args__ = (
         Index("idx_rec_user_status_created", "user_id", "status", "created_at"),
         Index("idx_rec_status_created", "status", "created_at"),
-        Index("idx_rec_status_visit_order", "status", "visit_order"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -65,7 +64,6 @@ class CaptureRecord(Base):
     field_captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # 15 Task Dispatch Planning Fields (Admin Google Sheet)
-    visit_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
     unique_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     cumulative_road_distance_km: Mapped[float | None] = mapped_column(String(50), nullable=True)
     coordinates: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -153,6 +151,9 @@ class CaptureRecord(Base):
     revisit_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     updated_coordinates: Mapped[str | None] = mapped_column(String(100), nullable=True)
     updated_information: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_by_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    updated_by_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    updated_by_role: Mapped[str | None] = mapped_column(String(50), nullable=True)
     follow_up_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Relationships
@@ -168,6 +169,7 @@ class CaptureRecord(Base):
     assigned_telecaller = relationship("User", foreign_keys=[assigned_telecaller_id])
     telecaller_by = relationship("User", foreign_keys=[telecaller_by_id])
     reassigned_to = relationship("User", foreign_keys=[reassigned_to_id])
+    updated_by = relationship("User", foreign_keys=[updated_by_id])
     images = relationship(
         "CapturedImage",
         back_populates="record",
@@ -190,7 +192,7 @@ class CaptureRecord(Base):
         # populated street address says nothing about where the row came from.
         return self.source == "captured" and self.user_id is not None and all(
             getattr(self, key) in (None, "") for key in (
-                "uploaded_by_id", "staged_operator_id", "assigned_auditor_id", "visit_order",
+                "uploaded_by_id", "staged_operator_id", "assigned_auditor_id",
                 "site_address", "land_use", "survey_no", "survey_number",
             )
         )
@@ -199,7 +201,7 @@ class CaptureRecord(Base):
     def is_manually_added(cls):
         return or_(cls.source == "manual", and_(cls.source == "captured", cls.user_id.isnot(None),
             cls.uploaded_by_id.is_(None), cls.staged_operator_id.is_(None), cls.assigned_auditor_id.is_(None),
-            cls.visit_order.is_(None), *(func.coalesce(getattr(cls, key), '') == '' for key in
+            *(func.coalesce(getattr(cls, key), '') == '' for key in
                 ('site_address', 'land_use', 'survey_no', 'survey_number'))))
 
     @validates("user_id")

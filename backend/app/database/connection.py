@@ -71,7 +71,6 @@ CREATE TABLE capture_records_new (
     field_longitude FLOAT,
     field_location_accuracy FLOAT,
     field_captured_at TIMESTAMP,
-    visit_order INTEGER,
     unique_id VARCHAR(100),
     cumulative_road_distance_km VARCHAR(50),
     coordinates VARCHAR(100),
@@ -129,7 +128,6 @@ _CAPTURE_RECORDS_AUDIT_INDEX_DDL = [
     "CREATE INDEX IF NOT EXISTS ix_capture_records_audit_status ON capture_records (audit_status)",
     "CREATE INDEX IF NOT EXISTS idx_rec_user_status_created ON capture_records (user_id, status, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_rec_status_created ON capture_records (status, created_at)",
-    "CREATE INDEX IF NOT EXISTS idx_rec_status_visit_order ON capture_records (status, visit_order)",
 ]
 
 
@@ -472,6 +470,9 @@ def create_tables():
                 ("telecaller_called_at", "TIMESTAMP"),
                 ("telecaller_by_id", "INTEGER REFERENCES users (id)"),
                 ("property_type", "VARCHAR(50)"),
+                ("updated_by_id", "INTEGER REFERENCES users (id)"),
+                ("updated_by_name", "VARCHAR(255)"),
+                ("updated_by_role", "VARCHAR(50)"),
             ]
             for col_n, col_d in audit_cols_to_check:
                 if col_n not in record_columns:

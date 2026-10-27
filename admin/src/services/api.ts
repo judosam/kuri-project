@@ -224,7 +224,6 @@ export const recordsApi = {
         | 'name'
         | 'description'
         | 'status'
-        | 'visit_order'
         | 'unique_id'
         | 'cumulative_road_distance_km'
         | 'coordinates'

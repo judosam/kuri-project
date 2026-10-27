@@ -236,6 +236,9 @@ async def save_telecaller_feedback(
     record.telecaller_called_at = datetime.now(timezone.utc)
     record.updated_at = record.telecaller_called_at
     record.telecaller_by_id = current_user.id
+    record.updated_by_id = current_user.id
+    record.updated_by_name = current_user.full_name or current_user.username
+    record.updated_by_role = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
 
     # If unassigned and current user is telecaller, claim it
     if record.assigned_telecaller_id is None and current_user.role.value == "TELECALLER":

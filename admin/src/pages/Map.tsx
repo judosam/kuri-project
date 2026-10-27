@@ -820,11 +820,7 @@ export default function MapPage() {
                           <span className="mono-sm txt-faint" style={{ whiteSpace: 'nowrap' }}>{formatDateTime(loc.captured_at)}</span>
                         )}
                       </div>
-                      {loc.visit_order ? (
-                        <div style={{ fontSize: 11, color: '#6366f1', fontWeight: 600, marginBottom: 2 }}>
-                          Stop #{loc.visit_order}
-                        </div>
-                      ) : null}
+
                       <span className="map-pop-name">{loc.record_name}</span>
                       {(enName(loc.location_name) || enName(loc.formatted_address) || loc.site_address) && (
                         <span className="map-pop-loc">

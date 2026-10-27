@@ -228,7 +228,6 @@ def test_commit_imports_only_valid_rows_and_flags_source(client, admin_token, le
     assert detail["unique_id"] == "OLD-001"
     assert detail["owner_name_en"] == "Ravi Kumar"
     assert detail["district"] == "Coimbatore"
-    assert detail["visit_order"] == 1
     assert detail["date_of_visit"] == "2024-05-11"
     assert detail["construction_happening"] == "Yes"
     assert detail["remarks"] == "Completed before app rollout"

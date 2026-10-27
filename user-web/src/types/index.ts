@@ -124,6 +124,9 @@ export interface InspectionFormData {
   construction_happening: 'Yes' | 'No';
   stage_of_construction: string;
   custom_stage?: string;
+  no_of_floors?: string;
+  built_up_area?: string;
+  expected_completion?: string;
   type_of_construction: string;
   relationship_with_building: string;
   building_user_name: string;

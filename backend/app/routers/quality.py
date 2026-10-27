@@ -83,7 +83,7 @@ async def field_location_options(
         st = status.upper()
         is_completed = or_(
             CaptureRecord.status.in_(["COMPLETED", "Updated Revisited", "UPDATED_REVISITED"]),
-            CaptureRecord.revisit_status == "COMPLETED",
+            func.coalesce(CaptureRecord.revisit_status, "") == "COMPLETED",
         )
         is_not_interested = or_(
             CaptureRecord.status.in_(["NOT_INTERESTED", "Not Interested"]),

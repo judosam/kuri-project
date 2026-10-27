@@ -102,7 +102,9 @@ export type IconName =
   | 'check'
   | 'published_with_changes'
   | 'comment'
-  | 'description';
+  | 'description'
+  | 'edit_document'
+  | 'sync';
 
 
 export function Icon({

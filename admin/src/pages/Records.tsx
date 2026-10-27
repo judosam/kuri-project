@@ -1,12 +1,12 @@
+import { TelecallingInfoModal, FieldVerifierInfoModal, QaInfoModal } from '../components/LeadInfoModals';
+import BulkEditModal from '../components/BulkEditModal';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { recordsApi, usersApi, SERVER_BASE } from '../services/api';
 import type { AuditStatus, CaptureRecord, User } from '../types';
 import {
   formatDateTime,
-  formatCapturedDateOrTime,
   Icon,
-  Avatar,
   EmptyPanel,
   LoadingPanel,
   Pager,
@@ -18,7 +18,7 @@ import {
 import RecordColumnHeader from '../components/RecordColumnHeader';
 import { readRecordState, saveRecordState } from '../utils/recordState';
 import { useTopHeader } from '../context/HeaderContext';
-import { calculateCoordVariance, getFieldCoordinates } from '../utils/geo';
+import { getFieldCoordinates } from '../utils/geo';
 import { ExpandableCellText } from '../components/ExpandableCellText';
 import { GmapSatellitePanel } from '../components/GmapSatellite';
 import { CoordinateMap } from '../components/CoordinateMap';
@@ -34,7 +34,6 @@ import {
   QcStatusCell,
   AuditStatusCell,
   SatelliteCell,
-  capturedTime,
   type RecordView,
 } from '../components/RecordWorkflowFields';
 
@@ -87,7 +86,7 @@ const defaultSortKeyFor = (isAuditorView: boolean) => (isAuditorView ? 'qc_compl
  * Location Verification chip tones for the records table — mirrors the
  * Record Detail page's coordinate-variance chips (10 m exact / 30 m nearby).
  */
-const LOCATION_VERIFICATION_TONE = {
+export const LOCATION_VERIFICATION_TONE = {
   exact: { label: 'Exact Match', bg: '#ecfdf5', fg: '#059669', dot: '#10b981', border: '#a7f3d0' },
   close: { label: 'Nearby Lock', bg: '#fffbeb', fg: '#b45309', dot: '#f59e0b', border: '#fde68a' },
   far: { label: 'Position Discrepancy', bg: '#fef2f2', fg: '#b91c1c', dot: '#ef4444', border: '#fecaca' },
@@ -352,6 +351,10 @@ export default function Records({
   const [exporting, setExporting] = useState(false);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [telecallingModalRecord, setTelecallingModalRecord] = useState<CaptureRecord | null>(null);
+  const [verifierModalRecord, setVerifierModalRecord] = useState<CaptureRecord | null>(null);
+  const [qaModalRecord, setQaModalRecord] = useState<CaptureRecord | null>(null);
   const [exportSections, setExportSections] = useState({
     planning: true,
     audit: true,
@@ -1311,6 +1314,26 @@ export default function Records({
         <button
           type="button"
           className="btn btn-secondary btn-sm"
+          onClick={() => setShowBulkEditModal(true)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, height: 30, borderRadius: 6 }}
+          title="Bulk update existing leads via Excel template"
+        >
+          <Icon name="edit_document" size={14} />
+          <span className="btn-label">Bulk Edit</span>
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => setShowBulkEditModal(true)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, height: 30, borderRadius: 6 }}
+          title="Bulk update existing leads via Excel template"
+        >
+          <Icon name="edit_document" size={14} />
+          <span className="btn-label">Bulk Edit</span>
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
           onClick={handleExportClick}
           disabled={exporting}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, height: 30, borderRadius: 6 }}
@@ -1854,40 +1877,15 @@ export default function Records({
   </>
 ) : (
   <>
-    {/* Field-verification table. Identity and the imported QA facts lead; the
-        captured construction detail sits in the middle; location evidence and
-        the saved imagery close the row. */}
-    {sortHeader('Unique ID', 'unique_id', 135, true, 140)}
-    {sortHeader('Last Modified Date', 'last_modified_at', 172, true, 185, 165)}
-    {sortHeader('QC Status', 'qc_status', 125, true, 135, 115)}
-    {sortHeader('Audit Status', 'audit_status', 160, true, 180, 150)}
-    {sortHeader('Audited By', 'audited_by', 110, true, 120, 100)}
-    {sortHeader('QC Comments (VHR Imagery)', 'qc_vhr_comment', 200, true, 220)}
-    {sortHeader('QC Additional Details (Street View)', 'qc_street_details', 220, true, 240)}
-    {sortHeader('Sq.ft', 'qc_sqfeet', 120, true, 130)}
-    {sortHeader('Field Verifier', 'user_name', 135, true, 145)}
-    {sortHeader('Verification Status', 'status', 170, true, 195, 155)}
-    <th style={{ width: 78, minWidth: 72, maxWidth: 86 }} className="col-photos">Photos</th>
-    {sortHeader('Captured / Inspection Completed', 'captured_at', 225, true, 255, 210)}
-    <th style={{ width: 100, minWidth: 100, maxWidth: 110 }}>Deviation</th>
-    {sortHeader('Constructions Happened', 'construction_happening', 160, true, 175)}
-    {sortHeader('Type of Construction', 'type_of_construction', 145, true, 155)}
-    {sortHeader('Stage of Construction', 'stage_of_construction', 150, true, 160)}
-    {sortHeader('Relationship with Building', 'relationship_with_building', 160, true, 170)}
-    {sortHeader('Building User', 'building_user_name', 135, true, 145)}
-    {sortHeader('Spoken With', 'spoken_with', 135, true, 145)}
-    {sortHeader('Contact Number', 'contact_number', 125, true, 135)}
-    {sortHeader('Contractor / Architect', 'site_contractor_architect_name', 155, true, 165)}
-    {sortHeader('Inspection Remarks', 'remarks', 200, true, 220)}
-    {sortHeader('Contractor Contact', 'site_contractor_architect_number', 125, true, 135)}
-    {sortHeader('Telecaller Status', 'telecaller_status', 155, true, 170, 140)}
-    {sortHeader('Telecaller Comment', 'telecaller_comment', 200, false, 240, 180)}
-    {sortHeader('Village', 'village', 125, true, 135)}
-    {sortHeader('Taluk', 'taluk', 115, true, 125)}
-    {sortHeader('District', 'district', 115, true, 125)}
-    {sortHeader('Coordinates', 'coordinates', 155, true, 165)}
-    <th style={{ width: 145, minWidth: 140, maxWidth: 155 }}>Location Verification</th>
-    <th style={{ width: 64, minWidth: 64, maxWidth: 70 }} title="Google Maps satellite image saved for this location">Satellite</th>
+    {/* Intelligent compact enterprise columns */}
+    {sortHeader('Lead / Project', 'unique_id', 160, true, 175)}
+    {sortHeader('Contact & Phone', 'contact_number', 150, true, 165)}
+    {sortHeader('Location', 'village', 140, true, 155)}
+    {sortHeader('Construction Specs', 'stage_of_construction', 160, true, 175)}
+    {sortHeader('Field Status', 'status', 130, true, 145)}
+    {sortHeader('Last Updated', 'last_modified_at', 140, true, 155)}
+    <th style={{ width: 235, minWidth: 220, textAlign: 'center' }}>Details & Portals</th>
+    <th style={{ width: 70, minWidth: 65, textAlign: 'center' }}>Action</th>
   </>
 )}
 </tr>
@@ -1907,19 +1905,8 @@ export default function Records({
                         : null);
 
                   const nil = <span style={{ color: '#0f172a', fontWeight: 600 }}>-</span>;
-                  // Empty inspection cells read as a dash instead of a blank gap.
-                  const cellText = (value?: string | number | null) =>
-                    value == null || value === '' ? nil : <span title={String(value)}>{value}</span>;
-
                   const isImported = r.source === 'imported';
                   const mapLink = gmapUrl(coordsDisplay);
-                  // Distance between the admin-given coordinates and the field
-                  // GPS fix (backend computes it; recomputed locally as fallback).
-                  const locationVariance = r.deviation_formatted
-                    ? { formatted: r.deviation_formatted, status: (r.deviation_status || 'far') as keyof typeof LOCATION_VERIFICATION_TONE }
-                    : calculateCoordVariance(r.coordinates, fieldCoords?.latitude ?? null, fieldCoords?.longitude ?? null);
-                  const locationTone =
-                    LOCATION_VERIFICATION_TONE[locationVariance?.status ?? 'far'] ?? LOCATION_VERIFICATION_TONE.far;
 
                   return (
                     <tr
@@ -1985,335 +1972,236 @@ export default function Records({
                           title="Select this record"
                         />
                       </td>}
-{/* 1. Unique ID — the record key operators quote on the phone. */}
-<td className="col-unique-id">
-  {r.unique_id ? (
-    <span className="mono-sm rec-unique-id" style={{ fontWeight: 700, color: '#0f172a' }}>{r.unique_id}</span>
-  ) : nil}
-</td>
-{/* 2. Last Modified Date — when lead was assigned or reassigned */}
-<td className="rec-last-modified col-last-modified" style={{ whiteSpace: 'nowrap' }} title="When lead was assigned or reassigned">
-  {(() => {
-    const t = r.last_modified_at || r.reassigned_at || r.assigned_at || r.created_at;
-    return t ? formatDateTime(t) : nil;
-  })()}
-</td>
-{/* 3. QC Status (QC Done / QC Pending) */}
-<QcStatusCell record={r} />
-{/* 4. Audit Status (Approval / Disapproval / Commercial / Pending) */}
-<AuditStatusCell record={r} />
-{/* Audited By */}
-<td className="col-audited-by">
-  {r.audited_by_name ? (
-    <div className="cell-person">
-      <Avatar name={r.audited_by_name} size="sm" />
-      <span className="pname" style={{ color: '#0f172a', fontWeight: 600 }}>
-        {r.audited_by_name}
-      </span>
-    </div>
-  ) : nil}
-</td>
-{/* QC Comments (VHR Imagery) */}
-<QcCommentsCell record={r} />
-{/* QC Additional Details (Street View) */}
-<td className="col-qc-street-details"><div className="rec-text-cell"><ExpandableCellText text={r.qc_street_details} /></div></td>
-{/* Sq.ft */}
-<td><div className="rec-text-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{r.qc_sqfeet || '—'}</div></td>
-{/* 8. Field Verifier — who the task was released to. */}
-<td title={r.unique_id ? `Unique ID: ${r.unique_id}` : undefined}>
-  {r.user_id != null ? (
-    <div className="cell-person">
-      <Avatar name={r.user_name || `User ${r.user_id}`} size="sm" />
-      <span className="pname" style={{ color: '#0f172a', fontWeight: 600 }}>
-        {r.user_name || `User ${r.user_id}`}
-      </span>
-    </div>
-  ) : (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: r.audit_status === 'APPROVAL' ? '#059669' : '#b45309', fontWeight: 600, fontSize: '0.78rem', whiteSpace: 'nowrap' }}
-      title={r.audit_status === 'APPROVAL' ? 'Auditor approved — ready to assign a field verifier' : r.assigned_auditor_name ? `Routed to auditor ${r.assigned_auditor_name} — awaiting decision` : 'Staged — route it to an auditor for review'}>
-      <Icon name={r.audit_status === 'APPROVAL' ? 'check_circle' : 'pending_actions'} size={13} />
-      {r.audit_status === 'APPROVAL'
-        ? 'Ready to assign'
-        : r.assigned_auditor_name
-          ? `With ${r.assigned_auditor_name}`
-          : 'Staged'}
+{/* 1. Lead / Project Name */}
+<td className="col-lead-info" style={{ textAlign: 'left' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <span className="mono-sm" style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.84rem' }}>
+      {r.unique_id || `#${r.id}`}
     </span>
-  )}
-</td>
-{/* 9. Verification Status. */}
-<td>
-  {r.is_manually_added || r.source === 'manual' ? (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        padding: '1.5px 7px',
-        borderRadius: 9999,
-        fontSize: '0.70rem',
-        fontWeight: 700,
-        whiteSpace: 'nowrap',
-        background: '#eff6ff',
-        color: '#1d4ed8',
-        border: '1px solid #bfdbfe',
-        lineHeight: 1,
-        height: 20,
-      }}
-      title="Manually added record"
-    >
-      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
-      Manually Added
+    <span style={{ fontSize: '0.76rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }} title={r.name || r.site_address || undefined}>
+      {r.name || r.site_address || 'Site Lead'}
     </span>
-  ) : r.status ? (() => {
-    const s = (r.status || '').toUpperCase();
-    const isNotInterested = s === 'NOT_INTERESTED' || s === 'NOT INTERESTED';
-    const isDuplicate = s === 'DUPLICATE';
-    const isConstructionFinished = s === 'CONSTRUCTION_FINISHED' || s === 'CONSTRUCTION FINISHED';
-    const isClosed = isNotInterested || isDuplicate || isConstructionFinished;
-
-    const isReassigned = !isComplete && !isClosed && (r.reassigned_to_id != null || r.revisit_status === 'REASSIGNED' || r.revisit_status === 'PENDING_REVISIT');
-    const isRevisited = isComplete && (r.status === 'Updated Revisited' || r.status === 'UPDATED_REVISITED' || r.revisit_status === 'Updated Revisited' || r.revisit_status === 'COMPLETED' || (r.reassigned_to_id != null && (r.updated_coordinates || r.updated_information)));
-    
-    let bg = isComplete ? '#ecfdf5' : isReassigned ? '#eff6ff' : '#fff7ed';
-    let color = isComplete ? '#059669' : isReassigned ? '#1d4ed8' : '#d97706';
-    let dotBg = isComplete ? '#10b981' : isReassigned ? '#3b82f6' : '#f59e0b';
-    let border = isReassigned ? '1px solid #bfdbfe' : '1px solid transparent';
-    let label = isComplete ? 'Completed' : isReassigned ? 'Reassigned' : 'Pending';
-    let title = isComplete
-      ? (r.status === 'Updated Revisited' || r.status === 'UPDATED_REVISITED' ? 'Field verification completed (Revisit completed)' : 'Field verification completed')
-      : isReassigned
-      ? 'Reassigned to field verifier — verification pending'
-      : r.user_id != null
-      ? 'Assigned to a field verifier — inspection pending'
-      : 'Not yet assigned to a field verifier';
-
-    if (isNotInterested) {
-      bg = '#fef3c7'; color = '#b45309'; dotBg = '#f59e0b'; border = '1px solid #fde68a';
-      label = 'Not Interested'; title = 'Owner or contact person not interested / refused verification';
-    } else if (isDuplicate) {
-      bg = '#ede9fe'; color = '#6d28d9'; dotBg = '#8b5cf6'; border = '1px solid #ddd6fe';
-      label = 'Duplicate'; title = 'Duplicate of an existing or already visited site';
-    } else if (isConstructionFinished) {
-      bg = '#ccfbf1'; color = '#0f766e'; dotBg = '#14b8a6'; border = '1px solid #99f6e4';
-      label = 'Construction Finished'; title = 'Construction work is finished on site';
-    }
-    return (
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexWrap: 'nowrap' }}>
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '1.5px 7px',
-            borderRadius: 9999,
-            fontSize: '0.70rem',
-            fontWeight: 700,
-            whiteSpace: 'nowrap',
-            background: bg,
-            color: color,
-            border: border,
-            lineHeight: 1,
-            height: 20,
-          }}
-          title={title}
-        >
-          <span style={{ width: 5, height: 5, borderRadius: '50%', background: dotBg, flexShrink: 0 }} />
-          {label}
-        </span>
-        {isRevisited && (
-          <span
-            className="revisited-tag"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 3,
-              padding: '1.5px 6px',
-              borderRadius: 4,
-              fontSize: '0.68rem',
-              fontWeight: 700,
-              background: '#eff6ff',
-              color: '#1d4ed8',
-              border: '1px solid #bfdbfe',
-              whiteSpace: 'nowrap',
-              lineHeight: 1,
-              height: 20,
-            }}
-            title={`Revisit completed by ${r.reassigned_to_name || r.user_name || 'verifier'}`}
-          >
-            <Icon name="history" size={11} />
-            Revisited
-          </span>
-        )}
-      </div>
-    );
-  })() : (
-    nil
-  )}
-</td>
-{/* Photos — thumbnails with badge count if captured/uploaded */}
-<td className="col-photos cell-thumb" onClick={(e) => e.stopPropagation()}>
-  {r.images && r.images.length > 0 ? (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      <button
-        type="button"
-        className="photo-thumb-btn"
-        onClick={(e) => {
-          e.stopPropagation();
-          openPhotoViewer(r.images![0]);
-        }}
-        title={`View photo 1 of ${r.images.length}`}
-      >
-        <AuthThumbnail
-          imageUrl={r.images[0].thumbnail_url || r.images[0].image_url}
-          alt={r.images[0].file_name || 'Captured photo'}
-          size={36}
-        />
-      </button>
-      {r.images.length > 1 && (
-        <span className="photo-count-chip">+{r.images.length - 1}</span>
-      )}
-    </div>
-  ) : nil}
-</td>
-{/* 10. Captured / Inspection Completed. */}
-<td style={{ whiteSpace: 'nowrap' }} className="col-captured-at">
-  {(() => {
-    const raw = capturedTime(r);
-    return raw ? formatCapturedDateOrTime(raw) : nil;
-  })()}
-</td>
-{/* 11. Deviation — metres between the admin-given fix and the field GPS. */}
-<td style={{ whiteSpace: 'nowrap' }}>
-  {locationVariance ? (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        padding: '1.5px 7px',
-        borderRadius: 9999,
-        fontSize: '0.70rem',
-        fontWeight: 700,
-        background: locationTone.bg,
-        color: locationTone.fg,
-        border: `1px solid ${locationTone.border}`,
-        lineHeight: 1,
-        height: 20,
-      }}
-      title={`Field GPS is ${locationVariance.formatted} from the admin-given position (exact ≤ 10 m, nearby ≤ 30 m)`}
-    >
-      <span style={{ width: 5, height: 5, borderRadius: '50%', background: locationTone.dot, flexShrink: 0 }} />
-      {locationVariance.formatted}
-    </span>
-  ) : (
-    <span style={{ color: '#94a3b8', fontWeight: 600, fontSize: '0.72rem' }} title="No field GPS fix yet — location cannot be verified">
-      Not captured
-    </span>
-  )}
-</td>
-{/* Constructions Happened */}
-<td>
-  {r.construction_happening ? (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        padding: '1.5px 7px',
-        borderRadius: 9999,
-        fontSize: '0.70rem',
-        fontWeight: 700,
-        background: r.construction_happening.toLowerCase() === 'yes' ? '#ecfdf5' : '#fef2f2',
-        color: r.construction_happening.toLowerCase() === 'yes' ? '#047857' : '#b91c1c',
-        border: `1px solid ${r.construction_happening.toLowerCase() === 'yes' ? '#a7f3d0' : '#fecaca'}`,
-        lineHeight: 1,
-        height: 20,
-      }}
-    >
-      <span style={{ width: 5, height: 5, borderRadius: '50%', background: r.construction_happening.toLowerCase() === 'yes' ? '#10b981' : '#ef4444', flexShrink: 0 }} />
-      {r.construction_happening}
-    </span>
-  ) : (
-    nil
-  )}
-</td>
-{/* 12. Type of Construction */}
-<td>{cellText(r.type_of_construction)}</td>
-{/* 13. Stage of Construction */}
-<td>{cellText(r.stage_of_construction)}</td>
-{/* 14. Relationship with Building */}
-<td><div className="rec-text-cell"><ExpandableCellText text={r.relationship_with_building} /></div></td>
-{/* 15. Building User */}
-<td>{cellText(r.building_user_name)}</td>
-{/* 15b. Spoken With */}
-<td>{cellText(r.spoken_with)}</td>
-{/* 16. Contact Number */}
-<td className="mono-sm" style={{ whiteSpace: 'nowrap' }}>{cellText(r.contact_number)}</td>
-{/* 17. Contractor / Architect */}
-<td><div className="rec-text-cell"><ExpandableCellText text={r.site_contractor_architect_name} /></div></td>
-{/* 18. Inspection Remarks */}
-<td className="col-remarks"><div className="rec-text-cell"><ExpandableCellText text={r.remarks} /></div></td>
-{/* 19. Contractor Contact */}
-<td className="mono-sm" style={{ whiteSpace: 'nowrap' }}>{cellText(r.site_contractor_architect_number)}</td>
-{/* Telecaller Status & Comment */}
-<td className="col-telecaller-status">
-  <TelecallerStatusChip status={r.telecaller_status} />
-</td>
-<td className="col-telecaller-comment">
-  <div className="rec-text-cell">
-    <ExpandableCellText text={r.telecaller_comment} />
   </div>
 </td>
-{/* 20-22. Village, Taluk, District */}
-<td><div className="rec-text-cell"><ExpandableCellText text={r.village} /></div></td>
-<td><div className="rec-text-cell"><ExpandableCellText text={r.taluk} /></div></td>
-<td><div className="rec-text-cell"><ExpandableCellText text={r.district} /></div></td>
-{/* 23. Coordinates — the admin-given fix, else the field GPS capture. */}
-<CoordinatesCell record={r} />
-{/* 24. Location Verification — status chip plus the Maps deep link. */}
-<td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
-  {locationVariance ? (
-    <span
+
+{/* 2. Contact Person & Phone */}
+<td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <span style={{ fontSize: '0.80rem', fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }} title={r.owner_name_en || r.building_user_name || undefined}>
+      {r.owner_name_en || r.building_user_name || '—'}
+    </span>
+    {r.contact_number && r.contact_number.trim() && r.contact_number !== '-' ? (
+      <a
+        href={`tel:${r.contact_number.trim()}`}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          fontSize: '0.76rem',
+          color: '#2563eb',
+          fontWeight: 600,
+          textDecoration: 'none',
+        }}
+        title="Click to call"
+      >
+        <Icon name="call" size={12} />
+        {r.contact_number.trim()}
+      </a>
+    ) : r.site_contractor_architect_number ? (
+      <a
+        href={`tel:${r.site_contractor_architect_number.trim()}`}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          fontSize: '0.76rem',
+          color: '#64748b',
+          textDecoration: 'none',
+        }}
+      >
+        <Icon name="call" size={12} />
+        {r.site_contractor_architect_number.trim()}
+      </a>
+    ) : (
+      <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>No phone</span>
+    )}
+  </div>
+</td>
+
+{/* 3. Location */}
+<td style={{ textAlign: 'left' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+    <span style={{ fontSize: '0.80rem', fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }} title={r.village || undefined}>
+      {r.village || '—'}
+    </span>
+    <span style={{ fontSize: '0.72rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}>
+      {[r.taluk, r.district].filter(Boolean).join(', ') || '—'}
+    </span>
+  </div>
+</td>
+
+{/* 4. Construction Specs */}
+<td style={{ textAlign: 'left' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+    <span style={{ fontSize: '0.80rem', fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 155 }} title={r.stage_of_construction || undefined}>
+      {r.stage_of_construction || 'Stage not set'}
+    </span>
+    <span style={{ fontSize: '0.72rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 155 }}>
+      {[r.no_of_floors, r.built_up_area].filter(Boolean).join(' • ') || (r.expected_completion ? `Exp: ${r.expected_completion}` : '—')}
+    </span>
+  </div>
+</td>
+
+{/* 5. Field Status & Date */}
+<td style={{ textAlign: 'left' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    {(() => {
+      const s = (r.status || '').toUpperCase();
+      const isNotInterested = s === 'NOT_INTERESTED' || s === 'NOT INTERESTED';
+      const isDuplicate = s === 'DUPLICATE';
+      const isConstructionFinished = s === 'CONSTRUCTION_FINISHED' || s === 'CONSTRUCTION FINISHED';
+      const isReassigned = !isComplete && (r.reassigned_to_id != null || r.revisit_status === 'REASSIGNED' || r.revisit_status === 'PENDING_REVISIT');
+      const isRevisited = isComplete && (r.status === 'Updated Revisited' || r.status === 'UPDATED_REVISITED' || r.revisit_status === 'Updated Revisited' || r.revisit_status === 'COMPLETED');
+      
+      let bg = isComplete ? '#ecfdf5' : isReassigned ? '#eff6ff' : '#fff7ed';
+      let color = isComplete ? '#059669' : isReassigned ? '#1d4ed8' : '#d97706';
+      let dotBg = isComplete ? '#10b981' : isReassigned ? '#3b82f6' : '#f59e0b';
+      let label = isComplete ? (isRevisited ? 'Revisited' : 'Completed') : isReassigned ? 'Reassigned' : 'Pending';
+
+      if (isNotInterested) { bg = '#fef3c7'; color = '#b45309'; dotBg = '#f59e0b'; label = 'Not Interested'; }
+      else if (isDuplicate) { bg = '#ede9fe'; color = '#6d28d9'; dotBg = '#8b5cf6'; label = 'Duplicate'; }
+      else if (isConstructionFinished) { bg = '#ccfbf1'; color = '#0f766e'; dotBg = '#14b8a6'; label = 'Finished'; }
+
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 9999, fontSize: '0.70rem', fontWeight: 700, background: bg, color: color, whiteSpace: 'nowrap' }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: dotBg }} />
+          {label}
+        </span>
+      );
+    })()}
+    <span style={{ fontSize: '0.70rem', color: '#64748b' }}>
+      {r.date_of_visit || (r.field_captured_at ? new Date(r.field_captured_at).toLocaleDateString() : '')}
+    </span>
+  </div>
+</td>
+
+{/* 6. Last Updated (Updater & Role) */}
+<td style={{ textAlign: 'left' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+    <span style={{ fontSize: '0.74rem', color: '#0f172a', fontWeight: 600, whiteSpace: 'nowrap' }}>
+      {(() => {
+        const t = r.last_modified_at || r.reassigned_at || r.assigned_at || r.created_at;
+        return t ? formatDateTime(t) : nil;
+      })()}
+    </span>
+    {r.updated_by_name && (
+      <span style={{ fontSize: '0.70rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 130 }}>
+        by {r.updated_by_name} ({r.updated_by_role ? r.updated_by_role.toLowerCase() : 'user'})
+      </span>
+    )}
+  </div>
+</td>
+
+{/* 7. Quick Modals (3 Dedicated Popups) */}
+<td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+    <button
+      type="button"
+      className="btn btn-secondary btn-sm"
       style={{
+        padding: '3px 8px',
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        height: 28,
+        minHeight: 28,
         display: 'inline-flex',
         alignItems: 'center',
         gap: 4,
-        padding: '1.5px 7px',
-        borderRadius: 9999,
-        fontSize: '0.70rem',
-        fontWeight: 700,
-        background: locationTone.bg,
-        color: locationTone.fg,
-        border: `1px solid ${locationTone.border}`,
-        lineHeight: 1,
-        height: 20,
+        background: r.telecaller_status ? '#eff6ff' : '#f8fafc',
+        border: `1px solid ${r.telecaller_status ? '#bfdbfe' : '#e2e8f0'}`,
+        color: r.telecaller_status ? '#1d4ed8' : '#475569',
       }}
-      title={`Field GPS is ${locationVariance.formatted} from the admin-given position (exact ≤ 10 m, nearby ≤ 30 m)`}
+      onClick={() => setTelecallingModalRecord(r)}
+      title="View Telecalling Information"
     >
-      <span style={{ width: 5, height: 5, borderRadius: '50%', background: locationTone.dot, flexShrink: 0 }} />
-      {locationTone.label}
-    </span>
-  ) : (
-    <span style={{ color: '#94a3b8', fontWeight: 600, fontSize: '0.72rem' }} title="No field GPS fix yet — location cannot be verified">
-      Not captured
-    </span>
-  )}
-  {mapLink && (
-    <a
-      className="btn btn-ghost btn-sm"
-      href={mapLink}
-      target="_blank"
-      rel="noopener noreferrer"
-      title="Open these coordinates in Google Maps (satellite view)"
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 6, textDecoration: 'none' }}
+      <Icon name="call" size={13} style={{ color: r.telecaller_status ? '#2563eb' : '#64748b' }} />
+      <span>Telecalling</span>
+    </button>
+
+    <button
+      type="button"
+      className="btn btn-secondary btn-sm"
+      style={{
+        padding: '3px 8px',
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        height: 28,
+        minHeight: 28,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        background: isComplete ? '#ecfdf5' : '#f8fafc',
+        border: `1px solid ${isComplete ? '#a7f3d0' : '#e2e8f0'}`,
+        color: isComplete ? '#047857' : '#475569',
+      }}
+      onClick={() => setVerifierModalRecord(r)}
+      title="View Field Verifier Information"
     >
-      <Icon name="my_location" size={13} style={{ color: '#e86667' }} />
-      Map
-    </a>
-  )}
+      <Icon name="photo_camera" size={13} style={{ color: isComplete ? '#059669' : '#64748b' }} />
+      <span>Verifier</span>
+    </button>
+
+    <button
+      type="button"
+      className="btn btn-secondary btn-sm"
+      style={{
+        padding: '3px 8px',
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        height: 28,
+        minHeight: 28,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        background: r.audit_status === 'APPROVAL' ? '#ecfdf5' : r.audit_status === 'DISAPPROVAL' ? '#fef2f2' : '#f8fafc',
+        border: `1px solid ${r.audit_status === 'APPROVAL' ? '#a7f3d0' : r.audit_status === 'DISAPPROVAL' ? '#fecaca' : '#e2e8f0'}`,
+        color: r.audit_status === 'APPROVAL' ? '#047857' : r.audit_status === 'DISAPPROVAL' ? '#b91c1c' : '#475569',
+      }}
+      onClick={() => setQaModalRecord(r)}
+      title="View QA & Audit Information"
+    >
+      <Icon name="fact_check" size={13} style={{ color: r.audit_status === 'APPROVAL' ? '#059669' : r.audit_status === 'DISAPPROVAL' ? '#dc2626' : '#64748b' }} />
+      <span>QA</span>
+    </button>
+  </div>
 </td>
-{/* 25. Satellite — the saved Google Maps mosaic for this location. */}
-<SatelliteCell record={r} />
+
+{/* 8. Action (Map / View) */}
+<td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+    {mapLink && (
+      <a
+        className="btn btn-ghost btn-sm"
+        href={mapLink}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Open coordinates in Google Maps"
+        style={{ padding: '3px 6px', display: 'inline-flex', alignItems: 'center', color: '#ef4444' }}
+      >
+        <Icon name="pin_drop" size={15} />
+      </a>
+    )}
+    <button
+      type="button"
+      className="btn btn-ghost btn-sm"
+      onClick={() => navigate(isImported ? `/records/imported/${r.id}` : `/records/${r.id}`)}
+      title="Open Record Details"
+      style={{ padding: '3px 6px', display: 'inline-flex', alignItems: 'center', color: '#64748b' }}
+    >
+      <Icon name="chevron_right" size={16} />
+    </button>
+  </div>
+</td>
 </>
 )}
                     </tr>
@@ -3812,6 +3700,36 @@ export default function Records({
           />
         </div>
       )}
+          {/* Modals */}
+      {showBulkEditModal && (
+        <BulkEditModal
+          isOpen={showBulkEditModal}
+          onClose={() => setShowBulkEditModal(false)}
+          onSuccess={() => {
+            setShowBulkEditModal(false);
+            loadRecords();
+          }}
+        />
+      )}
+      {telecallingModalRecord && (
+        <TelecallingInfoModal
+          record={telecallingModalRecord}
+          onClose={() => setTelecallingModalRecord(null)}
+        />
+      )}
+      {verifierModalRecord && (
+        <FieldVerifierInfoModal
+          record={verifierModalRecord}
+          onClose={() => setVerifierModalRecord(null)}
+        />
+      )}
+      {qaModalRecord && (
+        <QaInfoModal
+          record={qaModalRecord}
+          onClose={() => setQaModalRecord(null)}
+        />
+      )}
+
     </PageShell>
   );
 }

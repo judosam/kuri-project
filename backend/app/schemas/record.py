@@ -120,7 +120,6 @@ class RecordCreateRequest(BaseModel):
 
 class TaskDispatchItem(BaseModel):
     user_id: int
-    visit_order: Optional[int] = None
     unique_id: Optional[str] = None
     cumulative_road_distance_km: Optional[str] = None
     coordinates: Optional[str] = None
@@ -204,7 +203,6 @@ class RecordDetail(BaseModel):
     is_manually_added: bool = False
 
     # 15 Task Dispatch Planning Fields (Admin Google Sheet)
-    visit_order: Optional[int] = None
     unique_id: Optional[str] = None
     cumulative_road_distance_km: Optional[str] = None
     coordinates: Optional[str] = None
@@ -278,6 +276,9 @@ class RecordDetail(BaseModel):
     revisit_status: Optional[str] = None
     updated_coordinates: Optional[str] = None
     updated_information: Optional[str] = None
+    updated_by_id: Optional[int] = None
+    updated_by_name: Optional[str] = None
+    updated_by_role: Optional[str] = None
     follow_up_date: Optional[str] = None
 
     # Google Maps satellite snapshot: the cached mosaic served to every panel
@@ -439,7 +440,6 @@ class RecordUpdateRequest(BaseModel):
 
     # 15 Task Dispatch Planning Fields — editable so imported (backfilled)
     # records can be corrected from the admin portal.
-    visit_order: Optional[int] = None
     unique_id: Optional[str] = None
     cumulative_road_distance_km: Optional[str] = None
     coordinates: Optional[str] = None
@@ -490,6 +490,9 @@ class RecordUpdateRequest(BaseModel):
     updated_coordinates: Optional[str] = None
     revisit_status: Optional[str] = None
     updated_information: Optional[str] = None
+    updated_by_id: Optional[int] = None
+    updated_by_name: Optional[str] = None
+    updated_by_role: Optional[str] = None
 
 
 class MarkStatusRequest(BaseModel):
@@ -593,6 +596,8 @@ class DashboardOverview(BaseModel):
     sent_to_field: int = 0
     unassigned_properties: int = 0
     completed_verifications: int = 0
+    closed_verifications: int = 0
+    disapproved_verifications: int = 0
     pending_verifications: int = 0
     completion_rate: float = 0.0
     confirmed_construction: int = 0
