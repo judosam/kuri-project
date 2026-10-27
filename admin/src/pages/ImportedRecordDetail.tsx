@@ -44,6 +44,7 @@ import { useLightboxKeys } from '../hooks/useLightboxKeys';
 import { QC_VHR_OPTIONS, QC_STREET_OPTIONS } from '../utils/qcOptions';
 
 import { TELECALLER_STATUS_OPTIONS } from '../components/TelecallerRecordModal';
+import { TelecallerHistoryTable } from '../components/TelecallerHistoryTable';
 
 const CONSTRUCTION_TYPES = [
   'Residential',
@@ -2167,9 +2168,16 @@ export default function ImportedRecordDetail({
                       { key: 'telecaller_called_at', label: 'Call Logged At', value: record.telecaller_called_at ? formatDateTime(record.telecaller_called_at) : '—' },
                       { key: 'telecaller_by', label: 'Called By', value: record.telecaller_by_name ?? '—' },
                       { key: 'telecaller_status', label: 'Call Decision / Status', value: record.telecaller_status ? record.telecaller_status.replace(/_/g, ' ') : 'No call recorded' },
-                      { key: 'telecaller_comment', label: 'Telecaller Comments', value: record.telecaller_comment ?? '—' },
                     ]}
                   />
+                  {record.telecaller_comment && (
+                    <div style={{ marginTop: 14 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: 6 }}>
+                        Call & Follow-up History Log (Table)
+                      </div>
+                      <TelecallerHistoryTable comment={record.telecaller_comment} isEditing={false} maxHeight={220} />
+                    </div>
+                  )}
                   {telecallerNotice && (
                     <div style={{ marginTop: 8, fontSize: '0.8rem', fontWeight: 600, color: telecallerNotice.ok ? '#059669' : '#dc2626' }}>
                       {telecallerNotice.text}

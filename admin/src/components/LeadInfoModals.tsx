@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { CaptureRecord } from '../types';
 import { Icon } from './ui';
+import { TelecallerHistoryTable } from './TelecallerHistoryTable';
 
 interface ModalProps {
   record: CaptureRecord;
@@ -8,13 +9,9 @@ interface ModalProps {
 }
 
 export function TelecallingInfoModal({ record, onClose }: ModalProps) {
-  // Parse telecaller comments into structured timeline entries if formatted
-  const rawComments = record.telecaller_comment || '';
-  const entries = rawComments.split(/\n\n+/).filter(Boolean);
-
   return (
     <div className="fos-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="fos-modal-card" style={{ maxWidth: 640, width: '95%' }} onClick={(e) => e.stopPropagation()}>
+      <div className="fos-modal-card" style={{ maxWidth: 760, width: '95%' }} onClick={(e) => e.stopPropagation()}>
         <div className="fos-modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ display: 'flex', padding: 8, borderRadius: 8, background: '#eff6ff', color: '#2563eb' }}>
@@ -70,26 +67,17 @@ export function TelecallingInfoModal({ record, onClose }: ModalProps) {
             </div>
           </div>
 
-          {/* Call History / Comments Timeline */}
+          {/* Call History / Comments Table */}
           <div>
-            <h4 style={{ margin: '0 0 12px 0', fontSize: 13, fontWeight: 700, color: '#334155', textTransform: 'uppercase' }}>
-              Call History & Comments ({entries.length})
+            <h4 style={{ margin: '0 0 12px 0', fontSize: 13, fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="table_view" size={16} style={{ color: '#0284c7' }} />
+              Call & Follow-up History (Table Format)
             </h4>
-            {entries.length === 0 ? (
-              <div style={{ padding: 20, textAlign: 'center', background: '#f8fafc', borderRadius: 8, color: '#94a3b8', fontSize: 13 }}>
-                No call feedback logged yet.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {entries.map((entry: string, idx: number) => (
-                  <div key={idx} style={{ padding: 12, background: '#ffffff', borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                    <pre style={{ margin: 0, fontFamily: 'inherit', fontSize: 13, color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                      {entry}
-                    </pre>
-                  </div>
-                ))}
-              </div>
-            )}
+            <TelecallerHistoryTable
+              comment={record.telecaller_comment}
+              isEditing={false}
+              maxHeight={320}
+            />
           </div>
         </div>
 

@@ -51,6 +51,7 @@ from app.services.activity_log_service import backfill_historical_logs_if_empty,
 from app.services.local_storage_service import LocalStorageService
 from app.services.record_service import RecordService
 from app.services.record_filter_service import SORT_PATTERN, parse_column_filters
+from app.services.telecaller_comment_service import normalize_to_table
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -3126,6 +3127,8 @@ async def admin_update_record(
 
     # If telecaller status or comment is updated
     if "telecaller_status" in update_kwargs or "telecaller_comment" in update_kwargs:
+        if update_kwargs.get("telecaller_comment"):
+            update_kwargs["telecaller_comment"] = normalize_to_table(update_kwargs["telecaller_comment"])
         now_utc = datetime.now(timezone.utc)
         update_kwargs["telecaller_called_at"] = request.telecaller_called_at or now_utc
         if not record.telecaller_by_id:

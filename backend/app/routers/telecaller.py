@@ -18,6 +18,12 @@ from app.schemas.record import (
     TelecallerDashboardMetrics,
 )
 from app.services.activity_log_service import log_activity
+from app.services.telecaller_comment_service import (
+    append_call_log_entry,
+    normalize_to_table,
+    parse_comment_to_rows,
+    format_rows_to_table,
+)
 from app.routers.records import _record_to_detail
 from app.repositories.record_repository import BUSINESS_TZ, local_day_bounds
 
@@ -210,28 +216,26 @@ async def save_telecaller_feedback(
     new_note = (request.telecaller_comment or "").strip()
 
     if request.overwrite_comment:
-        record.telecaller_comment = new_note or None
+        record.telecaller_comment = normalize_to_table(new_note) if new_note else None
     else:
-        # Build timestamped entry for call & follow-up history
-        ist_tz = timezone(timedelta(hours=5, minutes=30))
-        ts_str = datetime.now(ist_tz).strftime("%d %b %Y, %I:%M %p")
         caller_name = current_user.full_name or current_user.email or "Telecaller"
         status_label = request.telecaller_status.replace("_", " ").title() if request.telecaller_status else "Call Logged"
 
-        meta_parts = [status_label]
+        meta_parts = []
         if request.follow_up_date:
             meta_parts.append(f"Follow-up: {request.follow_up_date}")
         if request.stage_of_construction:
             meta_parts.append(f"Stage: {request.stage_of_construction}")
 
-        header = f"[{ts_str} - {caller_name} ({' | '.join(meta_parts)})]"
-        entry = f"{header}\n{new_note}" if new_note else header
+        details_str = " | ".join(meta_parts) if meta_parts else "—"
 
-        if record.telecaller_comment and record.telecaller_comment.strip():
-            if entry not in record.telecaller_comment:
-                record.telecaller_comment = f"{record.telecaller_comment.strip()}\n\n{entry}"
-        else:
-            record.telecaller_comment = entry
+        record.telecaller_comment = append_call_log_entry(
+            existing_comment=record.telecaller_comment,
+            caller_name=caller_name,
+            status=status_label,
+            details=details_str,
+            note=new_note,
+        )
 
     record.telecaller_called_at = datetime.now(timezone.utc)
     record.updated_at = record.telecaller_called_at

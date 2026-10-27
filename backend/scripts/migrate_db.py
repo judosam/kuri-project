@@ -1,7 +1,12 @@
 import sqlite3
 import os
 import shutil
+import sys
 from datetime import datetime
+
+# Add app to path to import telecaller_comment_service
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from app.services.telecaller_comment_service import normalize_to_table
 
 DB_PATHS = ['backend/data/app.db', 'data/app.db']
 
@@ -64,6 +69,17 @@ for db_path in DB_PATHS:
         WHERE unique_id = 'CBE-110154-769878' OR id = 2927
     """)
     print(f"Updated lead CBE-110154-769878 location. Rows affected: {cur.rowcount}")
+
+    # Normalize telecaller comments from paragraph to table format
+    cur.execute("SELECT id, telecaller_comment FROM capture_records WHERE telecaller_comment IS NOT NULL AND length(trim(telecaller_comment)) > 0")
+    comment_rows = cur.fetchall()
+    migrated_comments = 0
+    for cid, ctext in comment_rows:
+        tbl = normalize_to_table(ctext)
+        if tbl and tbl != ctext:
+            cur.execute("UPDATE capture_records SET telecaller_comment = ? WHERE id = ?", (tbl, cid))
+            migrated_comments += 1
+    print(f"Normalized {migrated_comments} telecaller comments to table format.")
 
     con.commit()
     con.close()

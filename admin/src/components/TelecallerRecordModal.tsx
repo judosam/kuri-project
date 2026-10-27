@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { CaptureRecord } from '../types';
 import { telecallerApi } from '../services/api';
 import { Icon, AuthThumbnail, formatDateTime } from './ui';
+import { TelecallerHistoryTable } from './TelecallerHistoryTable';
 
 interface TelecallerRecordModalProps {
   record: CaptureRecord;
@@ -800,7 +801,7 @@ export function TelecallerRecordModal({ record, onClose, onUpdated }: Telecaller
               </div>
             </div>
 
-            {/* C. Call History & New Appended Follow-up Notes */}
+            {/* C. Call History & New Appended Follow-up Notes (Table Format) */}
             <div
               style={{
                 background: '#ffffff',
@@ -812,7 +813,7 @@ export function TelecallerRecordModal({ record, onClose, onUpdated }: Telecaller
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                   <Icon name="history" size={14} style={{ color: '#8b5cf6' }} />
-                  Call & Follow-up History (Appended Log)
+                  Call & Follow-up History (Table Format)
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   {record.telecaller_comment && (
@@ -820,66 +821,28 @@ export function TelecallerRecordModal({ record, onClose, onUpdated }: Telecaller
                       type="button"
                       className="btn btn-ghost btn-xs"
                       onClick={() => setIsEditingHistory(!isEditingHistory)}
-                      style={{ fontSize: 10.5, color: '#64748b' }}
+                      style={{ fontSize: 10.5, color: isEditingHistory ? '#0284c7' : '#64748b' }}
                       title="Toggle direct editing of previous notes if needed to fix errors"
                     >
-                      <Icon name="edit" size={12} />
-                      {isEditingHistory ? 'Back to Add Note' : 'Edit Full History'}
+                      <Icon name={isEditingHistory ? "table_view" : "edit"} size={12} />
+                      {isEditingHistory ? 'Back to Add Note' : 'Edit History Table'}
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* Existing Log Box */}
-              {record.telecaller_comment ? (
-                <div
-                  style={{
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 6,
-                    padding: '8px 10px',
-                    maxHeight: 140,
-                    overflowY: 'auto',
-                    fontSize: 11.5,
-                    lineHeight: 1.5,
-                    color: '#334155',
-                    whiteSpace: 'pre-wrap',
-                    marginBottom: 10,
-                  }}
-                >
-                  {record.telecaller_comment}
-                </div>
-              ) : (
-                <div
-                  style={{
-                    background: '#f8fafc',
-                    borderRadius: 6,
-                    padding: '8px 10px',
-                    fontSize: 11,
-                    color: '#94a3b8',
-                    fontStyle: 'italic',
-                    marginBottom: 10,
-                  }}
-                >
-                  No prior call logs or follow-up notes recorded yet.
-                </div>
-              )}
+              {/* Call History Table Component */}
+              <div style={{ marginBottom: 10 }}>
+                <TelecallerHistoryTable
+                  comment={record.telecaller_comment}
+                  isEditing={isEditingHistory}
+                  onChange={(_rows, tableText) => setHistoryText(tableText)}
+                  maxHeight={180}
+                />
+              </div>
 
-              {/* Direct History Editor or New Note Input */}
-              {isEditingHistory ? (
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#d97706', marginBottom: 4 }}>
-                    ⚠️ Editing raw history (saving will overwrite the full history log above):
-                  </div>
-                  <textarea
-                    className="fld"
-                    rows={4}
-                    value={historyText}
-                    onChange={(e) => setHistoryText(e.target.value)}
-                    style={{ width: '100%', fontSize: 11.5, borderRadius: 6 }}
-                  />
-                </div>
-              ) : (
+              {/* Add New Note input (shown when not editing historical records) */}
+              {!isEditingHistory && (
                 <div>
                   <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#334155', marginBottom: 4 }}>
                     Add New Note / Follow-up Details
@@ -894,7 +857,7 @@ export function TelecallerRecordModal({ record, onClose, onUpdated }: Telecaller
                   />
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
                     <span style={{ fontSize: 10, color: '#64748b' }}>
-                      ✨ This note will be appended with current date, time, and your username.
+                      ✨ This note will be appended as a new row in table format with current date, time, and your username.
                     </span>
                   </div>
                 </div>

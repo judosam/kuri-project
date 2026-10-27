@@ -66,6 +66,7 @@ import {
 import { useTopHeader } from '../context/HeaderContext';
 import { TelecallerRecordModal, TELECALLER_STATUS_OPTIONS } from '../components/TelecallerRecordModal';
 import { ExpandableCellText } from '../components/ExpandableCellText';
+import { getLatestCommentSummary } from '../utils/telecallerHistory';
 
 const PAGE_SIZE = 25;
 
@@ -617,7 +618,7 @@ export default function TelecallerRecords() {
                       <td style={{ textAlign: 'left' }}>
                         {r.telecaller_comment ? (
                           <div className="rec-text-cell" style={{ maxWidth: 220, textAlign: 'left' }}>
-                            <ExpandableCellText text={r.telecaller_comment} maxChars={35} />
+                            <ExpandableCellText text={getLatestCommentSummary(r.telecaller_comment)} maxChars={35} />
                           </div>
                         ) : (
                           nil

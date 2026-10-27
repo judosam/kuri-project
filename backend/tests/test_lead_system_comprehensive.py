@@ -107,3 +107,69 @@ def test_templates_without_visit_order(db, client):
     assert "unique_id" in headers2
     assert "visit_order" not in headers2
     assert "stage_of_construction" in headers2
+
+def test_telecaller_history_table_format(db, client):
+    """Telecaller comments must be split into and saved as table format, not raw paragraphs."""
+    from app.services.telecaller_comment_service import (
+        parse_comment_to_rows,
+        format_rows_to_table,
+        append_call_log_entry,
+    )
+
+    # 1. Test parsing legacy paragraph format into table rows
+    legacy_sample = (
+        "[26 Oct 2026, 01:19 PM - Ajithkumar M (Connected Follow Up | Stage: Additional Floor Construction)]\n"
+        "Spoke with Sarathi, who is the owner. He said he is interested in solar and would like us to meet him."
+    )
+    rows = parse_comment_to_rows(legacy_sample)
+    assert len(rows) == 1
+    assert rows[0]["caller"] == "Ajithkumar M"
+    assert rows[0]["status"] == "Connected Follow Up"
+    assert "Additional Floor Construction" in rows[0]["details"]
+    assert "Spoke with Sarathi" in rows[0]["note"]
+
+    # 2. Test formatting to table format
+    tbl = format_rows_to_table(rows)
+    assert tbl.startswith("| Date & Time | Caller | Call Status | Stage / Details | Notes / Discussion |")
+    assert "| Ajithkumar M | Connected Follow Up |" in tbl
+
+    # 3. Test appending entry returns table format
+    appended = append_call_log_entry(
+        existing_comment=tbl,
+        caller_name="Samuel P",
+        status="Construction Confirmed",
+        details="Stage: Completed Building",
+        note="Customer confirmed completion",
+        timestamp_str="27 Oct 2026, 03:00 PM"
+    )
+    assert "| Samuel P | Construction Confirmed |" in appended
+    roundtrip = parse_comment_to_rows(appended)
+    assert len(roundtrip) == 2
+    assert roundtrip[1]["caller"] == "Samuel P"
+
+    # 4. Test API endpoint saves as table format
+    auth_svc = AuthService(db)
+    telecaller = db.query(User).filter(User.role == UserRole.TELECALLER).first()
+    token = auth_svc.create_token(telecaller)
+
+    record = db.query(CaptureRecord).filter(CaptureRecord.contact_number.isnot(None)).first()
+    assert record is not None
+
+    res = client.post(
+        f"/api/telecaller/records/{record.id}/feedback",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "telecaller_status": "CONNECTED_FOLLOW_UP",
+            "telecaller_comment": "Testing automated table format saving",
+            "stage_of_construction": "Additional Floor Construction",
+            "follow_up_date": "2026-11-05",
+            "overwrite_comment": False
+        }
+    )
+    assert res.status_code == 200
+    data = res.json()
+    saved_comment = data["telecaller_comment"]
+    assert saved_comment is not None
+    assert saved_comment.startswith("| Date & Time | Caller |")
+    assert "Testing automated table format saving" in saved_comment
+    assert "Connected Follow Up" in saved_comment
