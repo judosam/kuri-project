@@ -263,6 +263,10 @@ export const recordsApi = {
         | 'assigned_telecaller_id'
         | 'telecaller_status'
         | 'telecaller_comment'
+        | 'telecaller_no_of_floors'
+        | 'telecaller_expected_completion'
+        | 'telecaller_built_up_area'
+        | 'telecaller_stage_of_construction'
         | 'follow_up_date'
       >
     >

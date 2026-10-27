@@ -149,6 +149,7 @@ SECTION_FIELD_MAP = {
     "telecaller": [
         "assigned_telecaller_name", "telecaller_status", "telecaller_comment",
         "telecaller_called_at", "telecaller_by_name",
+        "telecaller_no_of_floors", "telecaller_built_up_area", "telecaller_expected_completion", "telecaller_stage_of_construction",
     ],
     # 5. Reassign Columns
     "reassign": [
@@ -228,6 +229,10 @@ REPORT_LABELS = {
     "telecaller_comment": "Telecaller Comment",
     "telecaller_called_at": "Telecaller Called At",
     "telecaller_by_name": "Telecaller Done By",
+    "telecaller_no_of_floors": "Telecaller - No. of Floors",
+    "telecaller_built_up_area": "Telecaller - Built-up Area",
+    "telecaller_expected_completion": "Telecaller - Expected Completion",
+    "telecaller_stage_of_construction": "Telecaller - Stage of Construction",
     "reassigned_to_name": "Reassigned Field Verifier",
     "reassigned_at": "Reassign Date",
     "revisit_status": "Revisit Status",
@@ -306,6 +311,10 @@ def build_records_report(
             detail["built_up_area"] = getattr(record, "built_up_area", None)
         if "expected_completion" not in detail or not detail["expected_completion"]:
             detail["expected_completion"] = getattr(record, "expected_completion", None)
+        detail["telecaller_no_of_floors"] = getattr(record, "telecaller_no_of_floors", None)
+        detail["telecaller_built_up_area"] = getattr(record, "telecaller_built_up_area", None)
+        detail["telecaller_expected_completion"] = getattr(record, "telecaller_expected_completion", None)
+        detail["telecaller_stage_of_construction"] = getattr(record, "telecaller_stage_of_construction", None)
 
         # Telecaller data fallbacks
         if "assigned_telecaller_name" not in detail or not detail["assigned_telecaller_name"]:

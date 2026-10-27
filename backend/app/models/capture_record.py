@@ -143,6 +143,10 @@ class CaptureRecord(Base):
     telecaller_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     telecaller_called_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     telecaller_by_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    telecaller_no_of_floors: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    telecaller_expected_completion: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    telecaller_built_up_area: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    telecaller_stage_of_construction: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Reassign & Revisit workflow
     reassigned_to_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)

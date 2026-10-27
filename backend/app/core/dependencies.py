@@ -90,11 +90,13 @@ async def require_admin_or_manager(user: User = Depends(require_active_user)) ->
 async def require_record_writer(user: User = Depends(require_active_user)) -> User:
     """Only roles that capture field work create records: field operators
     (USER) and dedicated FIELD_VERIFIERs. Managers can view and reassign;
-    auditors are read-only reviewers."""
+    auditors and telecallers are forbidden from creating or updating field records."""
     if user.role.value == "MANAGER":
         raise HTTPException(status_code=403, detail="Managers can only view and assign records")
     if user.role.value == "AUDITOR":
         raise HTTPException(status_code=403, detail="Auditors can only view records")
+    if user.role.value == "TELECALLER":
+        raise HTTPException(status_code=403, detail="Telecallers cannot create or submit field records")
     return user
 
 

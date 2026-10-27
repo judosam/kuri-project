@@ -140,6 +140,10 @@ export interface CaptureRecord {
   telecaller_called_at?: string | null;
   telecaller_by_id?: number | null;
   telecaller_by_name?: string | null;
+  telecaller_no_of_floors?: string | null;
+  telecaller_expected_completion?: string | null;
+  telecaller_built_up_area?: string | null;
+  telecaller_stage_of_construction?: string | null;
 
   // Reassign & Revisit fields
   reassigned_to_id?: number | null;

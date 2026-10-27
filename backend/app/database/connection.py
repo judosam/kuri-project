@@ -270,6 +270,10 @@ def _add_assigned_auditor_column(engine) -> None:
                 ("ALTER TABLE capture_records ADD COLUMN no_of_floors VARCHAR(50)", "no_of_floors"),
                 ("ALTER TABLE capture_records ADD COLUMN expected_completion VARCHAR(100)", "expected_completion"),
                 ("ALTER TABLE capture_records ADD COLUMN built_up_area VARCHAR(100)", "built_up_area"),
+                ("ALTER TABLE capture_records ADD COLUMN telecaller_no_of_floors VARCHAR(50)", "telecaller_no_of_floors"),
+                ("ALTER TABLE capture_records ADD COLUMN telecaller_expected_completion VARCHAR(100)", "telecaller_expected_completion"),
+                ("ALTER TABLE capture_records ADD COLUMN telecaller_built_up_area VARCHAR(100)", "telecaller_built_up_area"),
+                ("ALTER TABLE capture_records ADD COLUMN telecaller_stage_of_construction VARCHAR(255)", "telecaller_stage_of_construction"),
             ):
                 if name not in cols:
                     conn.execute(text(stmt))

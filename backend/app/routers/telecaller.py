@@ -202,14 +202,21 @@ async def save_telecaller_feedback(
 
     record.telecaller_status = request.telecaller_status
 
-    if request.no_of_floors is not None:
-        record.no_of_floors = request.no_of_floors.strip() or None
-    if request.expected_completion is not None:
-        record.expected_completion = request.expected_completion.strip() or None
-    if request.built_up_area is not None:
-        record.built_up_area = request.built_up_area.strip() or None
-    if "stage_of_construction" in request.model_fields_set:
-        record.stage_of_construction = (request.stage_of_construction.strip() or None) if request.stage_of_construction else None
+    tc_floors = request.telecaller_no_of_floors if request.telecaller_no_of_floors is not None else request.no_of_floors
+    if tc_floors is not None:
+        record.telecaller_no_of_floors = tc_floors.strip() or None
+
+    tc_exp = request.telecaller_expected_completion if request.telecaller_expected_completion is not None else request.expected_completion
+    if tc_exp is not None:
+        record.telecaller_expected_completion = tc_exp.strip() or None
+
+    tc_area = request.telecaller_built_up_area if request.telecaller_built_up_area is not None else request.built_up_area
+    if tc_area is not None:
+        record.telecaller_built_up_area = tc_area.strip() or None
+
+    tc_stage = request.telecaller_stage_of_construction if request.telecaller_stage_of_construction is not None else request.stage_of_construction
+    if tc_stage is not None:
+        record.telecaller_stage_of_construction = tc_stage.strip() or None
     if request.follow_up_date is not None:
         record.follow_up_date = request.follow_up_date.strip() or None
 

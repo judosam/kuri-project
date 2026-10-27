@@ -88,14 +88,14 @@ export function TelecallingInfoModal({ record, onClose }: ModalProps) {
             </div>
           </div>
 
-          {/* Construction details synced */}
+          {/* Construction details verified by telecaller */}
           <div style={{ padding: '12px 14px', background: '#f1f5f9', borderRadius: 8, marginBottom: 20 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 8 }}>Synced Construction Details</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 8 }}>Telecaller Verified Construction Details</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, fontSize: 12 }}>
-              <div><strong>Stage:</strong> {record.stage_of_construction || '—'}</div>
-              <div><strong>Floors:</strong> {record.no_of_floors || '—'}</div>
-              <div><strong>Built-up Area:</strong> {record.built_up_area || '—'}</div>
-              <div><strong>Expected Completion:</strong> {record.expected_completion || '—'}</div>
+              <div><strong>Stage:</strong> {record.telecaller_stage_of_construction || record.stage_of_construction || '—'}</div>
+              <div><strong>Floors:</strong> {record.telecaller_no_of_floors || record.no_of_floors || '—'}</div>
+              <div><strong>Built-up Area:</strong> {record.telecaller_built_up_area || record.built_up_area || '—'}</div>
+              <div><strong>Expected Completion:</strong> {record.telecaller_expected_completion || record.expected_completion || '—'}</div>
             </div>
           </div>
 

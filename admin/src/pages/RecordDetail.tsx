@@ -250,6 +250,10 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
     assigned_telecaller_id: '',
     telecaller_status: 'PENDING',
     telecaller_comment: '',
+    telecaller_no_of_floors: '',
+    telecaller_built_up_area: '',
+    telecaller_expected_completion: '',
+    telecaller_stage_of_construction: '',
   });
 
   useEffect(() => {
@@ -569,6 +573,10 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
           assigned_telecaller_id: data.assigned_telecaller_id ? String(data.assigned_telecaller_id) : '',
           telecaller_status: data.telecaller_status || 'PENDING',
           telecaller_comment: data.telecaller_comment || '',
+          telecaller_no_of_floors: data.telecaller_no_of_floors || '',
+          telecaller_built_up_area: data.telecaller_built_up_area || '',
+          telecaller_expected_completion: data.telecaller_expected_completion || '',
+          telecaller_stage_of_construction: data.telecaller_stage_of_construction || '',
         });
         setSelectedImage(0);
         // Pre-fetch all images with auth
@@ -729,6 +737,10 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
         assigned_telecaller_id: telecallerDraft.assigned_telecaller_id ? Number(telecallerDraft.assigned_telecaller_id) : 0,
         telecaller_status: telecallerDraft.telecaller_status || undefined,
         telecaller_comment: telecallerDraft.telecaller_comment.trim() || undefined,
+        telecaller_no_of_floors: telecallerDraft.telecaller_no_of_floors.trim() || undefined,
+        telecaller_built_up_area: telecallerDraft.telecaller_built_up_area.trim() || undefined,
+        telecaller_expected_completion: telecallerDraft.telecaller_expected_completion.trim() || undefined,
+        telecaller_stage_of_construction: telecallerDraft.telecaller_stage_of_construction.trim() || undefined,
       });
       setRecord(updated);
       setIsEditingTelecaller(false);
@@ -2130,6 +2142,10 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                           assigned_telecaller_id: record.assigned_telecaller_id ? String(record.assigned_telecaller_id) : '',
                           telecaller_status: record.telecaller_status || 'PENDING',
                           telecaller_comment: record.telecaller_comment || '',
+                          telecaller_no_of_floors: record.telecaller_no_of_floors || '',
+                          telecaller_built_up_area: record.telecaller_built_up_area || '',
+                          telecaller_expected_completion: record.telecaller_expected_completion || '',
+                          telecaller_stage_of_construction: record.telecaller_stage_of_construction || '',
                         });
                         setIsEditingTelecaller((prev) => !prev);
                         setTelecallerNotice(null);
@@ -2199,6 +2215,62 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                       />
                     </div>
 
+                    <div>
+                      <label className="sub-field-label" htmlFor="fld-tc-floors" style={{ display: 'block', marginBottom: 4 }}>
+                        No. of Floors (Telecaller)
+                      </label>
+                      <input
+                        id="fld-tc-floors"
+                        type="text"
+                        className="fld"
+                        placeholder="e.g. G+2"
+                        value={telecallerDraft.telecaller_no_of_floors}
+                        onChange={(e) => setTelecallerDraft((d) => ({ ...d, telecaller_no_of_floors: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="sub-field-label" htmlFor="fld-tc-built-up" style={{ display: 'block', marginBottom: 4 }}>
+                        Built-up Area (Telecaller)
+                      </label>
+                      <input
+                        id="fld-tc-built-up"
+                        type="text"
+                        className="fld"
+                        placeholder="e.g. 2500 sq.ft"
+                        value={telecallerDraft.telecaller_built_up_area}
+                        onChange={(e) => setTelecallerDraft((d) => ({ ...d, telecaller_built_up_area: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="sub-field-label" htmlFor="fld-tc-exp-comp" style={{ display: 'block', marginBottom: 4 }}>
+                        Expected Completion (Telecaller)
+                      </label>
+                      <input
+                        id="fld-tc-exp-comp"
+                        type="text"
+                        className="fld"
+                        placeholder="e.g. 1 year, Dec 2026"
+                        value={telecallerDraft.telecaller_expected_completion}
+                        onChange={(e) => setTelecallerDraft((d) => ({ ...d, telecaller_expected_completion: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="sub-field-label" htmlFor="fld-tc-stage" style={{ display: 'block', marginBottom: 4 }}>
+                        Stage of Construction (Telecaller)
+                      </label>
+                      <input
+                        id="fld-tc-stage"
+                        type="text"
+                        className="fld"
+                        placeholder="e.g. Foundation Work (Piling)"
+                        value={telecallerDraft.telecaller_stage_of_construction}
+                        onChange={(e) => setTelecallerDraft((d) => ({ ...d, telecaller_stage_of_construction: e.target.value }))}
+                      />
+                    </div>
+
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label className="sub-field-label" htmlFor="fld-telecaller-comment" style={{ display: 'block', marginBottom: 4 }}>
                         Telecaller Comments / Conversation Notes
@@ -2251,6 +2323,10 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                       { key: 'telecaller_called_at', label: 'Call Logged At', value: record.telecaller_called_at ? formatDateTime(record.telecaller_called_at) : '—' },
                       { key: 'telecaller_by', label: 'Called By', value: record.telecaller_by_name ?? '—' },
                       { key: 'telecaller_status', label: 'Call Decision / Status', value: record.telecaller_status ? record.telecaller_status.replace(/_/g, ' ') : 'No call recorded' },
+                      { key: 'tc_floors', label: 'No of Floors (Telecaller)', value: record.telecaller_no_of_floors },
+                      { key: 'tc_built_up', label: 'Built up area (Telecaller)', value: record.telecaller_built_up_area },
+                      { key: 'tc_exp_comp', label: 'Expected Completion (Telecaller)', value: record.telecaller_expected_completion },
+                      { key: 'tc_stage', label: 'Stage of Construction (Telecaller)', value: record.telecaller_stage_of_construction },
                       { key: 'telecaller_follow_up', label: 'Follow-up Date', value: record.follow_up_date ? formatDate(record.follow_up_date) : undefined },
                     ]}
                   />

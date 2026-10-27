@@ -40,11 +40,11 @@ export function TelecallerRecordModal({ record, onClose, onUpdated }: Telecaller
   const isFreshLead = !record.telecaller_called_at || !record.telecaller_status || record.telecaller_status === 'PENDING';
 
   const [status, setStatus] = useState<string>(record.telecaller_status || 'PENDING');
-  const [noOfFloors, setNoOfFloors] = useState<string>(record.no_of_floors || '');
-  const [expectedCompletion, setExpectedCompletion] = useState<string>(record.expected_completion || '');
-  const [builtUpArea, setBuiltUpArea] = useState<string>(record.built_up_area || '');
-  // Reset Stage of Construction to empty for next leads so it isn't pre-filled with field verification data
-  const initialStage = isFreshLead ? '' : (record.stage_of_construction || '');
+  const [noOfFloors, setNoOfFloors] = useState<string>(record.telecaller_no_of_floors || '');
+  const [expectedCompletion, setExpectedCompletion] = useState<string>(record.telecaller_expected_completion || '');
+  const [builtUpArea, setBuiltUpArea] = useState<string>(record.telecaller_built_up_area || '');
+  // Telecaller verified stage of construction
+  const initialStage = isFreshLead ? '' : (record.telecaller_stage_of_construction || '');
   const [stageOfConstruction, setStageOfConstruction] = useState<string>(initialStage);
   const [customStage, setCustomStage] = useState<string>(
     initialStage && !STAGES_OF_CONSTRUCTION.includes(initialStage)
@@ -55,10 +55,10 @@ export function TelecallerRecordModal({ record, onClose, onUpdated }: Telecaller
   useEffect(() => {
     const fresh = !record.telecaller_called_at || !record.telecaller_status || record.telecaller_status === 'PENDING';
     setStatus(record.telecaller_status || 'PENDING');
-    setNoOfFloors(record.no_of_floors || '');
-    setExpectedCompletion(record.expected_completion || '');
-    setBuiltUpArea(record.built_up_area || '');
-    const stg = fresh ? '' : (record.stage_of_construction || '');
+    setNoOfFloors(record.telecaller_no_of_floors || '');
+    setExpectedCompletion(record.telecaller_expected_completion || '');
+    setBuiltUpArea(record.telecaller_built_up_area || '');
+    const stg = fresh ? '' : (record.telecaller_stage_of_construction || '');
     setStageOfConstruction(stg);
     setCustomStage(stg && !STAGES_OF_CONSTRUCTION.includes(stg) ? stg : '');
     setNewComment('');
@@ -98,6 +98,10 @@ export function TelecallerRecordModal({ record, onClose, onUpdated }: Telecaller
     try {
       const payload: any = {
         telecaller_status: status,
+        telecaller_no_of_floors: noOfFloors.trim() || undefined,
+        telecaller_expected_completion: expectedCompletion.trim() || undefined,
+        telecaller_built_up_area: builtUpArea.trim() || undefined,
+        telecaller_stage_of_construction: effectiveStage.trim() ? effectiveStage.trim() : '',
         no_of_floors: noOfFloors.trim() || undefined,
         expected_completion: expectedCompletion.trim() || undefined,
         built_up_area: builtUpArea.trim() || undefined,

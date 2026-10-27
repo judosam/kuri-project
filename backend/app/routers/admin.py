@@ -3093,6 +3093,7 @@ async def admin_update_record(
         "qc_vhr_comment", "qc_street_details", "qc_builder_contact", "qc_sqfeet",
         "qc_reference_image_key", "qc_reference_image_url",
         "telecaller_status", "telecaller_comment",
+        "telecaller_no_of_floors", "telecaller_expected_completion", "telecaller_built_up_area", "telecaller_stage_of_construction",
         "updated_coordinates", "revisit_status", "updated_information",
     ]:
         val = getattr(request, f, None)
@@ -3332,6 +3333,10 @@ def _record_to_detail(record, errors: Optional[List[str]] = None) -> RecordDetai
         telecaller_comment=getattr(record, "telecaller_comment", None),
         telecaller_called_at=getattr(record, "telecaller_called_at", None),
         telecaller_by_id=getattr(record, "telecaller_by_id", None),
+        telecaller_no_of_floors=getattr(record, "telecaller_no_of_floors", None),
+        telecaller_expected_completion=getattr(record, "telecaller_expected_completion", None),
+        telecaller_built_up_area=getattr(record, "telecaller_built_up_area", None),
+        telecaller_stage_of_construction=getattr(record, "telecaller_stage_of_construction", None),
         telecaller_by_name=(record.telecaller_by.full_name or record.telecaller_by.email) if getattr(record, "telecaller_by", None) else None,
         reassigned_to_id=getattr(record, "reassigned_to_id", None),
         reassigned_to_name=(record.reassigned_to.full_name or record.reassigned_to.email) if getattr(record, "reassigned_to", None) else None,

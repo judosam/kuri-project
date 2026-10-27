@@ -269,6 +269,10 @@ class RecordDetail(BaseModel):
     telecaller_called_at: Optional[datetime] = None
     telecaller_by_id: Optional[int] = None
     telecaller_by_name: Optional[str] = None
+    telecaller_no_of_floors: Optional[str] = None
+    telecaller_expected_completion: Optional[str] = None
+    telecaller_built_up_area: Optional[str] = None
+    telecaller_stage_of_construction: Optional[str] = None
 
     # Reassignment & Revisit workflow
     reassigned_to_id: Optional[int] = None
@@ -307,6 +311,10 @@ class TelecallerFeedbackRequest(BaseModel):
     expected_completion: Optional[str] = Field(None, max_length=100)
     built_up_area: Optional[str] = Field(None, max_length=100)
     stage_of_construction: Optional[str] = Field(None, max_length=255)
+    telecaller_no_of_floors: Optional[str] = Field(None, max_length=50)
+    telecaller_expected_completion: Optional[str] = Field(None, max_length=100)
+    telecaller_built_up_area: Optional[str] = Field(None, max_length=100)
+    telecaller_stage_of_construction: Optional[str] = Field(None, max_length=255)
     follow_up_date: Optional[str] = Field(None, max_length=50)
     overwrite_comment: bool = False
 
@@ -316,6 +324,14 @@ class TelecallerFeedbackRequest(BaseModel):
             self.telecaller_status = self.status
         if not self.telecaller_comment and self.comment:
             self.telecaller_comment = self.comment
+        if not self.telecaller_no_of_floors and self.no_of_floors:
+            self.telecaller_no_of_floors = self.no_of_floors
+        if not self.telecaller_expected_completion and self.expected_completion:
+            self.telecaller_expected_completion = self.expected_completion
+        if not self.telecaller_built_up_area and self.built_up_area:
+            self.telecaller_built_up_area = self.built_up_area
+        if not self.telecaller_stage_of_construction and self.stage_of_construction:
+            self.telecaller_stage_of_construction = self.stage_of_construction
         if not self.telecaller_status:
             raise ValueError("telecaller_status or status is required")
         return self
@@ -488,6 +504,10 @@ class RecordUpdateRequest(BaseModel):
     telecaller_status: Optional[str] = None
     telecaller_comment: Optional[str] = None
     telecaller_called_at: Optional[datetime] = None
+    telecaller_no_of_floors: Optional[str] = None
+    telecaller_expected_completion: Optional[str] = None
+    telecaller_built_up_area: Optional[str] = None
+    telecaller_stage_of_construction: Optional[str] = None
 
     # Revisit / Updated Verification fields
     updated_coordinates: Optional[str] = None
