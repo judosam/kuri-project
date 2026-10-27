@@ -1,16 +1,18 @@
 {
-  "name": "photo-capture",
+  "name": "kuri-project",
   "private": true,
   "version": "1.0.0",
+  "description": "Kuri Project — Enterprise Field Verification, Telecaller & Quality Audit System",
   "scripts": {
-    "backend": "python backend/start_dev.py",
+    "start": "run.bat",
+    "setup": "setup.bat",
+    "backend": "cd backend && python start_dev.py",
     "admin": "npm --prefix admin run dev",
+    "admin:build": "npm --prefix admin run build",
     "user-web": "npm --prefix user-web run dev",
     "user-web:https": "npm --prefix user-web run dev:https",
     "user-web:tunnel": "cloudflared tunnel --url http://localhost:5174",
     "user-web:build": "npm --prefix user-web run build",
-    "mobile": "npm --prefix mobile start",
-    "mobile:web": "npm --prefix mobile run web",
-    "install:all": "npm --prefix admin install && npm --prefix mobile install && npm --prefix user-web install"
+    "install:all": "npm --prefix admin install && npm --prefix user-web install"
   }
 }
