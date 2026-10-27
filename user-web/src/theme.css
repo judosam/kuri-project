@@ -1,0 +1,82 @@
+:root {
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Primary Palette (Coral Red - Stitch Field Ops Precision System) */
+  --primary: #FF6467;
+  --primary-hover: #EA4E51;
+  --primary-dark: #B12A33;
+  --primary-light: #FFF1F2;
+  --primary-contrast: #ffffff;
+  --code-ink: #B12A33;
+  --primary-container: #FF6467;
+
+  /* Accent Colors matching Stitch template */
+  --accent-emerald: #006C4A;
+  --accent-emerald-dark: #003825;
+  --accent-emerald-bg: #ecfdf5;
+  --accent-emerald-border: #85f8c4;
+
+  --accent-blue: #006398;
+  --accent-blue-dark: #00476e;
+  --accent-blue-bg: #eff4ff;
+  --accent-blue-border: #cce5ff;
+
+  --accent-cyan: #0284c7;
+  --accent-cyan-bg: #f0f9ff;
+  --accent-cyan-border: #5bb8fe;
+
+  --accent-amber: #d97706;
+  --accent-amber-bg: #fffbeb;
+  --accent-amber-border: #fde68a;
+
+  --danger: #ba1a1a;
+  --danger-bg: #ffdad6;
+  --danger-border: #ffb3b1;
+
+  /* Surfaces & Containers from Stitch Design System */
+  --bg-app: #f8f9ff;
+  --bg-surface: #ffffff;
+  --bg-subtle: #eff4ff;
+  --bg-container: #e5eeff;
+  --bg-container-high: #dce9ff;
+  --bg-elevated: #ffffff;
+
+  --border-line: #e2e8f0;
+  --border-subtle: #f1f5f9;
+
+  --text-main: #0b1c30;
+  --text-body: #213145;
+  --text-muted: #594140;
+  --text-faint: #8d706f;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Layout dimensions */
+  --sidebar-width: 250px;
+  --bottom-bar-height: 64px;
+  --top-header-height: 60px;
+
+  /* Aliases used by the profile / form screens — keep in sync with the tokens above. */
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-hover);
+  --color-primary-light: var(--primary-light);
+  --color-danger: var(--danger);
+  --color-border: var(--border-line);
+  --color-bg: var(--bg-surface);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-text: var(--text-main);
+  --color-text-secondary: var(--text-body);
+  --color-text-muted: var(--text-muted);
+}

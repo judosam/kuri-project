@@ -1,0 +1,27 @@
+.daily-chart { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px; margin-bottom: 16px; min-width: 0; }
+.daily-chart-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; }
+.daily-chart-head h2 { font: inherit; font-size: 18px; font-weight: 700; color: #182338; margin: 0; }
+.daily-chart-head p { font-size: 12px; color: #64748b; margin: 5px 0 0; }
+.daily-chart-switch { display: flex; gap: 3px; padding: 3px; background: #f1f5f9; border-radius: 9px; }
+.daily-chart-switch button { padding: 7px 10px; border: 0; border-radius: 6px; background: transparent; color: #526176; font: inherit; font-size: 12px; cursor: pointer; }
+.daily-chart-switch button[aria-pressed=true] { color: #be3d4b; background: #fff; box-shadow: 0 1px 4px #18233815; font-weight: 600; }
+.daily-chart-switch button:focus-visible { outline: 2px solid #ed5661; outline-offset: 2px; }
+.daily-chart-summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 9px; margin: 18px 0 22px; color: #64748b; font-size: 12px; }
+.daily-chart-summary strong { font-size: 26px; color: #182338; font-weight: 700; }
+.daily-chart-legend { display: flex; gap: 12px; margin-left: auto; }
+.daily-chart-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.daily-chart-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; }
+.daily-done { background: #10a179; }.daily-pending { background: #f4b044; }.daily-construction { background: #5281dc; }
+.daily-chart-scroll { overflow-x: auto; padding-top: 24px; }
+.daily-chart-plot { position: relative; padding: 0 2px 0 30px; }
+.daily-chart-grid { position: absolute; inset: 0 0 29px 0; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+.daily-chart-grid span { width: 100%; border-bottom: 1px dashed #e2e8f0; color: #64748b; font-size: 10px; line-height: 0; text-indent: 2px; }
+.daily-chart-columns { display: flex; gap: 14px; position: relative; }
+.daily-chart-column { flex: 1; min-width: 34px; text-align: center; }
+.daily-chart-bar-area { height: 150px; display: flex; justify-content: center; align-items: flex-end; }
+.daily-chart-stack { width: 100%; max-width: 42px; min-width: 12px; display: flex; flex-direction: column; position: relative; border-radius: 5px 5px 0 0; }
+.daily-chart-stack > div { min-height: 0; }.daily-chart-stack > div:first-of-type { border-radius: 5px 5px 0 0; }
+.daily-chart-value { position: absolute; top: -19px; left: 0; right: 0; color: #475569; font-size: 10px; font-weight: 600; }
+.daily-chart-date { display: block; margin-top: 11px; height: 18px; white-space: nowrap; font-size: 10px; color: #64748b; }
+.daily-chart-foot,.daily-chart-empty { font-size: 11px; color: #64748b; margin: 13px 0 0; }
+@media(max-width:560px) { .daily-chart { padding: 16px; }.daily-chart-legend { width:100%; margin-left:0; }.daily-chart-head h2 { font-size:16px; } }

@@ -1,0 +1,37 @@
+[project]
+name = "photo-capture-backend"
+version = "0.1.0"
+description = "Photo Capture & Location Management System - FastAPI Backend"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.15.0",
+    "python-jose[cryptography]>=3.4.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.20",
+    "python-dotenv>=1.0.0",
+    "pydantic[email]>=2.11.0",
+    "pydantic-settings>=2.9.0",
+    "httpx>=0.28.0",
+    "Pillow>=11.0.0",
+    "google-api-python-client>=2.160.0",
+    "google-auth>=2.40.0",
+    "google-auth-oauthlib>=1.2.0",
+    "bcrypt>=4.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.26.0",
+    "pytest-httpx>=0.35.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

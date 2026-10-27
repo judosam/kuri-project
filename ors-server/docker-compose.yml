@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  openrouteservice:
+    image: openrouteservice/openrouteservice:latest
+    container_name: ors-server
+    restart: always
+    ports:
+      - "8080:8082"
+    environment:
+      - BUILD_GRAPHS=True
+      - "JAVA_OPTS=-Djava.awt.headless=true -server -XX:TargetSurvivorRatio=75 -XX:SurvivorRatio=64 -XX:MaxTenuringThreshold=3 -XX:+UseG1GC -XX:+ParallelRefProcEnabled -Xms2g -Xmx4g"
+      - "ors.engine.source_file=/home/ors/ors-core/data/osm_file.pbf"
+      - "ors.engine.profiles.car.enabled=true"
+      - "ors.engine.profiles.car.ext_storages.WayCategory=true"
+      - "ors.engine.profiles.car.ext_storages.HeavyVehicle=true"
+      - "ors.engine.profiles.car.ext_storages.WaySurfaceType=true"
+      - "ors.engine.profiles.bike.enabled=true"
+    volumes:
+      - ./data:/home/ors/ors-core/data
+      - ./graphs:/home/ors/ors-router/data/graphs
+      - ./logs:/home/ors/logs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8082/ors/v2/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s

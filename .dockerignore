@@ -1,0 +1,39 @@
+.git
+.gitignore
+.venv
+venv
+**/node_modules
+**/dist
+**/build
+**/.turbo
+mobile
+scratch
+*.zip
+*.log
+*.sqlite
+*.sqlite3
+*.db
+backend/data/*.db
+backend/*.db
+backend/data/app.db
+__pycache__
+**/*.pyc
+**/.pytest_cache
+# Exclude local data backups and uploads (served from GCS bucket on Cloud Run)
+backend/data/uploads/
+backend/data/_backup_*/
+backend/data/_local_backups/
+backend/data/*.bak
+# Exclude local database (GCP Cloud Run loads persistent database directly from GCS storage)
+backend/data/verification-only.db
+backend/camera_app.db
+TN scraping/
+stitch_templates/
+ors-server/
+latest_logs/
+outputs/
+.agents/
+Skills/
+*.xlsx
+*.csv
+*.mjs

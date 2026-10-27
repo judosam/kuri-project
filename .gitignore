@@ -1,0 +1,112 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# React Native
+mobile/android/app/build/
+mobile/ios/build/
+mobile/ios/Pods/
+mobile/.metro-health-check*
+mobile/.expo/
+
+# Admin build
+admin/dist/
+admin/build/
+
+# Playwright artifacts
+admin/test-results/
+admin/playwright-report/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# SQLite & runtime data
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.db.backup_*
+backend/data/
+data/
+!backend/app/data/
+!backend/app/data/**
+
+# Google credentials
+**/credentials.json
+**/service-account*.json
+**/client_secret*.json
+
+# Local uploads (user data)
+backend/data/uploads/
+
+# Logs
+*.log
+logs/
+
+# Coverage
+coverage/
+
+# Alembic
+backend/alembic/versions/*.pyc
+
+# Misc
+*.bak
+*.tmp
+admin.zip
+*.tsbuildinfo
+
+# Project archives / scratch copies / local tooling state
+Camera_App_*.zip
+scratch/
+outputs/
+.freebuff/
+deploy-cloudrun.bat
+
+# Temporary QA / debug scripts & artifacts
+.agents/
+Skills/
+stitch_templates/
+download_stitch_screens.py
+inspect_qc.py
+inspect_record.py
+process_empty_villages.py
+admin/take-screenshot.mjs
+admin/qa-*.mjs
+admin/.qa-*.ts
+user-web/.qa-*.ts
+crop_test.png
+admin/records-table-expanded.png

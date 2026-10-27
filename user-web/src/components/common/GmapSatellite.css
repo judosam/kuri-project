@@ -1,0 +1,177 @@
+/* Google Maps satellite viewer (field app) */
+.gmapsat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gmapsat-frame {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0f172a;
+  border: 1px solid #e2e8f0;
+  /* Vertical page scroll keeps working over the card. */
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.gmapsat-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-left: -384px;
+  margin-top: -384px;
+  transition: transform 0.08s linear;
+  will-change: transform;
+}
+
+.gmapsat-canvas img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* Magnified pixels stay crisp instead of blurring, so zooming in shows what
+   Google actually served rather than a smoothed guess. */
+.gmapsat-canvas.is-magnified img {
+  image-rendering: pixelated;
+}
+
+.gmapsat-pin {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35);
+}
+
+.gmapsat-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px;
+  text-align: center;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.gmapsat-tools {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px);
+}
+
+.gmapsat-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.gmapsat-tools button:active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.gmapsat-scale {
+  min-width: 32px;
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.gmapsat-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gmapsat-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.gmapsat-zoom-levels {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #f1f5f9;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-left: auto;
+}
+
+.gmapsat-zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 25px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gmapsat-zoom-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.gmapsat-zoom-btn.active {
+  background: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4);
+}
+
+.gmapsat-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  text-decoration: none;
+}

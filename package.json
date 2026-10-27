@@ -1,0 +1,16 @@
+{
+  "name": "photo-capture",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "backend": "python backend/start_dev.py",
+    "admin": "npm --prefix admin run dev",
+    "user-web": "npm --prefix user-web run dev",
+    "user-web:https": "npm --prefix user-web run dev:https",
+    "user-web:tunnel": "cloudflared tunnel --url http://localhost:5174",
+    "user-web:build": "npm --prefix user-web run build",
+    "mobile": "npm --prefix mobile start",
+    "mobile:web": "npm --prefix mobile run web",
+    "install:all": "npm --prefix admin install && npm --prefix mobile install && npm --prefix user-web install"
+  }
+}

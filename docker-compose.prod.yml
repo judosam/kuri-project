@@ -1,0 +1,40 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: ./.env
+    container_name: photocapture-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PROJECT_NAME=Photo Capture API
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-please-change-this-random-secret-key-in-production}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=1440
+      - DATABASE_URL=sqlite:////app/data/app.db
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost,http://localhost:80,http://localhost:5173}
+      - LOCAL_STORAGE_DIR=/app/data/uploads
+      - GOOGLE_GEOCODING_API_KEY=${GOOGLE_GEOCODING_API_KEY:-}
+      - GOOGLE_ROUTES_API_KEY=${GOOGLE_ROUTES_API_KEY:-}
+    volumes:
+      - photocapture-data:/app/data
+      - ./credentials:/app/credentials:ro
+
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
+    container_name: photocapture-admin
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  photocapture-data:
+    driver: local

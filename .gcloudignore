@@ -1,0 +1,24 @@
+.git/
+.gitignore
+.gcloudignore
+**/.venv/
+**/venv/
+**/node_modules/
+mobile/
+scratch/
+outputs/
+backend/data/
+**/*.db*
+*.zip
+TN scraping/
+ors-server/
+latest_logs/
+stitch_templates/
+.agents/
+Skills/
+data/
+backend/tests/
+crop_test.png
+*.mjs
+*.xlsx
+*.csv

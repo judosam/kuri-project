@@ -1,0 +1,184 @@
+@font-face { font-family: 'Material Symbols Outlined'; font-style: normal; font-weight: 100 700; font-display: block; src: url('/fonts/material-symbols-outlined.woff2') format('woff2'); }
+/* Compact field workspace, using the existing coral palette. */
+.app-header { margin: 10px 12px 6px; border: 1px solid var(--border-line); border-radius: 22px; min-height: 58px; padding: 9px 16px; box-shadow: 0 3px 12px #0f172a08; flex-shrink: 0; }
+.field-record-workspace { max-width: 1000px; margin: 0 auto; min-width: 0; }
+.field-record-controls { margin-bottom: 12px; }
+.field-record-search { display: flex; align-items: center; gap: 8px; min-width: 0; background: #fff; border: 1px solid var(--border-line); border-radius: 12px; padding: 0 12px; min-height: 44px; margin-bottom: 10px; }
+.field-record-search > .material-symbols-outlined { color: #64748b; flex-shrink: 0; }
+.field-record-search input { flex: 1; min-width: 0; width: 100%; min-height: 44px; border: 0; background: transparent; color: var(--text-main); font: inherit; font-size: 14px; }
+.field-record-search input:focus-visible { outline: none; }
+.field-record-search:focus-within { outline: 2px solid #bf3646; outline-offset: 2px; }
+.field-record-filters, .field-custom-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+.field-record-filters label, .field-custom-dates label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #475569; font-weight: 600; min-width: 0; }
+.field-record-filters select, .field-custom-dates input { width: 100%; min-width: 0; height: 40px; padding: 0 10px; border: 1px solid var(--border-line); border-radius: 10px; color: #0f172a; background: #fff; font: inherit; font-size: 14px; }
+.field-filter-reset { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; height: 44px; width: 44px; margin-inline-end: -8px; border: 0; border-radius: 10px; background: transparent; color: #bf3646; padding: 0; cursor: pointer; touch-action: manipulation; }
+.field-filter-reset:hover { background: #fff1f2; }
+.field-date-hint { margin: 0; color: #64748b; font-size: 12px; line-height: 1.4; }
+.field-filter-error { margin: 8px 0 0; font-size: 12px; color: #991b1b; }
+.field-record-workspace .feed-filter { margin-bottom: 8px; padding: 3px; border-radius: 15px; gap: 4px; }
+.field-record-workspace .feed-filter-btn { min-height: 38px; border-radius: 12px; font-size: 13px; }
+.field-record-workspace .feed-filter-btn[aria-selected="true"] { background: #bf3646; color: #fff; box-shadow: 0 1px 4px #7e182b16; }
+.field-record-workspace .feed-subfilter { display: grid; grid-template-columns: .8fr 1fr 1.2fr; gap: 4px; margin-top: 0; margin-bottom: 10px; padding: 3px; border-radius: 15px; }
+.field-record-workspace .feed-subfilter-btn, .field-record-workspace .feed-subfilter-provider { min-width: 0; min-height: 38px; height: auto; border-radius: 12px; font-size: 13px; box-shadow: none; }
+.field-record-workspace .feed-subfilter-provider-label { display: none; }
+.field-record-workspace .feed-subfilter-select { min-width: 0; width: 100%; font-size: 14px; min-height: 34px; }
+.field-record-workspace button:focus-visible, .field-record-workspace select:focus-visible, .field-record-workspace input[type="date"]:focus-visible { outline: 2px solid #bf3646; outline-offset: 2px; }
+.field-record-workspace .feed-subfilter-provider:focus-within { outline: 2px solid #bf3646; outline-offset: 2px; }
+.field-record-workspace .feed-subfilter-btn, .field-record-workspace .feed-subfilter-provider, .field-record-workspace .feed-filter-btn, .field-filter-reset { transition: background-color 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out; touch-action: manipulation; }
+/* QC Information Badges & Clean Toggle */
+.record-qc-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 3px 0 2px;
+  padding: 4px 6px;
+  background-color: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+.qc-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+.qc-badge-row.is-expanded {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.qc-badge-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  line-height: 1.25;
+}
+.qc-tag-vhr {
+  background: #e0f2fe;
+  color: #0284c7;
+  border: 1px solid #bae6fd;
+}
+.qc-tag-street {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+.qc-badge-text {
+  color: #1e293b;
+  font-size: 0.68rem;
+  min-width: 0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qc-badge-row.is-expanded .qc-badge-text {
+  flex: 1 1 100%;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-top: 2px;
+}
+.qc-toggle-btn {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.6rem;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1.2;
+  transition: all 0.15s ease;
+  margin-left: auto;
+}
+.qc-toggle-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+/* Center Elevated Dock Action */
+.nav-center-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-top: -14px;
+  position: relative;
+  z-index: 10;
+  touch-action: manipulation;
+}
+.nav-center-action-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FF6467 0%, #E11D48 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(255, 100, 103, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.nav-center-action:active .nav-center-action-btn {
+  transform: scale(0.92);
+  box-shadow: 0 2px 8px rgba(255, 100, 103, 0.35);
+}
+.nav-center-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #FF6467;
+  margin-top: 2px;
+  line-height: 1;
+}
+
+@media (max-width: 1023px) {
+ .bottom-nav {
+   left: 12px;
+   right: 12px;
+   bottom: max(10px, env(safe-area-inset-bottom));
+   width: auto;
+   height: 60px;
+   border: 1px solid #e2e8f0;
+   border-radius: 22px;
+   box-shadow: 0 6px 28px #0f172a14;
+   padding: 4px 16px;
+   display: flex;
+   align-items: center;
+   justify-content: space-around;
+   background: rgba(255, 255, 255, 0.96);
+   backdrop-filter: blur(12px);
+   z-index: 99;
+ }
+ .app-body { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 420px) { .app-header { margin: 7px 8px 4px; padding: 8px 11px; } }
+
+@media (max-width: 700px) {
+  .field-record-search { min-height: 36px; padding: 0 10px; margin-bottom: 6px; }
+  .field-record-search input { min-height: 34px; font-size: 13px; }
+  .field-filter-reset { height: 34px; width: 34px; }
+  .field-record-filters select, .field-custom-dates input { min-height: 32px; height: 32px; font-size: 12.5px; }
+  .field-record-workspace .feed-filter { margin-bottom: 6px; padding: 2px; }
+  .field-record-workspace .feed-filter-btn { min-height: 32px; height: 32px; font-size: 12px; }
+  .field-record-workspace .feed-subfilter { margin-bottom: 6px; padding: 2px; gap: 3px; }
+  .field-record-workspace .feed-subfilter-btn, .field-record-workspace .feed-subfilter-provider { min-height: 32px; height: 32px; font-size: 12px; }
+  .field-record-workspace .feed-subfilter-select { min-height: 28px; font-size: 12px; }
+  .record-card { padding: 6px 9px; gap: 8px; border-radius: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-record-workspace .feed-subfilter-btn, .field-record-workspace .feed-subfilter-provider, .field-record-workspace .feed-filter-btn, .field-filter-reset { transition: none; }
+}
