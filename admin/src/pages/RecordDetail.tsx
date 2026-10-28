@@ -993,10 +993,10 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
             {/* 4. Audit decision + QC assessment */}
             <Section
               icon="fact_check"
-              title="Audit Details"
+              title="Audit & QC Assessment Details"
               boxed
-              action={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              badges={
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   {(record.qc_edited_at || record.audit_status === 'RE_AUDITED') && (
                     <span
                       style={{
@@ -1019,148 +1019,98 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                   <AuditStatusChip status={record.audit_status} />
                 </div>
               }
+              action={
+                (canAdmin || canAudit) ? (
+                  <div className="fancy-action-btn-group">
+                    <button
+                      type="button"
+                      className="fancy-btn-history"
+                      onClick={() => setShowQcHistoryModal(true)}
+                      title="View QC Assessment & Audit Decision history"
+                    >
+                      <Icon name="history" size={13} />
+                      <span>QC Audit Details History</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`fancy-btn-edit${isEditingQc ? ' active' : ''}`}
+                      onClick={() => {
+                        if (isEditingQc) {
+                          setIsEditingQc(false);
+                          setAuditNotice(null);
+                        } else {
+                          setIsEditingQc(true);
+                        }
+                      }}
+                      title="Edit QC assessment and decision"
+                    >
+                      <Icon name={isEditingQc ? 'close' : 'edit'} size={13} />
+                      <span>{isEditingQc ? 'Close Edit' : 'Edit QC & Decision'}</span>
+                    </button>
+                  </div>
+                ) : undefined
+              }
             >
-              <FourColumnTable
-                fields={[
-                  { key: 'auditor', label: 'Assigned QA / QC User', value: record.assigned_auditor_name || record.qc_by_name || 'Not assigned' },
-                  { key: 'qc_done', label: 'QC Completed At', value: record.qc_completed_at ? formatDateTime(record.qc_completed_at) : '—' },
-                  { key: 'by', label: 'Audited By', value: record.audited_by_name ?? 'Not audited yet' },
-                  { key: 'qc_vhr', label: 'QC Comments (VHR Imagery)', value: record.qc_vhr_comment ?? 'No QC assessment recorded' },
-                  { key: 'qc_street', label: 'QC Additional Details (Street View)', value: record.qc_street_details ?? '—' },
-                  { key: 'qc_contact', label: 'Builder / Contact (Street View)', value: record.qc_builder_contact ?? '—' },
-                  { key: 'sqfeet', label: 'Sq.ft', value: record.qc_sqfeet ?? '—' },
-                  { key: 'audit_comment', label: 'Audit Comments', value: record.audit_comment ?? '—' },
-                  { key: 'last_mod', label: 'Last Modified Date', value: (record.last_modified_at || record.reassigned_at || record.assigned_at || record.created_at) ? formatDateTime(record.last_modified_at || record.reassigned_at || record.assigned_at || record.created_at) : '—' },
-                ]}
-              />
+              {!isEditingQc ? (
+                <>
+                  <FourColumnTable
+                    fields={[
+                      { key: 'auditor', label: 'Assigned QA / QC User', value: record.assigned_auditor_name || record.qc_by_name || 'Not assigned' },
+                      { key: 'qc_done', label: 'QC Completed At', value: record.qc_completed_at ? formatDateTime(record.qc_completed_at) : '—' },
+                      { key: 'by', label: 'Audited By', value: record.audited_by_name ?? 'Not audited yet' },
+                      { key: 'qc_vhr', label: 'QC Comments (VHR Imagery)', value: record.qc_vhr_comment ?? 'No QC assessment recorded' },
+                      { key: 'qc_street', label: 'QC Additional Details (Street View)', value: record.qc_street_details ?? '—' },
+                      { key: 'qc_contact', label: 'Builder / Contact (Street View)', value: record.qc_builder_contact ?? '—' },
+                      { key: 'sqfeet', label: 'Sq.ft', value: record.qc_sqfeet ?? '—' },
+                      { key: 'coords', label: 'QC Coordinates', value: record.coordinates ? prettyCoords(record.coordinates) : '—' },
+                      { key: 'audit_comment', label: 'Audit Comments', value: record.audit_comment ?? '—' },
+                      { key: 'last_mod', label: 'Last Modified Date', value: (record.last_modified_at || record.reassigned_at || record.assigned_at || record.created_at) ? formatDateTime(record.last_modified_at || record.reassigned_at || record.assigned_at || record.created_at) : '—' },
+                    ]}
+                  />
 
-              {(canAdmin || canAudit) && (
-                <div style={{ marginTop: 12, padding: '12px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10 }}>
-                  {!isEditingQc ? (
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                  {record.qc_reference_image_url && (
+                    <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: 10, marginTop: 12, display: 'flex', alignItems: 'center', gap: 14, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 10 }}>
+                      <div
+                        style={{ position: 'relative', width: 90, height: 70, borderRadius: 6, overflow: 'hidden', cursor: 'pointer', border: '1px solid #cbd5e1', flexShrink: 0, background: '#0f172a' }}
+                        onClick={() => setRefViewerUrl(`${SERVER_BASE}${record.qc_reference_image_url}`)}
+                        title="Click to view full image"
+                      >
+                        <img
+                          src={`${SERVER_BASE}${record.qc_reference_image_url}?thumb=true`}
+                          alt="QC Reference"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = `${SERVER_BASE}${record.qc_reference_image_url}`;
+                          }}
+                        />
+                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Icon name="zoom_in" size={20} style={{ color: '#fff' }} />
+                        </div>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <Icon name="visibility" size={15} style={{ color: '#64748b' }} />
-                          <strong style={{ fontSize: '0.74rem', letterSpacing: '0.05em', color: '#475569', textTransform: 'uppercase' }}>
-                            Record QC Assessment & Decision
-                          </strong>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>QC Reference Image</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>
+                            <Icon name="cloud_done" size={13} /> GDrive Synced
+                          </span>
                         </div>
-                        <div className="fancy-action-btn-group">
+                        <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Visible to Admin and Field Verifiers in the mobile app</span>
+                        <div style={{ marginTop: 2 }}>
                           <button
                             type="button"
-                            className="fancy-btn-history"
-                            onClick={() => setShowQcHistoryModal(true)}
-                            title="View QC Assessment & Audit Decision history"
-                          >
-                            <Icon name="history" size={13} />
-                            <span>QC Audit Details History</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="fancy-btn-edit"
-                            onClick={() => setIsEditingQc(true)}
-                            title="Edit QC assessment and decision"
-                          >
-                            <Icon name="edit" size={13} />
-                            <span>Edit QC & Decision</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px 16px' }}>
-                        <div>
-                          <span className="sub-field-label" style={{ display: 'block', marginBottom: 3, color: '#64748b' }}>QC Comments (VHR Imagery)</span>
-                          <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#0f172a' }}>
-                            {record.qc_vhr_comment || qcVhr || '—'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="sub-field-label" style={{ display: 'block', marginBottom: 3, color: '#64748b' }}>QC Additional Details (Street View)</span>
-                          <span style={{ fontSize: '0.85rem', color: '#334155', whiteSpace: 'pre-wrap' }}>
-                            {record.qc_street_details || qcStreet || '—'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="sub-field-label" style={{ display: 'block', marginBottom: 3, color: '#64748b' }}>Builder / Contact Details</span>
-                          <span style={{ fontSize: '0.85rem', color: '#334155' }}>
-                            {record.qc_builder_contact || qcBuilder || '—'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="sub-field-label" style={{ display: 'block', marginBottom: 3, color: '#64748b' }}>Sq.ft</span>
-                          <span style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 600 }}>
-                            {record.qc_sqfeet || qcSqfeet || '—'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="sub-field-label" style={{ display: 'block', marginBottom: 3, color: '#64748b' }}>QC Coordinates</span>
-                          <span style={{ fontSize: '0.85rem', fontFamily: 'monospace', color: '#0369a1', fontWeight: 600 }}>
-                            {record.coordinates || editCoordinates || '—'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="sub-field-label" style={{ display: 'block', marginBottom: 3, color: '#64748b' }}>Assigned QA / QC User</span>
-                          <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#0f172a' }}>
-                            {record.assigned_auditor_name || record.qc_by_name || '—'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="sub-field-label" style={{ display: 'block', marginBottom: 3, color: '#64748b' }}>Audit Decision</span>
-                          <div style={{ marginTop: 2 }}>
-                            <AuditStatusChip status={record.audit_status} />
-                          </div>
-                        </div>
-                        <div>
-                          <span className="sub-field-label" style={{ display: 'block', marginBottom: 3, color: '#64748b' }}>Audit Comments</span>
-                          <span style={{ fontSize: '0.85rem', color: '#334155', whiteSpace: 'pre-wrap' }}>
-                            {record.audit_comment || auditComment || '—'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {record.qc_reference_image_url && (
-                        <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: 10, marginTop: 12, display: 'flex', alignItems: 'center', gap: 14, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 10 }}>
-                          <div
-                            style={{ position: 'relative', width: 90, height: 70, borderRadius: 6, overflow: 'hidden', cursor: 'pointer', border: '1px solid #cbd5e1', flexShrink: 0, background: '#0f172a' }}
+                            className="btn btn-ghost btn-xs"
                             onClick={() => setRefViewerUrl(`${SERVER_BASE}${record.qc_reference_image_url}`)}
-                            title="Click to view full image"
+                            style={{ fontSize: '0.75rem', height: 24, padding: '0 8px' }}
                           >
-                            <img
-                              src={`${SERVER_BASE}${record.qc_reference_image_url}?thumb=true`}
-                              alt="QC Reference"
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = `${SERVER_BASE}${record.qc_reference_image_url}`;
-                              }}
-                            />
-                            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <Icon name="zoom_in" size={20} style={{ color: '#fff' }} />
-                            </div>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>QC Reference Image</span>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>
-                                <Icon name="cloud_done" size={13} /> GDrive Synced
-                              </span>
-                            </div>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Visible to Admin and Field Verifiers in the mobile app</span>
-                            <div style={{ marginTop: 2 }}>
-                              <button
-                                type="button"
-                                className="btn btn-ghost btn-xs"
-                                onClick={() => setRefViewerUrl(`${SERVER_BASE}${record.qc_reference_image_url}`)}
-                                style={{ fontSize: '0.75rem', height: 24, padding: '0 8px' }}
-                              >
-                                <Icon name="visibility" size={12} /> View Full Image
-                              </button>
-                            </div>
-                          </div>
+                            <Icon name="visibility" size={12} /> View Full Image
+                          </button>
                         </div>
-                      )}
+                      </div>
                     </div>
-                  ) : (
-                    <div>
+                  )}
+                </>
+              ) : (
+                <div style={{ marginTop: 12, padding: '14px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <Icon name="edit" size={15} style={{ color: '#0284c7' }} />
@@ -1590,8 +1540,6 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                       </div>
                     </div>
                   )}
-                </div>
-              )}
             </Section>
 
             {/* 5. Field operator inspection */}

@@ -513,10 +513,10 @@ export default function Dashboard() {
                   <table className="cc-funnel-table">
                     <thead>
                       <tr>
-                        <th>Operational Stage</th>
-                        <th style={{ textAlign: 'right' }}>Total Units</th>
-                        <th style={{ textAlign: 'right' }}>Funnel %</th>
-                        <th style={{ width: '35%' }}>Progress Distribution</th>
+                        <th style={{ minWidth: 290 }}>Operational Stage</th>
+                        <th style={{ textAlign: 'right', width: 95 }}>Total Units</th>
+                        <th style={{ textAlign: 'right', width: 95 }}>Funnel %</th>
+                        <th style={{ width: '32%' }}>Progress Distribution</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -544,8 +544,10 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span>1. Total Identified Properties</span>
-                            <span className="cc-funnel-tag tag-baseline">Catalog</span>
+                            <span className="cc-funnel-stage-name">1. Total Identified Properties</span>
+                            <span className="cc-funnel-tag tag-catalog">
+                              <span className="cc-funnel-tag-dot" />Catalog
+                            </span>
                           </div>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700 }}>{totalRecords.toLocaleString()}</td>
@@ -581,8 +583,10 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span>2. Commercial Property (QC Exclusive)</span>
-                            <span className="cc-funnel-tag tag-commercial">Excluded</span>
+                            <span className="cc-funnel-stage-name">2. Commercial Property (QC Exclusive)</span>
+                            <span className="cc-funnel-tag tag-commercial">
+                              <span className="cc-funnel-tag-dot" />Excluded
+                            </span>
                           </div>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700, color: '#b45309' }}>
@@ -628,8 +632,10 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span>3. Eligible for Field Verification</span>
-                            <span className="cc-funnel-tag tag-field">Field Ready</span>
+                            <span className="cc-funnel-stage-name">3. Eligible for Field Verification</span>
+                            <span className="cc-funnel-tag tag-field">
+                              <span className="cc-funnel-tag-dot" />Field Ready
+                            </span>
                           </div>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700 }}>{eligibleForField.toLocaleString()}</td>
@@ -674,8 +680,10 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span>4. Field Verification Completed</span>
-                            <span className="cc-funnel-tag tag-completed">Inspected</span>
+                            <span className="cc-funnel-stage-name">4. Field Verification Completed</span>
+                            <span className="cc-funnel-tag tag-completed">
+                              <span className="cc-funnel-tag-dot" />Inspected
+                            </span>
                           </div>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700, color: '#15803d' }}>
@@ -726,8 +734,10 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span>5. Constructions Happened (Yes)</span>
-                            <span className="cc-funnel-tag tag-completed">Positive</span>
+                            <span className="cc-funnel-stage-name">5. Constructions Happened (Yes)</span>
+                            <span className="cc-funnel-tag tag-positive">
+                              <span className="cc-funnel-tag-dot" />Positive
+                            </span>
                           </div>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700, color: '#15803d' }}>
@@ -772,8 +782,10 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span>6. Phone Numbers Obtained</span>
-                            <span className="cc-funnel-tag tag-field">Leads</span>
+                            <span className="cc-funnel-stage-name">6. Phone Numbers Obtained</span>
+                            <span className="cc-funnel-tag tag-leads">
+                              <span className="cc-funnel-tag-dot" />Leads
+                            </span>
                           </div>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700 }}>{phonesObtained.toLocaleString()}</td>
@@ -816,8 +828,10 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span>7. Manually Added by Field Verifiers</span>
-                            <span className="cc-funnel-tag tag-manual">Discovered</span>
+                            <span className="cc-funnel-stage-name">7. Manually Added by Field Verifiers</span>
+                            <span className="cc-funnel-tag tag-manual">
+                              <span className="cc-funnel-tag-dot" />Discovered
+                            </span>
                           </div>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700, color: '#6b21a8' }}>
@@ -858,8 +872,10 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span>8. QA Created Leads (QANEW-CBE)</span>
-                            <span className="cc-funnel-tag tag-manual" style={{ background: '#ede9fe', color: '#6d28d9', borderColor: '#ddd6fe' }}>QA New</span>
+                            <span className="cc-funnel-stage-name">8. QA Created Leads (QANEW-CBE)</span>
+                            <span className="cc-funnel-tag tag-qanew">
+                              <span className="cc-funnel-tag-dot" />QA New
+                            </span>
                           </div>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700, color: '#6d28d9' }}>
@@ -899,9 +915,9 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span>9. False Positives (Sites without Construction)</span>
-                            <span className="cc-funnel-tag tag-baseline" style={{ background: '#fee2e2', color: '#991b1b' }}>
-                              Disapproved
+                            <span className="cc-funnel-stage-name">9. False Positives (Sites without Construction)</span>
+                            <span className="cc-funnel-tag tag-disapproved">
+                              <span className="cc-funnel-tag-dot" />Disapproved
                             </span>
                           </div>
                         </td>
@@ -947,9 +963,9 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span>10. Pending Field Verifications</span>
-                            <span className="cc-funnel-tag tag-field" style={{ background: '#fef3c7', color: '#b45309' }}>
-                              In Queue
+                            <span className="cc-funnel-stage-name">10. Pending Field Verifications</span>
+                            <span className="cc-funnel-tag tag-queue">
+                              <span className="cc-funnel-tag-dot" />In Queue
                             </span>
                           </div>
                         </td>

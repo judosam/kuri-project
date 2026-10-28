@@ -1065,7 +1065,8 @@ a.btn-ghost, a.btn-ghost:hover, a.btn-ghost:focus, a.btn-ghost:active,
 /* Keep the records list dense, with full values available on expansion. */
 .fos-table.records-table thead th { height: 36px; padding: 0 10px; }
 .fos-table.records-table tbody td { padding: 8px 10px; font-size: 12px; line-height: 1.35; }
-.records-table .rec-unique-id { white-space: nowrap; }
+.records-table .rec-unique-id { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.records-table .col-unique-id { width: 225px; min-width: 210px; max-width: 260px; white-space: nowrap; }
 .record-sort-heading { display: inline-flex; align-items: center; gap: 5px; border: 0; padding: 8px 0; background: transparent; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
 .record-sort-heading:hover { color: #e54d57; }
 

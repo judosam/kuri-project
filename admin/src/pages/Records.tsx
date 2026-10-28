@@ -1949,7 +1949,7 @@ export default function Records({
   ? <th key={item.key} aria-sort={sortBy === item.sort ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}><button type="button" className="record-sort-heading" onClick={() => { setSortOrder(sortBy === item.sort && sortOrder === 'asc' ? 'desc' : 'asc'); setSortBy(item.sort!); setPage(1); }}>{item.label}<Icon name="unfold_more" size={14} /></button></th>
   : <th key={item.key}>{item.label}</th>) : isAuditorView ? (
   <>
-    {sortHeader('Unique ID', 'unique_id', 135, true, 140)}
+    {sortHeader('Unique ID', 'unique_id', 225, true, 260, 210)}
     {sortHeader('Last Modified Date', 'last_modified_at', 172, true, 185, 165)}
     {sortHeader('QA Done at', 'qc_completed_at', 145, true, 155)}
     {sortHeader('QC Status', 'qc_status', 125, true, 135, 115)}
@@ -1967,7 +1967,7 @@ export default function Records({
   </>
 ) : (
   <>
-    {sortHeader('Unique ID', 'unique_id', 135, true, 140)}
+    {sortHeader('Unique ID', 'unique_id', 225, true, 260, 210)}
     {sortHeader('Last Modified Date', 'last_modified_at', 172, true, 185, 165)}
     {sortHeader('QC Status', 'qc_status', 125, true, 135, 115)}
     {sortHeader('Audit Status', 'audit_status', 160, true, 180, 150)}
@@ -2100,7 +2100,7 @@ export default function Records({
                         />
                       </td>}
 {/* 1. Unique ID — the record key operators quote on the phone. */}
-<td className="col-unique-id">
+<td className="col-unique-id" style={{ minWidth: 210, width: 225, maxWidth: 260, whiteSpace: 'nowrap' }}>
   {r.unique_id ? (
     <span className="mono-sm rec-unique-id" style={{ fontWeight: 700, color: '#0f172a' }}>{r.unique_id}</span>
   ) : nil}
