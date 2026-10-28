@@ -28,6 +28,9 @@ from app.schemas.record import (
     AddressResolveResponse,
     AuditDecisionRequest,
     DashboardResponse,
+    QaCreateRecordRequest,
+    ResolveCoordsRequest,
+    ResolveCoordsResponse,
     ImageDetail,
     RecordAssignAuditorRequest,
     RecordAssignVerifierRequest,
@@ -49,7 +52,9 @@ from app.schemas.auth import AdminResetPasswordResponse, SimpleMessageResponse
 from app.schemas.user import UserCreate, UserDetail, UserListResponse, UserResetPasswordRequest, UserUpdate
 from app.services.activity_log_service import backfill_historical_logs_if_empty, log_activity
 from app.services.local_storage_service import LocalStorageService
-from app.services.record_service import RecordService
+import requests
+from app.services.record_service import RecordService, _parse_coordinates
+from app.services.village_master_service import get_village_master_service
 from app.services.record_filter_service import SORT_PATTERN, parse_column_filters
 from app.services.telecaller_comment_service import normalize_to_table
 
@@ -2546,6 +2551,8 @@ async def audit_record(
                 record.assigned_auditor_id = payload.assigned_auditor_id
             elif payload.assigned_auditor_id in (0, None):
                 record.assigned_auditor_id = None
+        if "area" in payload.model_fields_set:
+            record.area = (payload.area.strip() or None) if isinstance(payload.area, str) else payload.area
 
         # Also persist any field verification attributes provided in the audit request
         field_attrs = [
@@ -2784,6 +2791,201 @@ async def admin_resolve_record_address(
         deviation_status=deviation.get("status") if deviation else None,
         error=error,
     )
+
+
+
+
+@router.post("/records/resolve-coords", response_model=ResolveCoordsResponse)
+async def admin_resolve_coords(
+    payload: ResolveCoordsRequest,
+    auditor: User = Depends(require_auditor),
+    db: Session = Depends(get_db),
+):
+    """Resolve coordinates into lat, lng, site_id, area, village, taluk, district, address."""
+    coords_str = payload.coordinates.strip()
+    parsed = _parse_coordinates(coords_str)
+    if not parsed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid coordinates format. Expected 'latitude, longitude' (e.g. 11.0825, 76.9950)."
+        )
+    lat, lng = parsed
+    record_service = RecordService(db)
+    site_id = record_service.next_unique_id(lat, lng)
+
+    # 1. Google Reverse Geocoding for address and area
+    area = None
+    address = None
+    settings = get_settings()
+    api_key = settings.GOOGLE_GEOCODING_API_KEY
+    if api_key:
+        try:
+            url = f"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&key={api_key}"
+            resp = requests.get(url, timeout=10).json()
+            results = resp.get("results", [])
+            if results:
+                address = results[0].get("formatted_address")
+                # Look for sublocality_level_1 first
+                for res in results:
+                    for comp in res.get("address_components", []):
+                        types = comp.get("types", [])
+                        if "sublocality_level_1" in types:
+                            area = comp.get("long_name")
+                            break
+                    if area:
+                        break
+                # Fallback to sublocality / neighborhood / sublocality_level_2 / locality
+                if not area:
+                    for res in results:
+                        for comp in res.get("address_components", []):
+                            types = comp.get("types", [])
+                            if any(t in types for t in ["sublocality", "neighborhood", "sublocality_level_2", "locality"]):
+                                area = comp.get("long_name")
+                                break
+                        if area:
+                            break
+        except Exception as e:
+            logger.warning("Google geocoding error during resolve_coords: %s", e)
+
+    # 2. Village Master resolution for village, taluk, district
+    vms = get_village_master_service()
+    loc_match = vms.resolve_record_location(coordinates=f"{lat}, {lng}")
+    village = loc_match.get("village")
+    taluk = loc_match.get("taluk")
+    district = loc_match.get("district")
+    if not address and loc_match.get("formatted_address"):
+        address = loc_match.get("formatted_address")
+
+    if not area and village:
+        area = village
+
+    return ResolveCoordsResponse(
+        coordinates=f"{lat:.6f}, {lng:.6f}",
+        latitude=lat,
+        longitude=lng,
+        site_id=site_id,
+        area=area,
+        village=village,
+        taluk=taluk,
+        district=district,
+        address=address,
+        success=True,
+    )
+
+
+@router.post("/records/qa-create", response_model=RecordDetail, status_code=status.HTTP_201_CREATED)
+async def admin_qa_create_record(
+    payload: QaCreateRecordRequest,
+    auditor: User = Depends(require_auditor),
+    db: Session = Depends(get_db),
+):
+    """Create a new record from the QA portal by map point or coordinates."""
+    coords_str = payload.coordinates.strip()
+    parsed = _parse_coordinates(coords_str)
+    if not parsed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid coordinates format. Expected 'latitude, longitude'."
+        )
+    lat, lng = parsed
+    record_service = RecordService(db)
+
+    # Generate or reuse unique_id
+    unique_id = (payload.unique_id or "").strip()
+    if not unique_id:
+        unique_id = record_service.next_unique_id(lat, lng)
+
+    # Check if duplicate unique_id
+    existing = db.query(CaptureRecord).filter(CaptureRecord.unique_id == unique_id).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Record with Unique ID '{unique_id}' already exists (ID #{existing.id})."
+        )
+
+    # Resolve location if fields are empty
+    area = (payload.area or "").strip() or None
+    village = (payload.village or "").strip() or None
+    taluk = (payload.taluk or "").strip() or None
+    district = (payload.district or "").strip() or None
+    address = (payload.street_address or payload.site_address or "").strip() or None
+
+    if not (village and taluk and district) or not area or not address:
+        vms = get_village_master_service()
+        loc_match = vms.resolve_record_location(coordinates=f"{lat}, {lng}")
+        if not village:
+            village = loc_match.get("village")
+        if not taluk:
+            taluk = loc_match.get("taluk")
+        if not district:
+            district = loc_match.get("district")
+        if not address and loc_match.get("formatted_address"):
+            address = loc_match.get("formatted_address")
+        if not area and village:
+            area = village
+
+    formatted_coords = f"{lat:.6f}, {lng:.6f}"
+    rec_name = f"Site {unique_id}"
+    audit_status = (payload.audit_status or "PENDING").upper()
+    now_utc = datetime.now(timezone.utc)
+    is_decided = audit_status in ("APPROVAL", "DISAPPROVAL", "COMMERCIAL_PROPERTY", "RE_AUDITED")
+
+    rec = record_service.create_record(
+        user_id=None,
+        name=rec_name,
+        description=f"Created from QA Portal at {formatted_coords}",
+        location_name=area or village or "Coimbatore Site",
+        formatted_address=address,
+        admin_formatted_address=address,
+        status="NOT_COMPLETED",
+        source="qa_portal",
+        unique_id=unique_id,
+        coordinates=formatted_coords,
+        street_address=address,
+        site_address=address,
+        area=area,
+        village=village,
+        taluk=taluk,
+        district=district,
+        priority_tier=(payload.priority_tier or "Medium").title(),
+        property_type=payload.property_type,
+        owner_name_en=payload.owner_name_en,
+        survey_no=payload.survey_no,
+        subdivision_no=payload.subdivision_no,
+        dtcp_permit_date=payload.dtcp_permit_date,
+        dtcp_application_no=payload.dtcp_application_no,
+        govt_dtcp_permit=payload.govt_dtcp_permit or False,
+        audit_status=audit_status,
+        audit_comment=payload.audit_comment,
+        assigned_auditor_id=auditor.id,
+        uploaded_by_id=auditor.id,
+        qc_vhr_comment=payload.qc_vhr_comment,
+        qc_street_details=payload.qc_street_details,
+        qc_builder_contact=payload.qc_builder_contact,
+        qc_sqfeet=payload.qc_sqfeet,
+        qc_by_id=auditor.id if is_decided else None,
+        qc_completed_at=now_utc if is_decided else None,
+        audited_by_id=auditor.id if is_decided else None,
+        audited_at=now_utc if is_decided else None,
+    )
+
+    log_activity(
+        db=db,
+        action_type="qa_create_record",
+        type="record",
+        title="Record created in QA Portal",
+        detail=f"Record #{rec.id} ({rec.unique_id}) created with coordinates {formatted_coords}",
+        user_id=auditor.id,
+        user_name=auditor.full_name,
+        record_id=rec.id,
+        record_name=rec.name,
+        status="success",
+    )
+
+    detail = _record_to_detail(rec)
+    return detail
+
+
 
 
 @router.get("/records/{record_id}/images")
@@ -3316,6 +3518,7 @@ def _record_to_detail(record, errors: Optional[List[str]] = None) -> RecordDetai
         taluk=getattr(record, "taluk", None),
         village=getattr(record, "village", None),
         district=getattr(record, "district", None),
+        area=getattr(record, "area", None),
         date_of_visit=getattr(record, "date_of_visit", None),
         construction_happening=getattr(record, "construction_happening", None),
         remarks=getattr(record, "remarks", None),
@@ -3347,6 +3550,7 @@ def _record_to_detail(record, errors: Optional[List[str]] = None) -> RecordDetai
         qc_vhr_comment=getattr(record, "qc_vhr_comment", None),
         qc_street_details=getattr(record, "qc_street_details", None),
         qc_builder_contact=getattr(record, "qc_builder_contact", None),
+        qc_sqfeet=getattr(record, "qc_sqfeet", None),
         qc_status="DONE" if (
             getattr(record, "qc_completed_at", None) is not None
             or bool(getattr(record, "qc_vhr_comment", None) and str(record.qc_vhr_comment).strip())

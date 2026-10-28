@@ -1,3 +1,4 @@
+import time
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -438,3 +439,89 @@ def test_auditor_role_can_save_qc_and_bulk_audit(client, db):
     finally:
         db.delete(rec)
         db.commit()
+
+def test_qa_portal_resolve_coords_and_create_record(client, db):
+    """QA auditor can resolve coordinates (generating site_id, area, village, taluk, district, address)
+    and create a record directly from the QA portal."""
+    auditor = db.query(User).filter(User.role == UserRole.AUDITOR).first()
+    assert auditor is not None
+    auth_svc = AuthService(db)
+    auditor_token = auth_svc.create_token(auditor)
+
+    # 1. Test POST /api/admin/records/resolve-coords
+    coords_input = "11.0825, 76.9950"
+    res = client.post(
+        "/api/admin/records/resolve-coords",
+        json={"coordinates": coords_input},
+        headers={"Authorization": f"Bearer {auditor_token}"},
+    )
+    assert res.status_code == 200, f"Expected 200, got {res.status_code}: {res.text}"
+    data = res.json()
+    assert data["success"] is True
+    assert data["site_id"].startswith("CBE-")
+    assert data["latitude"] == 11.0825
+    assert data["longitude"] == 76.9950
+    assert data["district"] == "Coimbatore"
+    assert data["village"] is not None
+    assert data["taluk"] is not None
+    assert data["area"] is not None
+    assert data["address"] is not None
+
+    # 2. Test POST /api/admin/records/qa-create
+    unique_test_id = f"TEST-QA-{data['site_id']}-{int(time.time())}"
+    try:
+        res_create = client.post(
+            "/api/admin/records/qa-create",
+            json={
+                "coordinates": coords_input,
+                "unique_id": unique_test_id,
+                "area": data["area"],
+                "village": data["village"],
+                "taluk": data["taluk"],
+                "district": data["district"],
+                "site_address": data["address"],
+                "priority_tier": "High",
+                "audit_status": "PENDING",
+                "audit_comment": "Created via QA portal map select",
+                "qc_vhr_comment": "Vacant Land",
+                "qc_sqfeet": "2400",
+            },
+            headers={"Authorization": f"Bearer {auditor_token}"},
+        )
+        assert res_create.status_code == 201, f"Expected 201, got {res_create.status_code}: {res_create.text}"
+        created_rec = res_create.json()
+        assert created_rec["unique_id"] == unique_test_id
+        assert created_rec["area"] == data["area"]
+        assert created_rec["source"] == "qa_portal"
+        assert created_rec["assigned_auditor_id"] == auditor.id
+        assert created_rec["uploaded_by_id"] == auditor.id
+        assert created_rec["qc_vhr_comment"] == "Vacant Land"
+        assert created_rec["qc_sqfeet"] == "2400"
+
+        rec_in_db = db.query(CaptureRecord).filter(CaptureRecord.unique_id == unique_test_id).first()
+        assert rec_in_db is not None
+        assert rec_in_db.area == data["area"]
+        assert rec_in_db.source == "qa_portal"
+
+        # 3. RBAC isolation: Field verifier cannot call resolve-coords or qa-create
+        verifier = db.query(User).filter(User.role == UserRole.USER).first()
+        if verifier:
+            v_token = auth_svc.create_token(verifier)
+            res_v_resolve = client.post(
+                "/api/admin/records/resolve-coords",
+                json={"coordinates": coords_input},
+                headers={"Authorization": f"Bearer {v_token}"},
+            )
+            assert res_v_resolve.status_code == 403, "Field verifier must be blocked from resolve-coords"
+
+            res_v_create = client.post(
+                "/api/admin/records/qa-create",
+                json={"coordinates": coords_input, "unique_id": f"TEST-V-{data['site_id']}"},
+                headers={"Authorization": f"Bearer {v_token}"},
+            )
+            assert res_v_create.status_code == 403, "Field verifier must be blocked from qa-create"
+    finally:
+        for r in db.query(CaptureRecord).filter(CaptureRecord.unique_id.like("TEST-QA-%")).all():
+            db.delete(r)
+        db.commit()
+

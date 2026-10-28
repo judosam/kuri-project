@@ -57,7 +57,7 @@ export const RECORD_GROUPS: { key: 'imported' | 'audit' | 'field'; label: string
     field('coordinates', 'Imported Coordinates', 'coordinates'),
     field('site_address', 'Site Address'), field('admin_formatted_address', 'Admin Resolved Address'),
     field('land_use', 'Land Use', 'land_use'), field('owner_name_en', 'Owner Name', 'owner_name_en'),
-    field('village', 'Village', 'village'), field('taluk', 'Taluk', 'taluk'), field('district', 'District', 'district'),
+    field('area', 'Area', 'area'), field('village', 'Village', 'village'), field('taluk', 'Taluk', 'taluk'), field('district', 'District', 'district'),
     field('priority_tier', 'Priority Tier', 'priority_tier'),
     field('govt_dtcp_permit', 'DTCP Permit'),
     field('dtcp_permit_date', 'DTCP Permit Date'),
@@ -69,7 +69,7 @@ export const RECORD_GROUPS: { key: 'imported' | 'audit' | 'field'; label: string
     { key: 'audit_status', label: 'Audit Status', sort: 'audit_status', value: r => r.audit_status || 'Pending' },
     field('audited_by_name', 'Audited By', 'audited_by'), date('audited_at', 'Audited At'),
     field('qc_vhr_comment', 'QC Comments (VHR Imagery)'), field('qc_street_details', 'QC Additional Details (Street View)'),
-    field('qc_sqfeet', 'Sq.ft'),
+    field('area', 'Area', 'area'), field('qc_sqfeet', 'Sq.ft'),
     date('qc_completed_at', 'QC Completed At'),
   ] },
   { key: 'field', label: 'Field Verification', fields: [
@@ -85,7 +85,7 @@ export const RECORD_GROUPS: { key: 'imported' | 'audit' | 'field'; label: string
       return 'Pending';
     } },
     { key: 'captured_at', label: 'Captured or Inspection Completed', sort: 'captured_at', value: r => capturedTime(r) ? formatDateTime(capturedTime(r)!) : '—' },
-    field('village', 'Village', 'village'), field('taluk', 'Taluk', 'taluk'), field('district', 'District', 'district'),
+    field('area', 'Area', 'area'), field('village', 'Village', 'village'), field('taluk', 'Taluk', 'taluk'), field('district', 'District', 'district'),
     field('priority_tier', 'Priority Tier', 'priority_tier'),
     field('govt_dtcp_permit', 'DTCP Permit'),
     field('dtcp_permit_date', 'DTCP Permit Date'),

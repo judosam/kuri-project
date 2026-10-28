@@ -77,6 +77,7 @@ class CaptureRecord(Base):
     taluk: Mapped[str | None] = mapped_column(String(100), nullable=True)
     village: Mapped[str | None] = mapped_column(String(100), nullable=True)
     district: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    area: Mapped[str | None] = mapped_column(String(100), nullable=True)
     priority_tier: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     govt_dtcp_permit: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
     dtcp_permit_date: Mapped[str | None] = mapped_column(String(50), nullable=True)

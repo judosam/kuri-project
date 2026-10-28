@@ -136,6 +136,7 @@ class TaskDispatchItem(BaseModel):
     taluk: Optional[str] = None
     village: Optional[str] = None
     district: Optional[str] = None
+    area: Optional[str] = None
     priority_tier: Optional[str] = None
     govt_dtcp_permit: Optional[bool] = None
     dtcp_permit_date: Optional[str] = None
@@ -222,6 +223,7 @@ class RecordDetail(BaseModel):
     taluk: Optional[str] = None
     village: Optional[str] = None
     district: Optional[str] = None
+    area: Optional[str] = None
     priority_tier: Optional[str] = None
     govt_dtcp_permit: Optional[bool] = None
     dtcp_permit_date: Optional[str] = None
@@ -376,6 +378,7 @@ class AuditDecisionRequest(BaseModel):
     qc_edited_at: Optional[datetime] = None
     coordinates: Optional[str] = Field(None, max_length=100)
     assigned_auditor_id: Optional[int] = None
+    area: Optional[str] = Field(None, max_length=100)
 
     # Field Verification attributes
     type_of_construction: Optional[str] = Field(None, max_length=100)
@@ -478,6 +481,7 @@ class RecordUpdateRequest(BaseModel):
     taluk: Optional[str] = None
     village: Optional[str] = None
     district: Optional[str] = None
+    area: Optional[str] = None
     priority_tier: Optional[str] = None
     govt_dtcp_permit: Optional[bool] = None
     dtcp_permit_date: Optional[str] = None
@@ -759,4 +763,44 @@ class RecordReassignResponse(BaseModel):
     target_user_name: str
     message: str
 
+class ResolveCoordsRequest(BaseModel):
+    coordinates: str = Field(..., description="Coordinates as 'lat, lng'")
 
+
+class ResolveCoordsResponse(BaseModel):
+    coordinates: str
+    latitude: float
+    longitude: float
+    site_id: str
+    area: Optional[str] = None
+    village: Optional[str] = None
+    taluk: Optional[str] = None
+    district: Optional[str] = None
+    address: Optional[str] = None
+    success: bool = True
+    message: Optional[str] = None
+
+
+class QaCreateRecordRequest(BaseModel):
+    coordinates: str = Field(..., description="Coordinates as 'lat, lng'")
+    unique_id: Optional[str] = None
+    area: Optional[str] = None
+    village: Optional[str] = None
+    taluk: Optional[str] = None
+    district: Optional[str] = None
+    street_address: Optional[str] = None
+    site_address: Optional[str] = None
+    priority_tier: Optional[str] = None
+    property_type: Optional[str] = None
+    owner_name_en: Optional[str] = None
+    survey_no: Optional[str] = None
+    subdivision_no: Optional[str] = None
+    dtcp_permit_date: Optional[str] = None
+    dtcp_application_no: Optional[str] = None
+    govt_dtcp_permit: Optional[bool] = None
+    audit_status: Optional[str] = "PENDING"
+    audit_comment: Optional[str] = None
+    qc_vhr_comment: Optional[str] = None
+    qc_street_details: Optional[str] = None
+    qc_builder_contact: Optional[str] = None
+    qc_sqfeet: Optional[str] = None

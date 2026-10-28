@@ -1009,6 +1009,7 @@ def _record_to_detail(record, errors=None) -> RecordDetail:
         taluk=getattr(record, "taluk", None),
         village=getattr(record, "village", None),
         district=getattr(record, "district", None),
+        area=getattr(record, "area", None),
         date_of_visit=getattr(record, "date_of_visit", None),
         construction_happening=getattr(record, "construction_happening", None),
         remarks=getattr(record, "remarks", None),
@@ -1040,6 +1041,7 @@ def _record_to_detail(record, errors=None) -> RecordDetail:
         qc_vhr_comment=getattr(record, "qc_vhr_comment", None),
         qc_street_details=getattr(record, "qc_street_details", None),
         qc_builder_contact=getattr(record, "qc_builder_contact", None),
+        qc_sqfeet=getattr(record, "qc_sqfeet", None),
         qc_status="DONE" if (
             getattr(record, "qc_completed_at", None) is not None
             or bool(getattr(record, "qc_vhr_comment", None) and str(record.qc_vhr_comment).strip())

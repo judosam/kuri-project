@@ -84,6 +84,7 @@ export interface CaptureRecord {
   taluk?: string;
   village?: string;
   district?: string;
+  area?: string | null;
   priority_tier?: string | null;
   govt_dtcp_permit?: boolean | null;
   dtcp_permit_date?: string | null;
@@ -358,3 +359,42 @@ export interface ActivityLog {
 }
 
 export type RecordDetail = CaptureRecord;
+
+export interface ResolveCoordsResponse {
+  coordinates: string;
+  latitude: number;
+  longitude: number;
+  site_id: string;
+  area?: string | null;
+  village?: string | null;
+  taluk?: string | null;
+  district?: string | null;
+  address?: string | null;
+  success: boolean;
+  message?: string | null;
+}
+
+export interface QaCreateRecordPayload {
+  coordinates: string;
+  unique_id?: string;
+  area?: string;
+  village?: string;
+  taluk?: string;
+  district?: string;
+  street_address?: string;
+  site_address?: string;
+  priority_tier?: string;
+  property_type?: string;
+  owner_name_en?: string;
+  survey_no?: string;
+  subdivision_no?: string;
+  dtcp_permit_date?: string;
+  dtcp_application_no?: string;
+  govt_dtcp_permit?: boolean;
+  audit_status?: string;
+  audit_comment?: string;
+  qc_vhr_comment?: string;
+  qc_street_details?: string;
+  qc_builder_contact?: string;
+  qc_sqfeet?: string;
+}

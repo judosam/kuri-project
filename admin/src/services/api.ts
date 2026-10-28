@@ -9,6 +9,8 @@ import type {
   TokenResponse,
   LocationPoint,
   ActivityLog,
+  ResolveCoordsResponse,
+  QaCreateRecordPayload,
 } from '../types';
 
 const ENV_API_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '');
@@ -300,7 +302,7 @@ export const recordsApi = {
     id: number,
     audit_status: AuditStatus,
     audit_comment?: string | null,
-    qc?: { qc_vhr_comment?: string | null; qc_street_details?: string | null; qc_builder_contact?: string | null; qc_sqfeet?: string | null; coordinates?: string | null; assigned_auditor_id?: number | null }
+    qc?: { qc_vhr_comment?: string | null; qc_street_details?: string | null; qc_builder_contact?: string | null; qc_sqfeet?: string | null; coordinates?: string | null; area?: string | null; assigned_auditor_id?: number | null }
   ): Promise<CaptureRecord> => {
     // Back-compat: callers may still pass the decision as a 5th element object.
     const res = await api.patch(`/admin/records/${id}/audit`, {
@@ -312,9 +314,20 @@ export const recordsApi = {
         qc_builder_contact: qc.qc_builder_contact ?? null,
         qc_sqfeet: qc.qc_sqfeet ?? null,
         coordinates: qc.coordinates ?? undefined,
+        area: qc.area !== undefined ? (qc.area ?? null) : undefined,
         assigned_auditor_id: qc.assigned_auditor_id !== undefined ? qc.assigned_auditor_id : undefined,
       } : {}),
     });
+    return res.data;
+  },
+  /** Resolve coordinates to address, site_id, area, village, taluk, district (POST /admin/records/resolve-coords). */
+  resolveCoords: async (coordinates: string): Promise<ResolveCoordsResponse> => {
+    const res = await api.post('/admin/records/resolve-coords', { coordinates });
+    return res.data;
+  },
+  /** Create a new record from QA portal with auto-resolved details (POST /admin/records/qa-create). */
+  qaCreate: async (payload: QaCreateRecordPayload): Promise<CaptureRecord> => {
+    const res = await api.post('/admin/records/qa-create', payload);
     return res.data;
   },
   /** Bulk audit decision on selected records (POST /admin/records/bulk-audit). */

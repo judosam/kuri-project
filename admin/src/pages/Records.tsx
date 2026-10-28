@@ -1,5 +1,6 @@
 import { TelecallingInfoModal, FieldVerifierInfoModal, QaInfoModal } from '../components/LeadInfoModals';
 import BulkEditModal from '../components/BulkEditModal';
+import QaCreateRecordModal from '../components/QaCreateRecordModal';
 import { getLatestCommentSummary } from '../utils/telecallerHistory';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -299,6 +300,7 @@ export default function Records({
   // Auditor row-details popup: open the full record without leaving the queue.
   // These are only used when isAuditorView is true.
   const [detailRecord, setDetailRecord] = useState<CaptureRecord | null>(null);
+  const [showQaCreateModal, setShowQaCreateModal] = useState(false);
   const [qcDraft, setQcDraft] = useState<{
     auditStatus: string;
     vhr: string;
@@ -306,6 +308,7 @@ export default function Records({
     builder: string;
     sqfeet: string;
     coordinates: string;
+    area: string;
     auditComment: string;
     assignedAuditorId: string;
   }>({
@@ -315,6 +318,7 @@ export default function Records({
     builder: '',
     sqfeet: '',
     coordinates: '',
+    area: '',
     auditComment: '',
     assignedAuditorId: '',
   });
@@ -474,6 +478,7 @@ export default function Records({
         builder: detailRecord.qc_builder_contact || '',
         sqfeet: detailRecord.qc_sqfeet || '',
         coordinates: detailRecord.coordinates || '',
+        area: detailRecord.area || '',
         auditComment: detailRecord.audit_comment || '',
         assignedAuditorId: detailRecord.assigned_auditor_id ? String(detailRecord.assigned_auditor_id) : '',
       });
@@ -545,6 +550,7 @@ export default function Records({
           qc_builder_contact: qcDraft.builder.trim() || undefined,
           qc_sqfeet: qcDraft.sqfeet.trim() || undefined,
           coordinates: coordsChanged ? qcDraft.coordinates.trim() : undefined,
+          area: qcDraft.area.trim() || undefined,
           assigned_auditor_id: qcDraft.assignedAuditorId ? Number(qcDraft.assignedAuditorId) : (auditorChanged ? null : undefined),
         }
       );
@@ -1307,6 +1313,16 @@ export default function Records({
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <button
           type="button"
+          className="btn btn-primary btn-sm"
+          onClick={() => setShowQaCreateModal(true)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', fontSize: 11, height: 30, borderRadius: 6, fontWeight: 600, background: '#7c3aed', color: '#fff' }}
+          title="Create a new lead by picking a point on the map or pasting coordinates"
+        >
+          <Icon name="add" size={14} />
+          <span className="btn-label">+ Create Record</span>
+        </button>
+        <button
+          type="button"
           className="btn btn-secondary btn-sm"
           onClick={() => navigate('/audit/dashboard')}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', fontSize: 11, height: 30, borderRadius: 6 }}
@@ -1322,6 +1338,16 @@ export default function Records({
       </div>
     ) : canAdmin ? (
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={() => setShowQaCreateModal(true)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', fontSize: 11, height: 30, borderRadius: 6, fontWeight: 600, background: '#7c3aed', color: '#fff' }}
+          title="Create a new lead by picking a point on the map or pasting coordinates"
+        >
+          <Icon name="add" size={14} />
+          <span className="btn-label">+ Create Record</span>
+        </button>
         <button
           type="button"
           className="btn btn-primary btn-sm"
@@ -1879,6 +1905,7 @@ export default function Records({
     {sortHeader('QC Comments (VHR Imagery)', 'qc_vhr_comment', 200, true, 220)}
     {sortHeader('Sq.ft', 'qc_sqfeet', 120, true, 130)}
     {sortHeader('Audit Comments', 'audit_comment', 200, true, 220)}
+    {sortHeader('Area', 'area', 130, true, 140)}
     {sortHeader('Village', 'village', 125, true, 135)}
     {sortHeader('Taluk', 'taluk', 115, true, 125)}
     {sortHeader('District', 'district', 115, true, 125)}
@@ -1913,6 +1940,7 @@ export default function Records({
     {sortHeader('Telecaller Status', 'telecaller_status', 155, true, 170, 140)}
     {sortHeader('Telecaller Comment', 'telecaller_comment', 200, false, 240, 180)}
     {sortHeader('Follow-up Date', 'follow_up_date', 135, true, 145)}
+    {sortHeader('Area', 'area', 130, true, 140)}
     {sortHeader('Village', 'village', 125, true, 135)}
     {sortHeader('Taluk', 'taluk', 115, true, 125)}
     {sortHeader('District', 'district', 115, true, 125)}
@@ -1994,6 +2022,7 @@ export default function Records({
     <QcCommentsCell record={r} />
     <td><div className="rec-text-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{r.qc_sqfeet || '—'}</div></td>
     <td><div className="rec-text-cell"><ExpandableCellText text={r.audit_comment} /></div></td>
+    <td><div className="rec-text-cell"><ExpandableCellText text={r.area} /></div></td>
     <td><div className="rec-text-cell"><ExpandableCellText text={r.village} /></div></td>
     <td><div className="rec-text-cell"><ExpandableCellText text={r.taluk} /></div></td>
     <td><div className="rec-text-cell"><ExpandableCellText text={r.district} /></div></td>
@@ -2319,7 +2348,8 @@ export default function Records({
     nil
   )}
 </td>
-{/* 20-22. Village, Taluk, District */}
+{/* 20-22. Area, Village, Taluk, District */}
+<td><div className="rec-text-cell"><ExpandableCellText text={r.area} /></div></td>
 <td><div className="rec-text-cell"><ExpandableCellText text={r.village} /></div></td>
 <td><div className="rec-text-cell"><ExpandableCellText text={r.taluk} /></div></td>
 <td><div className="rec-text-cell"><ExpandableCellText text={r.district} /></div></td>
@@ -3585,6 +3615,20 @@ export default function Records({
                       />
                     </div>
                     <div className="auditor-form-group">
+                      <label className="sub-field-label" htmlFor="qc-area">
+                        Area
+                      </label>
+                      <input
+                        id="qc-area"
+                        type="text"
+                        className="fld auditor-input"
+                        maxLength={100}
+                        placeholder="e.g. Saravanampatti, Tatabad, Peelamedu"
+                        value={qcDraft.area}
+                        onChange={(e) => setQcDraft((d) => ({ ...d, area: e.target.value }))}
+                      />
+                    </div>
+                    <div className="auditor-form-group">
                       <label className="sub-field-label" htmlFor="qc-sqfeet">
                         Sq.ft
                       </label>
@@ -3909,6 +3953,17 @@ export default function Records({
         </div>
       )}
           {/* Modals */}
+      {showQaCreateModal && (
+        <QaCreateRecordModal
+          isOpen={showQaCreateModal}
+          onClose={() => setShowQaCreateModal(false)}
+          onSuccess={(newRec) => {
+            setShowQaCreateModal(false);
+            loadRecords();
+            setDeleteNotice({ tone: 'ok', text: `Lead ${newRec.unique_id || `#${newRec.id}`} created successfully!` });
+          }}
+        />
+      )}
       {showBulkEditModal && (
         <BulkEditModal
           isOpen={showBulkEditModal}

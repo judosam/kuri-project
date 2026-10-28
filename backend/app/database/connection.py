@@ -480,6 +480,7 @@ def create_tables():
                 ("govt_dtcp_permit", "BOOLEAN DEFAULT 0"),
                 ("dtcp_permit_date", "VARCHAR(50)"),
                 ("dtcp_application_no", "VARCHAR(100)"),
+                ("area", "VARCHAR(100)"),
             ]
             for col_n, col_d in audit_cols_to_check:
                 if col_n not in record_columns:

@@ -6,7 +6,8 @@
  * Verification" is really asking about, so seeing both beats comparing two
  * strings. Scroll-zoom is off so the map never hijacks the page scroll.
  */
-import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
+import { useEffect } from 'react';
+import { MapContainer, Marker, TileLayer, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fieldMarkerIcon, primaryMarkerIcon } from '../utils/mapPin';
 import { Icon } from './ui';
@@ -19,6 +20,16 @@ export interface CoordinateMapProps {
   readonly capture?: { latitude: number; longitude: number } | null;
   readonly editable?: boolean;
   readonly onCoordinatesChange?: (coords: string) => void;
+}
+
+function MapRecenter({ lat, lng }: { lat: number; lng: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0)) {
+      map.setView([lat, lng], map.getZoom());
+    }
+  }, [lat, lng, map]);
+  return null;
 }
 
 function MapClickPicker({ onSelect }: { onSelect: (lat: number, lng: number) => void }) {
@@ -51,6 +62,7 @@ export function CoordinateMap({
         attributionControl={false}
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <MapRecenter lat={latitude} lng={longitude} />
         {editable && onCoordinatesChange && (
           <MapClickPicker
             onSelect={(lat, lng) => onCoordinatesChange(`${lat.toFixed(6)}, ${lng.toFixed(6)}`)}
