@@ -642,6 +642,7 @@ class DashboardOverview(BaseModel):
     confirmed_construction: int = 0
     phone_numbers_obtained: int = 0
     manually_added: int = 0
+    qa_new_records: int = 0
     period_created: int = 0
     period_assigned: int = 0
     period_completed: int = 0
@@ -657,6 +658,7 @@ class DashboardFunnel(BaseModel):
     confirmed_construction: int = 0
     phone_numbers_obtained: int = 0
     manually_added: int = 0
+    qa_new_records: int = 0
 
 
 class DashboardTelecalling(BaseModel):
@@ -723,6 +725,7 @@ class DashboardResponse(BaseModel):
     total_commercial_properties: int = 0
     eligible_for_field: int = 0
     unassigned_properties: int = 0
+    qa_new_records: int = 0
     period_info: Optional[DashboardPeriodInfo] = None
     overview: Optional[DashboardOverview] = None
     funnel: Optional[DashboardFunnel] = None

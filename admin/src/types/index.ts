@@ -202,6 +202,7 @@ export interface DashboardOverview {
   confirmed_construction: number;
   phone_numbers_obtained: number;
   manually_added: number;
+  qa_new_records?: number;
   period_created: number;
   period_assigned: number;
   period_completed: number;
@@ -217,6 +218,7 @@ export interface DashboardFunnel {
   confirmed_construction: number;
   phone_numbers_obtained: number;
   manually_added: number;
+  qa_new_records?: number;
 }
 
 export interface DashboardTelecalling {
@@ -283,6 +285,7 @@ export interface DashboardData {
   total_commercial_properties?: number;
   eligible_for_field?: number;
   unassigned_properties?: number;
+  qa_new_records?: number;
   period_info?: DashboardPeriodInfo;
   overview?: DashboardOverview;
   funnel?: DashboardFunnel;

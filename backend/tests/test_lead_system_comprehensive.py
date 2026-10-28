@@ -448,7 +448,7 @@ def test_qa_portal_resolve_coords_and_create_record(client, db):
     auth_svc = AuthService(db)
     auditor_token = auth_svc.create_token(auditor)
 
-    # 1. Test POST /api/admin/records/resolve-coords
+    # 1. Test POST /api/admin/records/resolve-coords generates QANEW prefix with coordinate pattern
     coords_input = "11.0825, 76.9950"
     res = client.post(
         "/api/admin/records/resolve-coords",
@@ -458,7 +458,8 @@ def test_qa_portal_resolve_coords_and_create_record(client, db):
     assert res.status_code == 200, f"Expected 200, got {res.status_code}: {res.text}"
     data = res.json()
     assert data["success"] is True
-    assert data["site_id"].startswith("CBE-")
+    assert data["site_id"].startswith("QANEW-"), f"Expected site_id starting with QANEW-, got {data['site_id']}"
+    assert data["site_id"] == "QANEW-110825-769950"
     assert data["latitude"] == 11.0825
     assert data["longitude"] == 76.9950
     assert data["district"] == "Coimbatore"
@@ -467,9 +468,31 @@ def test_qa_portal_resolve_coords_and_create_record(client, db):
     assert data["area"] is not None
     assert data["address"] is not None
 
-    # 2. Test POST /api/admin/records/qa-create
-    unique_test_id = f"TEST-QA-{data['site_id']}-{int(time.time())}"
+    # 2. Test POST /api/admin/records/qa-create with auto-generated QANEW ID (no unique_id passed)
+    created_ids_to_clean = []
     try:
+        res_auto = client.post(
+            "/api/admin/records/qa-create",
+            json={
+                "coordinates": coords_input,
+                "area": data["area"],
+                "village": data["village"],
+                "taluk": data["taluk"],
+                "district": data["district"],
+                "site_address": data["address"],
+                "priority_tier": "High",
+                "audit_status": "PENDING",
+            },
+            headers={"Authorization": f"Bearer {auditor_token}"},
+        )
+        assert res_auto.status_code == 201, f"Expected 201, got {res_auto.status_code}: {res_auto.text}"
+        auto_rec = res_auto.json()
+        assert auto_rec["unique_id"].startswith("QANEW-")
+        assert auto_rec["source"] == "qa_portal"
+        created_ids_to_clean.append(auto_rec["id"])
+
+        # Also test explicit unique_id
+        unique_test_id = f"TEST-QA-{data['site_id']}-{int(time.time())}"
         res_create = client.post(
             "/api/admin/records/qa-create",
             json={
@@ -497,13 +520,22 @@ def test_qa_portal_resolve_coords_and_create_record(client, db):
         assert created_rec["uploaded_by_id"] == auditor.id
         assert created_rec["qc_vhr_comment"] == "Vacant Land"
         assert created_rec["qc_sqfeet"] == "2400"
+        created_ids_to_clean.append(created_rec["id"])
 
         rec_in_db = db.query(CaptureRecord).filter(CaptureRecord.unique_id == unique_test_id).first()
         assert rec_in_db is not None
         assert rec_in_db.area == data["area"]
         assert rec_in_db.source == "qa_portal"
 
-        # 3. RBAC isolation: Field verifier cannot call resolve-coords or qa-create
+        # 3. Test Dashboard counts QA Created records
+        record_service = RecordService(db)
+        metrics = record_service.get_dashboard_metrics()
+        assert "qa_new_records" in metrics["overview"]
+        assert metrics["overview"]["qa_new_records"] >= 2
+        assert metrics["funnel"]["qa_new_records"] >= 2
+        assert metrics["qa_new_records"] >= 2
+
+        # 4. RBAC isolation: Field verifier cannot call resolve-coords or qa-create
         verifier = db.query(User).filter(User.role == UserRole.USER).first()
         if verifier:
             v_token = auth_svc.create_token(verifier)
@@ -521,6 +553,10 @@ def test_qa_portal_resolve_coords_and_create_record(client, db):
             )
             assert res_v_create.status_code == 403, "Field verifier must be blocked from qa-create"
     finally:
+        for rid in created_ids_to_clean:
+            rec = db.query(CaptureRecord).filter(CaptureRecord.id == rid).first()
+            if rec:
+                db.delete(rec)
         for r in db.query(CaptureRecord).filter(CaptureRecord.unique_id.like("TEST-QA-%")).all():
             db.delete(r)
         db.commit()

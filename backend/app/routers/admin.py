@@ -123,6 +123,7 @@ async def get_dashboard(
         total_commercial_properties=metrics.get("total_commercial_properties", 0),
         eligible_for_field=metrics.get("eligible_for_field", 0),
         unassigned_properties=metrics.get("unassigned_properties", 0),
+        qa_new_records=metrics.get("qa_new_records", 0),
         period_info=metrics.get("period_info"),
         overview=metrics.get("overview"),
         funnel=metrics.get("funnel"),
@@ -2811,7 +2812,7 @@ async def admin_resolve_coords(
         )
     lat, lng = parsed
     record_service = RecordService(db)
-    site_id = record_service.next_unique_id(lat, lng)
+    site_id = record_service.next_unique_id(lat, lng, prefix="QANEW")
 
     # 1. Google Reverse Geocoding for address and area
     area = None
@@ -2893,7 +2894,7 @@ async def admin_qa_create_record(
     # Generate or reuse unique_id
     unique_id = (payload.unique_id or "").strip()
     if not unique_id:
-        unique_id = record_service.next_unique_id(lat, lng)
+        unique_id = record_service.next_unique_id(lat, lng, prefix="QANEW")
 
     # Check if duplicate unique_id
     existing = db.query(CaptureRecord).filter(CaptureRecord.unique_id == unique_id).first()

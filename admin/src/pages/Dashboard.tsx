@@ -151,6 +151,7 @@ export default function Dashboard() {
   const pendingVerifications = overview?.pending_verifications ?? data?.pending_records ?? 0;
   const completionRate = overview?.completion_rate ?? data?.completion_rate ?? 0;
   const falsePositives = funnel?.false_positives_qc ?? 0;
+  const qaNewRecords = overview?.qa_new_records ?? data?.qa_new_records ?? 0;
 
   const operators = useMemo(() => {
     return [...(data?.inspector_stats ?? [])]
@@ -254,6 +255,25 @@ export default function Dashboard() {
                   Showing active records for: <strong>{data.period_info?.label}</strong> • Last updated:{' '}
                   {updatedAt ? formatClock(updatedAt) : '—'}
                 </span>
+                {qaNewRecords > 0 && (
+                  <span
+                    style={{
+                      marginLeft: 10,
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      background: '#ede9fe',
+                      color: '#6d28d9',
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <Icon name="pin_drop" size={12} />
+                    {qaNewRecords} QANEW Created
+                  </span>
+                )}
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <span className="sub-field-label">Inspection Filter:</span>
@@ -294,6 +314,7 @@ export default function Dashboard() {
                     { label: 'Eligible for Field Verifiers', value: eligibleForField.toLocaleString() },
                     { label: 'Commercial Properties (QC Exclusive)', value: commercialCount.toLocaleString() },
                     { label: 'Manually Added by Verifiers', value: manuallyAdded.toLocaleString() },
+                    { label: 'QA Portal Created (QANEW)', value: qaNewRecords.toLocaleString() },
                     { label: 'Completed Inspections', value: completedVerifications.toLocaleString() },
                     { label: 'Pending in Queue', value: pendingVerifications.toLocaleString() },
                   ],
@@ -313,8 +334,9 @@ export default function Dashboard() {
                 <span className="cc-kpi-badge badge-blue">{commercialCount} Commercial</span>
               </div>
               <p className="cc-kpi-sub">
-                <strong>{eligibleForField.toLocaleString()}</strong> eligible for field verifiers •{' '}
-                <strong>{manuallyAdded}</strong> added in field
+                <strong>{eligibleForField.toLocaleString()}</strong> eligible •{' '}
+                <strong>{manuallyAdded}</strong> field added •{' '}
+                <strong>{qaNewRecords}</strong> QA created (QANEW)
               </p>
             </div>
 
@@ -812,6 +834,48 @@ export default function Dashboard() {
                         </td>
                       </tr>
 
+                      {/* Row 8: QA Created Leads (QANEW) */}
+                      <tr
+                        className="clickable-row"
+                        onClick={() =>
+                          setModalStat({
+                            title: 'QA Created Leads (QANEW)',
+                            category: 'Funnel Stage 8',
+                            value: qaNewRecords.toLocaleString(),
+                            badgeText: 'QA Portal Source',
+                            badgeTone: 'purple',
+                            icon: 'pin_drop',
+                            description:
+                              'New construction leads identified on high-resolution satellite imagery or coordinate input via the QA Auditor portal with QANEW unique ID scheme.',
+                            breakdown: [
+                              { label: 'QA Created Records (QANEW)', value: qaNewRecords.toLocaleString() },
+                              { label: 'Unique ID Prefix', value: 'QANEW' },
+                              { label: 'Source Provenance', value: 'qa_portal' },
+                            ],
+                            recordLinkOptions: {},
+                          })
+                        }
+                      >
+                        <td>
+                          <div className="cc-funnel-stage">
+                            <span>8. QA Created Leads (QANEW)</span>
+                            <span className="cc-funnel-tag tag-manual" style={{ background: '#ede9fe', color: '#6d28d9', borderColor: '#ddd6fe' }}>QA New</span>
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: '#6d28d9' }}>
+                          {qaNewRecords.toLocaleString()}
+                        </td>
+                        <td style={{ textAlign: 'right', color: '#64748b' }}>QA Portal</td>
+                        <td>
+                          <div className="cc-funnel-bar-wrap">
+                            <div
+                              className="cc-funnel-bar-fill"
+                              style={{ width: `${Math.min(100, qaNewRecords * 5)}%`, background: '#8b5cf6' }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+
                       {/* Row 8: False Positives */}
                       <tr
                         className="clickable-row"
@@ -835,7 +899,7 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span>8. False Positives (Sites without Construction)</span>
+                            <span>9. False Positives (Sites without Construction)</span>
                             <span className="cc-funnel-tag tag-baseline" style={{ background: '#fee2e2', color: '#991b1b' }}>
                               Disapproved
                             </span>
@@ -883,7 +947,7 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span>9. Pending Field Verifications</span>
+                            <span>10. Pending Field Verifications</span>
                             <span className="cc-funnel-tag tag-field" style={{ background: '#fef3c7', color: '#b45309' }}>
                               In Queue
                             </span>

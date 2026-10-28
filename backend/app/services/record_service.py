@@ -141,10 +141,10 @@ class RecordService:
         self.db.commit()
         return len(stale)
 
-    def next_unique_id(self, latitude: float, longitude: float) -> str:
+    def next_unique_id(self, latitude: float, longitude: float, prefix: str = DEFAULT_UNIQUE_ID_PREFIX) -> str:
         """Coordinate-derived unique ID, suffixed -2, -3… when the same ≈11 m
         cell already has a record (two inspections on one rooftop, say)."""
-        base = generate_unique_id(latitude, longitude)
+        base = generate_unique_id(latitude, longitude, prefix=prefix)
         candidate = base
         suffix = 1
         while self.db.query(CaptureRecord.id).filter(CaptureRecord.unique_id == candidate).first() is not None:
@@ -604,6 +604,7 @@ class RecordService:
                 'month_records': between(CaptureRecord.created_at, month_start.astimezone(timezone.utc), month_end.astimezone(timezone.utc)),
                 'total_records': total, 'total_completed_records': completed or 0,
                 'manually_added_records': query.filter(CaptureRecord.is_manually_added).count(),
+                'qa_new_records': query.filter(or_(CaptureRecord.unique_id.like("QANEW-%"), CaptureRecord.source == "qa_portal")).count(),
                 'pending_records': pending or 0, 'total_photos': photos,
                 'construction_yes_records': construction or 0, 'mobile_numbers_collected': len(numbers),
                 'completion_rate': round((completed or 0) / total * 100, 1) if total else 0.0}
@@ -798,6 +799,12 @@ class RecordService:
         ).count()
 
         manually_added = q_base.filter(CaptureRecord.is_manually_added).count()
+        qa_new_records = q_base.filter(
+            or_(
+                CaptureRecord.unique_id.like("QANEW-%"),
+                CaptureRecord.source == "qa_portal",
+            )
+        ).count()
 
         overview = {
             "total_records": total_records,
@@ -813,6 +820,7 @@ class RecordService:
             "confirmed_construction": confirmed_construction,
             "phone_numbers_obtained": phone_numbers_obtained,
             "manually_added": manually_added,
+            "qa_new_records": qa_new_records,
             "period_created": total_records,
             "period_assigned": sent_to_field,
             "period_completed": completed_verifications,
@@ -830,6 +838,7 @@ class RecordService:
             "confirmed_construction": confirmed_construction,
             "phone_numbers_obtained": phone_numbers_obtained,
             "manually_added": manually_added,
+            "qa_new_records": qa_new_records,
         }
 
         # 4. Telecalling breakdown (matching active filter scope)
@@ -1020,6 +1029,7 @@ class RecordService:
             "total_commercial_properties": commercial_records,
             "eligible_for_field": eligible_for_field,
             "unassigned_properties": unassigned_properties,
+            "qa_new_records": qa_new_records,
             "daily_activity": self.daily_activity(eff_from, eff_to, status),
             **legacy_metrics,
             "recent_records": self.record_repo.get_recent(limit=10),
