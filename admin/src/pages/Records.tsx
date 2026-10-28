@@ -23,7 +23,6 @@ import { readRecordState, saveRecordState } from '../utils/recordState';
 import { useTopHeader } from '../context/HeaderContext';
 import { calculateCoordVariance, getFieldCoordinates } from '../utils/geo';
 import { ExpandableCellText } from '../components/ExpandableCellText';
-import { GmapSatellitePanel } from '../components/GmapSatellite';
 import { CoordinateMap } from '../components/CoordinateMap';
 import {
   RECORD_GROUPS,
@@ -36,7 +35,6 @@ import {
   QcDoneAtCell,
   QcStatusCell,
   AuditStatusCell,
-  SatelliteCell,
   capturedTime,
   type RecordView,
 } from '../components/RecordWorkflowFields';
@@ -1920,7 +1918,6 @@ export default function Records({
     {sortHeader('District', 'district', 115, true, 125)}
     {sortHeader('Coordinates', 'coordinates', 155, true, 165)}
     <th style={{ width: 145, minWidth: 140, maxWidth: 155 }}>Location Verification</th>
-    <th style={{ width: 64, minWidth: 64, maxWidth: 70 }} title="Google Maps satellite image saved for this location">Satellite</th>
     <th style={{ width: 175, minWidth: 165, maxWidth: 195, textAlign: 'center' }}>Quick Modals</th>
   </>
 )}
@@ -2356,22 +2353,8 @@ export default function Records({
       Not captured
     </span>
   )}
-  {mapLink && (
-    <a
-      className="btn btn-ghost btn-sm"
-      href={mapLink}
-      target="_blank"
-      rel="noopener noreferrer"
-      title="Open these coordinates in Google Maps (satellite view)"
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 6, textDecoration: 'none' }}
-    >
-      <Icon name="my_location" size={13} style={{ color: '#e86667' }} />
-      Map
-    </a>
-  )}
+  
 </td>
-{/* 25. Satellite — the saved Google Maps mosaic for this location. */}
-<SatelliteCell record={r} />
 {/* Quick Modals Column with 3 dedicated buttons */}
 <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
@@ -3500,36 +3483,7 @@ export default function Records({
                 <RecordWorkflowDetails record={detailRecord} />
               </div>
 
-              {/* Saved Google Maps satellite mosaic - Hidden in QA / Auditor portal */}
-              {!isAuditorView && (
-                <div className="auditor-card auditor-satellite-card">
-                <div className="auditor-card-header">
-                  <div className="auditor-card-title-wrap">
-                    <Icon name="satellite_alt" size={15} className="auditor-card-icon" />
-                    <span className="auditor-card-title">Google Maps Satellite View</span>
-                  </div>
-                  {gmapUrl(detailRecord.coordinates) && (
-                    <a
-                      className="auditor-external-btn"
-                      href={gmapUrl(detailRecord.coordinates)!}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Open this location in Google Maps (satellite view)"
-                    >
-                      <Icon name="open_in_new" size={13} />
-                      <span>View on GMap</span>
-                    </a>
-                  )}
-                </div>
-                <GmapSatellitePanel
-                  recordId={detailRecord.id}
-                  coordinates={detailRecord.coordinates}
-                  zoom={detailRecord.gmap_zoom}
-                  height={300}
-                  title={`Satellite image for record ${detailRecord.unique_id || detailRecord.id}`}
-                />
-              </div>
-              )}
+              
 
               {/* QC assessment + audit decision card */}
               {canAudit && (

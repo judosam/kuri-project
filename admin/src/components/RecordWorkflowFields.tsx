@@ -3,7 +3,7 @@ import type { CaptureRecord } from '../types';
 import { AuthThumbnail, formatDate, formatDateTime, parseUtcDate, Icon } from './ui';
 import { getFieldCoordinates } from '../utils/geo';
 import { ExpandableCellText } from './ExpandableCellText';
-import { GmapSatelliteThumb } from './GmapSatellite';
+// Gmap satellite thumbnail removed per user request
 
 export type RecordView = 'overview' | 'all' | 'imported' | 'audit' | 'field';
 type Field = { key: string; label: string; sort?: string; value: (record: CaptureRecord) => string };
@@ -489,11 +489,7 @@ export function MapLinkCell({ url, label = 'GMap' }: { url?: string | null; labe
   );
 }
 
-/** "Satellite" column — the saved Google Maps mosaic for the location. */
-export function SatelliteCell({ record }: { record: CaptureRecord }) {
-  return (
-    <td className="cell-thumb">
-      <GmapSatelliteThumb recordId={record.id} coordinates={record.coordinates} zoom={record.gmap_zoom} label={record.unique_id || `#${record.id}`} />
-    </td>
-  );
+/** "Satellite" column — deprecated / removed per user request. */
+export function SatelliteCell(_props?: { record?: CaptureRecord }) {
+  return null;
 }

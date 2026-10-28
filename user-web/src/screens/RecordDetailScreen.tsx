@@ -4,7 +4,6 @@ import { api } from '../services/api';
 import Icon from '../components/common/Icon';
 import Lightbox from '../components/common/Lightbox';
 import GoogleMapEmbed from '../components/common/GoogleMapEmbed';
-import GmapSatellite from '../components/common/GmapSatellite';
 import { formatDateTime, formatDate, formatRecordNo, inspectionDateLabel, getGoogleMapsUrl, isRecordCompleted, isRecordClosed, getRecordStatusBadgeInfo, getRecentCaptureOrInspection } from '../utils/format';
 import { useForegroundRefresh } from '../hooks/useForegroundRefresh';
 import MarkStatusModal from '../components/MarkStatusModal';
@@ -872,17 +871,7 @@ export default function RecordDetailScreen({
           ) : null}
         </div>
 
-        {/* Google Maps satellite image: saved while the sheet was imported, so
-            the verifier sees exactly what the importer and auditor reviewed. */}
-        <div style={{ marginTop: 14 }}>
-          <GmapSatellite
-            recordId={record.id}
-            coordinates={record.coordinates}
-            zoom={record.gmap_zoom}
-            height={260}
-            label={record.unique_id || `Record #${record.id}`}
-          />
-        </div>
+
       </div>
 
       </div>
