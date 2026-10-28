@@ -3698,6 +3698,121 @@ input[type="date"].fld:hover::-webkit-calendar-picker-indicator {
   border-bottom: 1px solid #f1f5f9;
 }
 
+
+/* ============================================================
+   Fancy Pill Action Buttons (History & Edit)
+   ============================================================ */
+.fancy-action-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.fancy-btn-history,
+.fancy-btn-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 13px;
+  border-radius: 9999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+  text-decoration: none !important;
+  line-height: 1;
+}
+
+.fancy-btn-history {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.fancy-btn-history .ms {
+  font-size: 14px;
+  color: #6366f1; /* Vibrant Indigo accent */
+  transition: transform 0.2s ease;
+}
+
+.fancy-btn-history:hover {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-color: #94a3b8;
+  color: #0f172a;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
+  transform: translateY(-1px);
+}
+
+.fancy-btn-history:hover .ms {
+  transform: rotate(-15deg);
+}
+
+.fancy-btn-history:active {
+  transform: translateY(0.5px);
+  box-shadow: 0 1px 1px rgba(15, 23, 42, 0.05);
+}
+
+.fancy-btn-edit {
+  background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
+  color: #0284c7;
+  border: 1px solid #7dd3fc;
+  box-shadow: 0 1px 2px rgba(2, 132, 199, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.fancy-btn-edit .ms {
+  font-size: 14px;
+  color: #0284c7;
+  transition: transform 0.2s ease;
+}
+
+.fancy-btn-edit:hover {
+  background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 100%);
+  border-color: #38bdf8;
+  color: #0369a1;
+  box-shadow: 0 3px 8px rgba(2, 132, 199, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  transform: translateY(-1px);
+}
+
+.fancy-btn-edit:hover .ms {
+  transform: rotate(15deg);
+}
+
+.fancy-btn-edit:active {
+  transform: translateY(0.5px);
+  box-shadow: 0 1px 1px rgba(2, 132, 199, 0.1);
+}
+
+.fancy-btn-edit.active,
+.fancy-btn-edit-close {
+  background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%);
+  color: #b91c1c;
+  border-color: #fca5a5;
+  box-shadow: 0 1px 2px rgba(220, 38, 38, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.fancy-btn-edit.active .ms,
+.fancy-btn-edit-close .ms {
+  color: #dc2626;
+}
+
+.fancy-btn-edit.active:hover,
+.fancy-btn-edit-close:hover {
+  background: linear-gradient(180deg, #fee2e2 0%, #fecaca 100%);
+  border-color: #f87171;
+  color: #991b1b;
+  box-shadow: 0 3px 8px rgba(220, 38, 38, 0.2);
+  transform: translateY(-1px);
+}
+
 .rd-section-title {
   display: inline-flex;
   align-items: center;

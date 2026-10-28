@@ -99,23 +99,32 @@ function Section({
   icon,
   title,
   action,
+  badges,
   boxed = false,
   children,
 }: {
   icon: IconName;
   title: string;
   action?: ReactNode;
+  badges?: ReactNode;
   boxed?: boolean;
   children: ReactNode;
 }) {
   return (
     <section className={`rd-section${boxed ? ' rd-section-boxed' : ''}`}>
       <header className="rd-section-head">
-        <span className="rd-section-title">
-          <Icon name={icon} size={15} />
-          {title}
-        </span>
-        {action}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0, flex: '1 1 auto' }}>
+          <span className="rd-section-title" style={{ flex: 'none' }}>
+            <Icon name={icon} size={15} />
+            {title}
+          </span>
+          {badges}
+        </div>
+        {action && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 'auto' }}>
+            {action}
+          </div>
+        )}
       </header>
       {children}
     </section>
@@ -1029,30 +1038,17 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                 <div style={{ marginTop: 12, padding: '12px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10 }}>
                   {!isEditingQc ? (
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <Icon name="visibility" size={15} style={{ color: '#64748b' }} />
                           <strong style={{ fontSize: '0.74rem', letterSpacing: '0.05em', color: '#475569', textTransform: 'uppercase' }}>
                             Record QC Assessment & Decision
                           </strong>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div className="fancy-action-btn-group">
                           <button
                             type="button"
-                            className="btn btn-secondary btn-xs"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 5,
-                              fontSize: '0.75rem',
-                              height: 26,
-                              padding: '0 10px',
-                              borderRadius: 6,
-                              fontWeight: 600,
-                              color: '#334155',
-                              borderColor: '#cbd5e1',
-                              background: '#ffffff',
-                            }}
+                            className="fancy-btn-history"
                             onClick={() => setShowQcHistoryModal(true)}
                             title="View QC Assessment & Audit Decision history"
                           >
@@ -1061,8 +1057,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                           </button>
                           <button
                             type="button"
-                            className="btn btn-secondary btn-xs"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.75rem', height: 26, padding: '0 10px', borderRadius: 6, fontWeight: 600, color: '#0369a1', borderColor: '#bae6fd', background: '#f0f9ff' }}
+                            className="fancy-btn-edit"
                             onClick={() => setIsEditingQc(true)}
                             title="Edit QC assessment and decision"
                           >
@@ -1166,7 +1161,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                     </div>
                   ) : (
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <Icon name="edit" size={15} style={{ color: '#0284c7' }} />
                           <strong style={{ fontSize: '0.74rem', letterSpacing: '0.05em', color: '#0369a1', textTransform: 'uppercase' }}>
@@ -1175,8 +1170,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                         </div>
                         <button
                           type="button"
-                          className="btn btn-ghost btn-xs"
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', height: 26, padding: '0 8px', color: '#64748b' }}
+                          className="fancy-btn-edit active"
                           onClick={() => {
                             setIsEditingQc(false);
                             setQcVhr(record.qc_vhr_comment || '');
@@ -1189,9 +1183,10 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                             setShowPinPicker(false);
                             setAuditNotice(null);
                           }}
+                          title="Close edit"
                         >
                           <Icon name="close" size={13} />
-                          <span>Cancel</span>
+                          <span>Close Edit</span>
                         </button>
                       </div>
 
@@ -1618,7 +1613,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                   icon="assignment_turned_in"
                   title="Field Verification"
                   boxed
-                  action={
+                  badges={
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       {isRevisitOrEdited && (
                         <span
@@ -1651,22 +1646,13 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                           {record.construction_happening === 'Yes' ? 'Active Construction' : 'No Construction'}
                         </span>
                       ) : undefined}
+                    </div>
+                  }
+                  action={
+                    <div className="fancy-action-btn-group">
                       <button
                         type="button"
-                        className="btn btn-outline btn-xs"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 5,
-                          fontSize: '0.75rem',
-                          height: 26,
-                          padding: '0 10px',
-                          borderRadius: 6,
-                          fontWeight: 600,
-                          color: '#334155',
-                          borderColor: '#cbd5e1',
-                          background: '#ffffff',
-                        }}
+                        className="fancy-btn-history"
                         onClick={() => setShowEditHistoryModal(true)}
                         title="View Field Verification history and previous inspection details"
                       >
@@ -1676,20 +1662,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                       {canAdmin && (
                         <button
                           type="button"
-                          className="btn btn-secondary btn-xs"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 5,
-                            fontSize: '0.75rem',
-                            height: 26,
-                            padding: '0 10px',
-                            borderRadius: 6,
-                            fontWeight: 600,
-                            color: '#0369a1',
-                            borderColor: '#bae6fd',
-                            background: '#f0f9ff',
-                          }}
+                          className={`fancy-btn-edit${isEditingField ? ' active' : ''}`}
                           onClick={() => {
                             setFieldDraft({
                               construction_happening: record.construction_happening || 'Yes',
@@ -1713,7 +1686,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                           }}
                           title="Edit Field Verification details"
                         >
-                          <Icon name="edit" size={13} />
+                          <Icon name={isEditingField ? 'close' : 'edit'} size={13} />
                           <span>{isEditingField ? 'Close Edit' : 'Edit Field Verification'}</span>
                         </button>
                       )}
@@ -2101,44 +2074,33 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
               icon="call"
               title="Telecaller Verification"
               boxed
+              badges={
+                record.telecaller_status ? (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '2px 8px',
+                      borderRadius: 9999,
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      background: record.telecaller_status === 'CONSTRUCTION_CONFIRMED' ? '#ecfdf5' : '#eff6ff',
+                      color: record.telecaller_status === 'CONSTRUCTION_CONFIRMED' ? '#059669' : '#1d4ed8',
+                      border: `1px solid ${record.telecaller_status === 'CONSTRUCTION_CONFIRMED' ? '#a7f3d0' : '#bfdbfe'}`,
+                    }}
+                  >
+                    <Icon name={record.telecaller_status === 'CONSTRUCTION_CONFIRMED' ? 'check_circle' : 'call'} size={13} />
+                    {record.telecaller_status.replace(/_/g, ' ')}
+                  </span>
+                ) : undefined
+              }
               action={
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  {record.telecaller_status ? (
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        padding: '2px 8px',
-                        borderRadius: 9999,
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        background: record.telecaller_status === 'CONSTRUCTION_CONFIRMED' ? '#ecfdf5' : '#eff6ff',
-                        color: record.telecaller_status === 'CONSTRUCTION_CONFIRMED' ? '#059669' : '#1d4ed8',
-                        border: `1px solid ${record.telecaller_status === 'CONSTRUCTION_CONFIRMED' ? '#a7f3d0' : '#bfdbfe'}`,
-                      }}
-                    >
-                      <Icon name={record.telecaller_status === 'CONSTRUCTION_CONFIRMED' ? 'check_circle' : 'call'} size={13} />
-                      {record.telecaller_status.replace(/_/g, ' ')}
-                    </span>
-                  ) : undefined}
-                  {(canAdmin || canAudit) && (
+                (canAdmin || canAudit) ? (
+                  <div className="fancy-action-btn-group">
                     <button
                       type="button"
-                      className="btn btn-secondary btn-xs"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 5,
-                        fontSize: '0.75rem',
-                        height: 26,
-                        padding: '0 10px',
-                        borderRadius: 6,
-                        fontWeight: 600,
-                        color: '#0369a1',
-                        borderColor: '#bae6fd',
-                        background: '#f0f9ff',
-                      }}
+                      className={`fancy-btn-edit${isEditingTelecaller ? ' active' : ''}`}
                       onClick={() => {
                         setTelecallerDraft({
                           assigned_telecaller_id: record.assigned_telecaller_id ? String(record.assigned_telecaller_id) : '',
@@ -2154,11 +2116,11 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                       }}
                       title="Edit Telecaller Verification details"
                     >
-                      <Icon name="edit" size={13} />
+                      <Icon name={isEditingTelecaller ? 'close' : 'edit'} size={13} />
                       <span>{isEditingTelecaller ? 'Close Edit' : 'Edit Telecaller Details'}</span>
                     </button>
-                  )}
-                </div>
+                  </div>
+                ) : undefined
               }
             >
               {isEditingTelecaller ? (
