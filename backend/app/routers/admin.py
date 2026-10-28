@@ -2513,7 +2513,7 @@ async def admin_get_record(record_id: int, admin: User = Depends(require_record_
 async def audit_record(
     record_id: int,
     payload: AuditDecisionRequest,
-    auditor: User = Depends(require_admin),
+    auditor: User = Depends(require_auditor),
     db: Session = Depends(get_db),
 ):
     """Apply an auditor decision to a record.
@@ -2598,7 +2598,7 @@ async def audit_record(
 @router.post("/records/bulk-audit", response_model=RecordBulkAuditResponse)
 async def bulk_audit_records(
     request: RecordBulkAuditRequest,
-    auditor: User = Depends(require_admin),
+    auditor: User = Depends(require_auditor),
     db: Session = Depends(get_db),
 ):
     """Apply an audit decision in bulk to selected records.
@@ -2744,7 +2744,7 @@ async def bulk_status_records(
 
 
 @router.get("/records/{record_id}/export")
-async def admin_export_full_record(record_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def admin_export_full_record(record_id: int, admin: User = Depends(require_record_manager), db: Session = Depends(get_db)):
     record = RecordService(db).get_record(record_id)
     if not record:
         raise HTTPException(status_code=404, detail="Record not found")
@@ -3029,7 +3029,7 @@ async def admin_generate_gmap_image(
 async def admin_log_image_download(
     record_id: int,
     image_id: int,
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_record_manager),
     db: Session = Depends(get_db),
 ):
     """Log an audit event when an admin downloads a photo from the record viewer."""

@@ -369,3 +369,72 @@ def test_telecaller_field_verifier_isolation(client, db):
     finally:
         db.delete(rec)
         db.commit()
+
+
+def test_auditor_role_can_save_qc_and_bulk_audit(client, db):
+    """Verify that AUDITOR role can execute single and bulk audit without 403 Admin access required."""
+    auditor = db.query(User).filter(User.role == UserRole.AUDITOR).first()
+    if not auditor:
+        pytest.skip("No auditor user found")
+    auth_svc = AuthService(db)
+    auditor_token = auth_svc.create_token(auditor)
+
+    # 1. Create a dummy test record
+    rec = CaptureRecord(
+        name="Test Lead for Auditor QC",
+        status="PENDING",
+        audit_status="PENDING",
+        unique_id="TEST-QC-001",
+    )
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+
+    try:
+        # 2. Auditor calls PATCH /api/admin/records/{id}/audit
+        res = client.patch(
+            f"/api/admin/records/{rec.id}/audit",
+            json={
+                "audit_status": "APPROVAL",
+                "audit_comment": "Verified and approved by QA",
+                "qc_vhr_comment": "Construction Active",
+                "qc_street_details": "Good road access",
+                "qc_builder_contact": "9876543210",
+            },
+            headers={"Authorization": f"Bearer {auditor_token}"},
+        )
+        assert res.status_code == 200, f"Auditor got {res.status_code}: {res.text}"
+        data = res.json()
+        assert data["audit_status"] == "RE_AUDITED"
+        db.refresh(rec)
+        assert rec.audit_status == "RE_AUDITED"
+        assert rec.audited_by_id == auditor.id
+
+        # 3. Auditor calls POST /api/admin/records/bulk-audit
+        res_bulk = client.post(
+            "/api/admin/records/bulk-audit",
+            json={
+                "record_ids": [rec.id],
+                "audit_status": "RE_AUDITED",
+                "audit_comment": "Bulk QA update",
+            },
+            headers={"Authorization": f"Bearer {auditor_token}"},
+        )
+        assert res_bulk.status_code == 200, f"Auditor got {res_bulk.status_code}: {res_bulk.text}"
+        assert res_bulk.json()["audited_count"] == 1
+        db.refresh(rec)
+        assert rec.audit_status == "RE_AUDITED"
+
+        # 4. Verify telecaller / verifier get 403 on audit endpoint
+        telecaller = db.query(User).filter(User.role == UserRole.TELECALLER).first()
+        if telecaller:
+            tc_token = auth_svc.create_token(telecaller)
+            res_tc = client.patch(
+                f"/api/admin/records/{rec.id}/audit",
+                json={"audit_status": "APPROVAL"},
+                headers={"Authorization": f"Bearer {tc_token}"},
+            )
+            assert res_tc.status_code == 403, f"Telecaller should get 403 on audit endpoint, got {res_tc.status_code}"
+    finally:
+        db.delete(rec)
+        db.commit()
