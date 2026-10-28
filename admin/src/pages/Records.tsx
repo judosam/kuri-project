@@ -204,6 +204,48 @@ export function TelecallerStatusChip({ status }: { status?: string | null }) {
   return <span className="telecaller-chip telecaller-status-pending">{status}</span>;
 }
 
+function TierBadge({ tier }: { tier?: string | null }) {
+  if (!tier) return <span style={{ color: '#0f172a', fontWeight: 600 }}>-</span>;
+  const lower = tier.toLowerCase();
+  let bg = '#f8fafc';
+  let color = '#475569';
+  let border = '#e2e8f0';
+
+  if (lower.includes('tier 1') || lower.includes('high')) {
+    bg = '#ecfdf5';
+    color = '#047857';
+    border = '#a7f3d0';
+  } else if (lower.includes('tier 2') || lower.includes('moderate') || lower.includes('medium')) {
+    bg = '#eff6ff';
+    color = '#1d4ed8';
+    border = '#bfdbfe';
+  } else if (lower.includes('tier 3') || lower.includes('capacity') || lower.includes('low')) {
+    bg = '#fef3c7';
+    color = '#b45309';
+    border = '#fde68a';
+  }
+
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '2px 8px',
+        borderRadius: 9999,
+        fontSize: '0.72rem',
+        fontWeight: 700,
+        background: bg,
+        color: color,
+        border: `1px solid ${border}`,
+        whiteSpace: 'nowrap',
+      }}
+      title={tier}
+    >
+      {tier}
+    </span>
+  );
+}
+
 type DatePreset = 'today' | 'yesterday' | 'thisWeek' | 'thisMonth' | 'allTime' | 'custom';
 
 function toISODate(d: Date): string {
@@ -722,6 +764,8 @@ export default function Records({
     'village',
     'taluk',
     'district',
+    'area',
+    'priority_tier',
     'coordinates',
     'last_modified_at',
     'follow_up_date',
@@ -1902,6 +1946,7 @@ export default function Records({
     {sortHeader('QA Done at', 'qc_completed_at', 145, true, 155)}
     {sortHeader('QC Status', 'qc_status', 125, true, 135, 115)}
     {sortHeader('Audit Status', 'audit_status', 160, true, 180, 150)}
+    {sortHeader('Tier', 'priority_tier', 140, true, 160)}
     {sortHeader('QC Comments (VHR Imagery)', 'qc_vhr_comment', 200, true, 220)}
     {sortHeader('Sq.ft', 'qc_sqfeet', 120, true, 130)}
     {sortHeader('Audit Comments', 'audit_comment', 200, true, 220)}
@@ -1919,6 +1964,7 @@ export default function Records({
     {sortHeader('QC Status', 'qc_status', 125, true, 135, 115)}
     {sortHeader('Audit Status', 'audit_status', 160, true, 180, 150)}
     {sortHeader('Audited By', 'audited_by', 110, true, 120, 100)}
+    {sortHeader('Tier', 'priority_tier', 140, true, 160)}
     {sortHeader('QC Comments (VHR Imagery)', 'qc_vhr_comment', 200, true, 220)}
     {sortHeader('QC Additional Details (Street View)', 'qc_street_details', 220, true, 240)}
     {sortHeader('Sq.ft', 'qc_sqfeet', 120, true, 130)}
@@ -2019,6 +2065,7 @@ export default function Records({
     <QcDoneAtCell record={r} />
     <QcStatusCell record={r} />
     <AuditStatusCell record={r} />
+    <td><TierBadge tier={r.priority_tier} /></td>
     <QcCommentsCell record={r} />
     <td><div className="rec-text-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{r.qc_sqfeet || '—'}</div></td>
     <td><div className="rec-text-cell"><ExpandableCellText text={r.audit_comment} /></div></td>
@@ -2072,6 +2119,8 @@ export default function Records({
     </div>
   ) : nil}
 </td>
+{/* Priority Tier */}
+<td><TierBadge tier={r.priority_tier} /></td>
 {/* QC Comments (VHR Imagery) */}
 <QcCommentsCell record={r} />
 {/* QC Additional Details (Street View) */}

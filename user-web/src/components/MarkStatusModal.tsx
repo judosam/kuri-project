@@ -63,30 +63,12 @@ export default function MarkStatusModal({
   const [remarks, setRemarks] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [gpsFix, setGpsFix] = useState<{ lat: number; lon: number; acc: number } | null>(null);
 
-  // Capture current GPS position silently when modal opens
   useEffect(() => {
     if (!isOpen) return;
     setSelectedStatus(initialStatus);
     setRemarks('');
     setError(null);
-
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setGpsFix({
-            lat: pos.coords.latitude,
-            lon: pos.coords.longitude,
-            acc: pos.coords.accuracy,
-          });
-        },
-        () => {
-          // GPS error ignored; status can be marked without GPS if unavailable
-        },
-        { enableHighAccuracy: true, timeout: 7000 }
-      );
-    }
   }, [isOpen, initialStatus]);
 
   if (!isOpen) return null;
@@ -101,12 +83,10 @@ export default function MarkStatusModal({
     try {
       setSubmitting(true);
       setError(null);
+      // Marking status must NOT update or alter coordinates
       const updated = await api.markRecordStatus(record.id, {
         status: selectedStatus,
         remarks: remarks.trim() || undefined,
-        field_latitude: gpsFix?.lat,
-        field_longitude: gpsFix?.lon,
-        field_location_accuracy: gpsFix?.acc,
       });
       onSuccess(updated);
       onClose();
@@ -329,13 +309,7 @@ export default function MarkStatusModal({
             />
           </div>
 
-          {/* GPS note */}
-          {gpsFix && (
-            <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Icon name="my_location" size={12} color="#10b981" />
-              <span>Current GPS location recorded with status update</span>
-            </div>
-          )}
+
 
           {/* Actions */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 6, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>

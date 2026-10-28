@@ -273,6 +273,8 @@ class RecordRepository:
             "district": CaptureRecord.district,
             "taluk": CaptureRecord.taluk,
             "village": CaptureRecord.village,
+            "area": CaptureRecord.area,
+            "priority_tier": CaptureRecord.priority_tier,
             "user_id": CaptureRecord.user_id,
             "user_name": select(User.full_name).where(User.id == CaptureRecord.user_id).correlate(CaptureRecord).scalar_subquery(),
               "coordinates": CaptureRecord.coordinates,

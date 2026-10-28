@@ -198,7 +198,9 @@ async def create_record(
                 "status": target_status,
                 "field_captured_at": capture_dt,
             }
-            if not request.photos and cur_lat is not None and cur_lon is not None and (cur_lat != 0 or cur_lon != 0):
+            is_closed_status = bool(request.status and request.status in closed_map)
+
+            if not request.photos and cur_lat is not None and cur_lon is not None and (cur_lat != 0 or cur_lon != 0) and not is_closed_status:
                 update_data["field_latitude"] = cur_lat
                 update_data["field_longitude"] = cur_lon
                 if cur_acc is not None:
@@ -206,9 +208,8 @@ async def create_record(
 
             if is_revisit:
                 update_data["revisit_status"] = "Updated Revisited"
-                if cur_coords:
+                if cur_coords and not is_closed_status:
                     update_data["updated_coordinates"] = cur_coords
-                    update_data["coordinates"] = cur_coords
 
                 info_parts = []
                 if request.remarks:
@@ -220,7 +221,7 @@ async def create_record(
                 if info_parts:
                     update_data["updated_information"] = " | ".join(info_parts)
             else:
-                if cur_coords and not (record.coordinates or "").strip():
+                if cur_coords and not (record.coordinates or "").strip() and not is_closed_status:
                     update_data["coordinates"] = cur_coords
 
             for field in (
@@ -726,15 +727,8 @@ async def mark_record_status(
     if is_revisit:
         record.revisit_status = "Updated Revisited"
 
-    if request.field_latitude is not None and request.field_longitude is not None:
-        if request.field_latitude != 0 or request.field_longitude != 0:
-            record.field_latitude = request.field_latitude
-            record.field_longitude = request.field_longitude
-            new_coords = f"{request.field_latitude:.6f}, {request.field_longitude:.6f}"
-            if is_revisit:
-                record.updated_coordinates = new_coords
-            elif not record.coordinates:
-                record.coordinates = new_coords
+    # When marking status, coordinates (coordinates, updated_coordinates, field_latitude/longitude)
+    # must NEVER be updated or overwritten — preserving the original site location intact.
 
     if request.remarks:
         cleaned_remarks = request.remarks.strip()
@@ -1010,6 +1004,11 @@ def _record_to_detail(record, errors=None) -> RecordDetail:
         village=getattr(record, "village", None),
         district=getattr(record, "district", None),
         area=getattr(record, "area", None),
+        priority_tier=getattr(record, "priority_tier", None),
+        govt_dtcp_permit=getattr(record, "govt_dtcp_permit", None),
+        dtcp_permit_date=getattr(record, "dtcp_permit_date", None),
+        dtcp_application_no=getattr(record, "dtcp_application_no", None),
+        property_type=getattr(record, "property_type", None),
         date_of_visit=getattr(record, "date_of_visit", None),
         construction_happening=getattr(record, "construction_happening", None),
         remarks=getattr(record, "remarks", None),

@@ -10,7 +10,7 @@ from app.models.user import User
 
 BLANK = "__BLANK__"
 FILTER_FIELDS = {
-    "name", "status", "source", "user_name", "owner_name_en", "district", "taluk", "village",
+    "name", "status", "source", "user_name", "owner_name_en", "district", "taluk", "village", "area", "priority_tier",
     "street_address", "land_use", "survey_no", "subdivision_no", "site_address", "survey_number",
     "sub_division", "construction_happening", "type_of_construction", "stage_of_construction",
     "relationship_with_building", "building_user_name", "spoken_with", "contact_number", "remarks",

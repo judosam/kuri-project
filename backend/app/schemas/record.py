@@ -141,6 +141,7 @@ class TaskDispatchItem(BaseModel):
     govt_dtcp_permit: Optional[bool] = None
     dtcp_permit_date: Optional[str] = None
     dtcp_application_no: Optional[str] = None
+    property_type: Optional[str] = None
 
 
 class TaskDispatchBatchRequest(BaseModel):
@@ -228,6 +229,7 @@ class RecordDetail(BaseModel):
     govt_dtcp_permit: Optional[bool] = None
     dtcp_permit_date: Optional[str] = None
     dtcp_application_no: Optional[str] = None
+    property_type: Optional[str] = None
 
     # 9 Field Inspection Result Fields
     date_of_visit: Optional[str] = None
