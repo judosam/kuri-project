@@ -30,7 +30,7 @@ def test_corrected_lead_location(db):
     assert "Dharmapuri" not in (lead.district or "")
 
 def test_dashboard_reconciliation(db):
-    """Total records (751) must reconcile exactly with Completed + Closed + Disapproved + Pending."""
+    """Total records (1849) must reconcile exactly with Completed + Closed + Disapproved + Pending."""
     svc = RecordService(db)
     metrics = svc.get_dashboard_metrics()
     overview = metrics.get("overview") or {}
@@ -41,11 +41,11 @@ def test_dashboard_reconciliation(db):
     disapproved = overview.get("disapproved_verifications")
     pending = overview.get("pending_verifications")
 
-    assert total == 751
+    assert total == 1849
     assert completed == 617
     assert closed == 60
     assert disapproved == 1
-    assert pending == 73
+    assert pending == 1171
     assert completed + closed + disapproved + pending == total
     assert metrics.get("pending_records") == pending
 

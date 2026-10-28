@@ -972,6 +972,9 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                     { key: 'taluk', label: 'Taluk', value: record.taluk },
                     { key: 'village', label: 'Village', value: record.village },
                     { key: 'district', label: 'District', value: record.district },
+                    { key: 'priority_tier', label: 'Priority Tier', value: record.priority_tier },
+                    { key: 'dtcp_permit_date', label: 'DTCP Permit Date', value: record.dtcp_permit_date },
+                    { key: 'dtcp_application_no', label: 'DTCP Application No', value: record.dtcp_application_no },
                     { key: 'site_addr', label: 'Site Address', value: record.site_address },
                   ]}
                 />

@@ -84,6 +84,10 @@ export interface CaptureRecord {
   taluk?: string;
   village?: string;
   district?: string;
+  priority_tier?: string | null;
+  govt_dtcp_permit?: boolean | null;
+  dtcp_permit_date?: string | null;
+  dtcp_application_no?: string | null;
 
   // 9 Field Inspection Result Fields
   date_of_visit?: string;
@@ -321,6 +325,10 @@ export interface LocationPoint {
   site_address?: string;
   survey_no?: string;
   district?: string;
+  priority_tier?: string | null;
+  govt_dtcp_permit?: boolean | null;
+  dtcp_permit_date?: string | null;
+  dtcp_application_no?: string | null;
   taluk?: string;
   village?: string;
 }

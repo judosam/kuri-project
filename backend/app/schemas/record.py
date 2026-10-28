@@ -136,6 +136,10 @@ class TaskDispatchItem(BaseModel):
     taluk: Optional[str] = None
     village: Optional[str] = None
     district: Optional[str] = None
+    priority_tier: Optional[str] = None
+    govt_dtcp_permit: Optional[bool] = None
+    dtcp_permit_date: Optional[str] = None
+    dtcp_application_no: Optional[str] = None
 
 
 class TaskDispatchBatchRequest(BaseModel):
@@ -218,6 +222,10 @@ class RecordDetail(BaseModel):
     taluk: Optional[str] = None
     village: Optional[str] = None
     district: Optional[str] = None
+    priority_tier: Optional[str] = None
+    govt_dtcp_permit: Optional[bool] = None
+    dtcp_permit_date: Optional[str] = None
+    dtcp_application_no: Optional[str] = None
 
     # 9 Field Inspection Result Fields
     date_of_visit: Optional[str] = None
@@ -470,6 +478,10 @@ class RecordUpdateRequest(BaseModel):
     taluk: Optional[str] = None
     village: Optional[str] = None
     district: Optional[str] = None
+    priority_tier: Optional[str] = None
+    govt_dtcp_permit: Optional[bool] = None
+    dtcp_permit_date: Optional[str] = None
+    dtcp_application_no: Optional[str] = None
 
     # 9 Field Inspection Result Fields
     date_of_visit: Optional[str] = None

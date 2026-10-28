@@ -233,6 +233,9 @@ const PLANNING_FIELDS: { key: keyof CaptureRecord; label: string; wide?: boolean
   { key: 'taluk', label: 'Taluk' },
   { key: 'village', label: 'Village' },
   { key: 'district', label: 'District' },
+  { key: 'priority_tier', label: 'Priority Tier' },
+  { key: 'dtcp_permit_date', label: 'DTCP Permit Date' },
+  { key: 'dtcp_application_no', label: 'DTCP Application No' },
 
   { key: 'coordinates', label: 'Admin Coordinates', wide: true },
   { key: 'site_address', label: 'Site Address', wide: true },
@@ -1007,6 +1010,9 @@ export default function ImportedRecordDetail({
                   <Row label="Taluk" value={record.taluk} />
                   <Row label="Village" value={record.village} />
                   <Row label="District" value={record.district} />
+                  {record.priority_tier && <Row label="Priority Tier" value={record.priority_tier} />}
+                  {record.dtcp_permit_date && <Row label="DTCP Permit Date" value={record.dtcp_permit_date} />}
+                  {record.dtcp_application_no && <Row label="DTCP Application No" value={record.dtcp_application_no} />}
                   <Row label="Site Address" value={record.site_address} wide />
                 </div>
               </Section>

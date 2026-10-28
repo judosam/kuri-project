@@ -476,6 +476,10 @@ def create_tables():
                 ("updated_by_id", "INTEGER REFERENCES users (id)"),
                 ("updated_by_name", "VARCHAR(255)"),
                 ("updated_by_role", "VARCHAR(50)"),
+                ("priority_tier", "VARCHAR(100)"),
+                ("govt_dtcp_permit", "BOOLEAN DEFAULT 0"),
+                ("dtcp_permit_date", "VARCHAR(50)"),
+                ("dtcp_application_no", "VARCHAR(100)"),
             ]
             for col_n, col_d in audit_cols_to_check:
                 if col_n not in record_columns:
@@ -485,6 +489,7 @@ def create_tables():
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_capture_records_assigned_telecaller_id ON capture_records (assigned_telecaller_id)"))
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_capture_records_telecaller_status ON capture_records (telecaller_status)"))
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_capture_records_property_type ON capture_records (property_type)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_capture_records_priority_tier ON capture_records (priority_tier)"))
                 conn.commit()
             # Tasks dispatched before the two addresses were split copied the
             # admin's sheet address into formatted_address, so the field
