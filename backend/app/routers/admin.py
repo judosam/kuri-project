@@ -2812,7 +2812,7 @@ async def admin_resolve_coords(
         )
     lat, lng = parsed
     record_service = RecordService(db)
-    site_id = record_service.next_unique_id(lat, lng, prefix="QANEW")
+    site_id = record_service.next_unique_id(lat, lng, prefix="QANEW-CBE")
 
     # 1. Google Reverse Geocoding for address and area
     area = None
@@ -2894,7 +2894,7 @@ async def admin_qa_create_record(
     # Generate or reuse unique_id
     unique_id = (payload.unique_id or "").strip()
     if not unique_id:
-        unique_id = record_service.next_unique_id(lat, lng, prefix="QANEW")
+        unique_id = record_service.next_unique_id(lat, lng, prefix="QANEW-CBE")
 
     # Check if duplicate unique_id
     existing = db.query(CaptureRecord).filter(CaptureRecord.unique_id == unique_id).first()

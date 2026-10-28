@@ -458,8 +458,8 @@ def test_qa_portal_resolve_coords_and_create_record(client, db):
     assert res.status_code == 200, f"Expected 200, got {res.status_code}: {res.text}"
     data = res.json()
     assert data["success"] is True
-    assert data["site_id"].startswith("QANEW-"), f"Expected site_id starting with QANEW-, got {data['site_id']}"
-    assert data["site_id"] == "QANEW-110825-769950"
+    assert data["site_id"].startswith("QANEW-CBE-"), f"Expected site_id starting with QANEW-CBE-, got {data['site_id']}"
+    assert data["site_id"] == "QANEW-CBE-110825-769950"
     assert data["latitude"] == 11.0825
     assert data["longitude"] == 76.9950
     assert data["district"] == "Coimbatore"
@@ -487,7 +487,8 @@ def test_qa_portal_resolve_coords_and_create_record(client, db):
         )
         assert res_auto.status_code == 201, f"Expected 201, got {res_auto.status_code}: {res_auto.text}"
         auto_rec = res_auto.json()
-        assert auto_rec["unique_id"].startswith("QANEW-")
+        assert auto_rec["unique_id"].startswith("QANEW-CBE-")
+        assert auto_rec["unique_id"] == "QANEW-CBE-110825-769950"
         assert auto_rec["source"] == "qa_portal"
         created_ids_to_clean.append(auto_rec["id"])
 

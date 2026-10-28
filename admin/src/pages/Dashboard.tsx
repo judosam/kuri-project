@@ -271,7 +271,7 @@ export default function Dashboard() {
                     }}
                   >
                     <Icon name="pin_drop" size={12} />
-                    {qaNewRecords} QANEW Created
+                    {qaNewRecords} QANEW-CBE Created
                   </span>
                 )}
               </div>
@@ -314,7 +314,7 @@ export default function Dashboard() {
                     { label: 'Eligible for Field Verifiers', value: eligibleForField.toLocaleString() },
                     { label: 'Commercial Properties (QC Exclusive)', value: commercialCount.toLocaleString() },
                     { label: 'Manually Added by Verifiers', value: manuallyAdded.toLocaleString() },
-                    { label: 'QA Portal Created (QANEW)', value: qaNewRecords.toLocaleString() },
+                    { label: 'QA Portal Created (QANEW-CBE)', value: qaNewRecords.toLocaleString() },
                     { label: 'Completed Inspections', value: completedVerifications.toLocaleString() },
                     { label: 'Pending in Queue', value: pendingVerifications.toLocaleString() },
                   ],
@@ -336,7 +336,7 @@ export default function Dashboard() {
               <p className="cc-kpi-sub">
                 <strong>{eligibleForField.toLocaleString()}</strong> eligible •{' '}
                 <strong>{manuallyAdded}</strong> field added •{' '}
-                <strong>{qaNewRecords}</strong> QA created (QANEW)
+                <strong>{qaNewRecords}</strong> QA created (QANEW-CBE)
               </p>
             </div>
 
@@ -839,17 +839,17 @@ export default function Dashboard() {
                         className="clickable-row"
                         onClick={() =>
                           setModalStat({
-                            title: 'QA Created Leads (QANEW)',
+                            title: 'QA Created Leads (QANEW-CBE)',
                             category: 'Funnel Stage 8',
                             value: qaNewRecords.toLocaleString(),
                             badgeText: 'QA Portal Source',
                             badgeTone: 'purple',
                             icon: 'pin_drop',
                             description:
-                              'New construction leads identified on high-resolution satellite imagery or coordinate input via the QA Auditor portal with QANEW unique ID scheme.',
+                              'New construction leads identified on high-resolution satellite imagery or coordinate input via the QA Auditor portal with QANEW-CBE unique ID scheme.',
                             breakdown: [
-                              { label: 'QA Created Records (QANEW)', value: qaNewRecords.toLocaleString() },
-                              { label: 'Unique ID Prefix', value: 'QANEW' },
+                              { label: 'QA Created Records (QANEW-CBE)', value: qaNewRecords.toLocaleString() },
+                              { label: 'Unique ID Prefix', value: 'QANEW-CBE' },
                               { label: 'Source Provenance', value: 'qa_portal' },
                             ],
                             recordLinkOptions: {},
@@ -858,7 +858,7 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span>8. QA Created Leads (QANEW)</span>
+                            <span>8. QA Created Leads (QANEW-CBE)</span>
                             <span className="cc-funnel-tag tag-manual" style={{ background: '#ede9fe', color: '#6d28d9', borderColor: '#ddd6fe' }}>QA New</span>
                           </div>
                         </td>

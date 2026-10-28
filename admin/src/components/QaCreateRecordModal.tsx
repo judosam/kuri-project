@@ -403,7 +403,7 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
                   type="text"
                   className="fld"
                   style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}
-                  placeholder="Auto-generated (e.g. QANEW-110825-769950)"
+                  placeholder="Auto-generated (e.g. QANEW-CBE-110825-769950)"
                   value={siteId}
                   onChange={(e) => setSiteId(e.target.value)}
                   required
