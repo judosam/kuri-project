@@ -244,6 +244,9 @@ async def assign_auditor_endpoint(
         if not record:
             skipped += 1
             continue
+        if auditor.role == UserRole.AUDITOR and record.assigned_auditor_id not in (None, auditor.id):
+            skipped += 1
+            continue
         try:
             record_service.assign_auditor(record, request.auditor_id, current_user)
             routed += 1
@@ -839,6 +842,9 @@ async def admin_list_records(
 ):
     if date_from and date_to and date_from > date_to:
         raise HTTPException(status_code=422, detail="From date must be before the To date")
+    if admin.role == UserRole.AUDITOR:
+        assigned_auditor_id = admin.id
+        unassigned_auditor = False
     record_service = RecordService(db)
     records, total = record_service.get_all_records(
         page=page, page_size=page_size, status=status, search=search, user_id=user_id,
@@ -1227,13 +1233,16 @@ async def export_records(
     column_filters: Optional[str] = Query(None, max_length=16000),
     include_images: bool = Query(True),
     sections: Optional[str] = Query(None),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_record_manager),
     db: Session = Depends(get_db),
 ):
     """Export matching records across all pages with customizable sections and photos."""
     from app.services.record_excel_service import build_records_report, iter_report_records
     if date_from and date_to and date_from > date_to:
         raise HTTPException(status_code=422, detail="From date must be before the To date")
+    if admin.role == UserRole.AUDITOR:
+        assigned_auditor_id = admin.id
+        unassigned_auditor = False
     parsed_sections = [s.strip().lower() for s in sections.split(",") if s.strip()] if sections else None
     records = iter_report_records(RecordService(db), status=status, user_id=user_id,
                                   date_from=date_from, date_to=date_to, search=search, date_field=date_field, audit_status=audit_status, qc_status=qc_status, column_filters=parse_column_filters(column_filters),
@@ -2510,6 +2519,8 @@ async def admin_get_record(record_id: int, admin: User = Depends(require_record_
     record = record_service.get_record(record_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
+    if admin.role == UserRole.AUDITOR and record.assigned_auditor_id not in (None, admin.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: Record is assigned to another QA reviewer")
     return _record_to_detail(record)
 
 
@@ -2534,6 +2545,8 @@ async def audit_record(
     record = record_service.get_record(record_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
+    if auditor.role == UserRole.AUDITOR and record.assigned_auditor_id not in (None, auditor.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: Record is assigned to another QA reviewer")
 
     try:
         record = record_service.audit_record(

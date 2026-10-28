@@ -278,6 +278,7 @@ export default function Records({
   pageTitle,
   roleBadge,
   storageKey = 'pc_record_filters',
+  currentUser,
 }: {
   canAdmin?: boolean;
   auditOnly?: boolean;
@@ -286,6 +287,7 @@ export default function Records({
   pageTitle?: string;
   roleBadge?: string;
   storageKey?: string;
+  currentUser?: User | null;
 }) {
   const navigate = useNavigate();
   // Auditor's queue: per-row decision controls, no bulk selection (selection
@@ -304,7 +306,7 @@ export default function Records({
   const [saved] = useState(() => readRecordState(storageKey, {
     page: 1, statusFilter: 'ALL' as 'ALL' | 'NOT_COMPLETED' | 'COMPLETED' | 'MANUALLY_ADDED',
     qcFilter: 'ALL' as 'ALL' | 'DONE' | 'PENDING', auditFilter: '' as '' | AuditStatus,
-    search: '', searchInput: '', preset: 'allTime' as DatePreset, dateFrom: '', dateTo: '', userId: '', auditorId: '',
+    search: '', searchInput: '', preset: 'allTime' as DatePreset, dateFrom: '', dateTo: '', userId: '', auditorId: isAuditorView ? (currentUser?.id ? String(currentUser.id) : '') : '',
     sortBy: defaultSortKeyFor(isAuditorView), sortOrder: 'desc' as 'asc' | 'desc', columnFilters: {} as Record<string, string[]>,
   }));
   const [columnFilters, setColumnFilters] = useState(saved.columnFilters);
@@ -328,7 +330,7 @@ export default function Records({
   const [dateFrom, setDateFrom] = useState(saved.dateFrom);
   const [dateTo, setDateTo] = useState(saved.dateTo);
   const [userId, setUserId] = useState(saved.userId);
-  const [auditorId, setAuditorId] = useState(saved.auditorId);
+  const [auditorId, setAuditorId] = useState(isAuditorView ? (currentUser?.id ? String(currentUser.id) : '') : saved.auditorId);
   const [users, setUsers] = useState<User[]>([]);
   const [hasFetchedUsers, setHasFetchedUsers] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -1001,8 +1003,10 @@ export default function Records({
     search: search || undefined,
     user_id: userId && userId !== 'UNASSIGNED' ? Number(userId) : undefined,
     unassigned_user: userId === 'UNASSIGNED' ? true : undefined,
-    assigned_auditor_id: auditorId && auditorId !== 'UNASSIGNED' ? Number(auditorId) : undefined,
-    unassigned_auditor: auditorId === 'UNASSIGNED' ? true : undefined,
+    assigned_auditor_id: isAuditorView
+      ? (currentUser?.id || (auditorId && auditorId !== 'UNASSIGNED' ? Number(auditorId) : undefined))
+      : (auditorId && auditorId !== 'UNASSIGNED' ? Number(auditorId) : undefined),
+    unassigned_auditor: isAuditorView ? undefined : (auditorId === 'UNASSIGNED' ? true : undefined),
     date_from: toApiStart(dateFrom),
     date_to: toApiEnd(dateTo),
     sort_by: sortBy,
@@ -1212,7 +1216,7 @@ export default function Records({
     setQcStatusFilter('ALL');
     setColumnFilters({});
     applyPreset('allTime');
-    setUserId(''); setAuditorId('');
+    setUserId(''); setAuditorId(isAuditorView ? (currentUser?.id ? String(currentUser.id) : '') : '');
     setSortBy(defaultSortKey);
     setSortOrder('desc');
     setPage(1);
@@ -1294,8 +1298,10 @@ export default function Records({
         status: isAuditorView ? undefined : (statusFilter === 'ALL' ? undefined : statusFilter),
         user_id: userId && userId !== 'UNASSIGNED' ? Number(userId) : undefined,
         unassigned_user: userId === 'UNASSIGNED' ? true : undefined,
-        assigned_auditor_id: auditorId && auditorId !== 'UNASSIGNED' ? Number(auditorId) : undefined,
-        unassigned_auditor: auditorId === 'UNASSIGNED' ? true : undefined,
+        assigned_auditor_id: isAuditorView
+          ? (currentUser?.id || (auditorId && auditorId !== 'UNASSIGNED' ? Number(auditorId) : undefined))
+          : (auditorId && auditorId !== 'UNASSIGNED' ? Number(auditorId) : undefined),
+        unassigned_auditor: isAuditorView ? undefined : (auditorId === 'UNASSIGNED' ? true : undefined),
         search: search || undefined,
         date_from: toApiStart(dateFrom),
         date_to: toApiEnd(dateTo),
@@ -1319,7 +1325,7 @@ export default function Records({
   const shownTo = Math.min(page * activePageSize, total);
   const isFiltered =
     !!search ||
-    !!userId || !!auditorId ||
+    !!userId || (!isAuditorView && !!auditorId) ||
     (!isAuditorView && statusFilter !== 'ALL') ||
     qcStatusFilter !== 'ALL' || Object.keys(columnFilters).length > 0 ||
     preset !== 'allTime' ||
@@ -1493,11 +1499,13 @@ export default function Records({
           </div>
         </div>
         <div className="toolbar-row records-filter-bar">
-          <div className="filter-bar-group filter-assignment">
-            <span className="filter-bar-label">Auditor</span>
-            <CustomSelect value={auditorId} onChange={value => { setAuditorId(value); setPage(1); }} ariaLabel="Filter by auditor"
-              options={[{ value: '', label: 'All auditors' }, { value: 'UNASSIGNED', label: 'Unassigned' }, ...auditors.map(user => ({ value: String(user.id), label: user.full_name || user.email }))]} />
-          </div>
+          {!isAuditorView && (
+            <div className="filter-bar-group filter-assignment">
+              <span className="filter-bar-label">Auditor</span>
+              <CustomSelect value={auditorId} onChange={value => { setAuditorId(value); setPage(1); }} ariaLabel="Filter by auditor"
+                options={[{ value: '', label: 'All auditors' }, { value: 'UNASSIGNED', label: 'Unassigned' }, ...auditors.map(user => ({ value: String(user.id), label: user.full_name || user.email }))]} />
+            </div>
+          )}
           {canRoute && <div className="filter-bar-group filter-assignment">
             <span className="filter-bar-label">Field verifier</span>
             <CustomSelect value={userId} onChange={value => { setUserId(value); setPage(1); }} ariaLabel="Filter by field verifier"

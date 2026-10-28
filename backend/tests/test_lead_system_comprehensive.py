@@ -562,3 +562,87 @@ def test_qa_portal_resolve_coords_and_create_record(client, db):
             db.delete(r)
         db.commit()
 
+
+
+def test_auditor_qa_portal_assigned_records_isolation(client, db):
+    """Auditor in QA portal strictly sees only records assigned to them, never other auditors' records."""
+    auditors = db.query(User).filter(User.role == UserRole.AUDITOR).all()
+    if len(auditors) < 2:
+        pytest.skip("Requires at least 2 auditors for isolation test")
+    
+    auditor1, auditor2 = auditors[0], auditors[1]
+    admin = db.query(User).filter(User.role == UserRole.ADMIN).first()
+    auth_svc = AuthService(db)
+    
+    a1_token = auth_svc.create_token(auditor1)
+    a2_token = auth_svc.create_token(auditor2)
+    admin_token = auth_svc.create_token(admin)
+    
+    # Create a record assigned to auditor 1 and another to auditor 2
+    rec1 = CaptureRecord(
+        name="Auditor 1 Task",
+        status="PENDING",
+        audit_status="PENDING",
+        unique_id="ISO-AUD1-001",
+        assigned_auditor_id=auditor1.id,
+    )
+    rec2 = CaptureRecord(
+        name="Auditor 2 Task",
+        status="PENDING",
+        audit_status="PENDING",
+        unique_id="ISO-AUD2-002",
+        assigned_auditor_id=auditor2.id,
+    )
+    db.add(rec1)
+    db.add(rec2)
+    db.commit()
+    db.refresh(rec1)
+    db.refresh(rec2)
+    
+    try:
+        # 1. Auditor 1 lists records without query params -> MUST ONLY get auditor 1 records
+        res1 = client.get("/api/admin/records", headers={"Authorization": f"Bearer {a1_token}"})
+        assert res1.status_code == 200
+        data1 = res1.json()
+        ids1 = [r["id"] for r in data1["records"]]
+        assert rec1.id in ids1, "Auditor 1 must see their own assigned record"
+        assert rec2.id not in ids1, "Auditor 1 must NEVER see Auditor 2's assigned record"
+        for r in data1["records"]:
+            assert r["assigned_auditor_id"] == auditor1.id, "All records returned must be assigned to auditor 1"
+        
+        # 2. Auditor 1 attempts to pass assigned_auditor_id=auditor2.id -> STILL only gets auditor 1 records
+        res1_spoof = client.get(
+            f"/api/admin/records?assigned_auditor_id={auditor2.id}",
+            headers={"Authorization": f"Bearer {a1_token}"}
+        )
+        assert res1_spoof.status_code == 200
+        data1_spoof = res1_spoof.json()
+        ids1_spoof = [r["id"] for r in data1_spoof["records"]]
+        assert rec2.id not in ids1_spoof, "Auditor 1 cannot bypass assignment filter"
+        for r in data1_spoof["records"]:
+            assert r["assigned_auditor_id"] == auditor1.id
+        
+        # 3. Auditor 1 attempts to fetch Auditor 2's record detail -> 403 Forbidden
+        res_get2 = client.get(
+            f"/api/admin/records/{rec2.id}",
+            headers={"Authorization": f"Bearer {a1_token}"}
+        )
+        assert res_get2.status_code == 403, f"Expected 403 when accessing another auditor's record, got {res_get2.status_code}"
+        
+        # 4. Auditor 1 attempts to audit Auditor 2's record -> 403 Forbidden
+        res_audit2 = client.patch(
+            f"/api/admin/records/{rec2.id}/audit",
+            json={"audit_status": "APPROVAL", "audit_comment": "Malicious takeover attempt"},
+            headers={"Authorization": f"Bearer {a1_token}"}
+        )
+        assert res_audit2.status_code == 403, "Auditor 1 cannot audit another auditor's record"
+        
+        # 5. Admin can list both
+        res_admin = client.get("/api/admin/records?search=ISO-AUD", headers={"Authorization": f"Bearer {admin_token}"})
+        assert res_admin.status_code == 200
+        admin_ids = [r["id"] for r in res_admin.json()["records"]]
+        assert rec1.id in admin_ids or rec2.id in admin_ids
+    finally:
+        db.delete(rec1)
+        db.delete(rec2)
+        db.commit()

@@ -202,7 +202,7 @@ function AppShell() {
             {/* Admin Portal Routes */}
             <Route path="/admin" element={user.role === 'ADMIN' ? <Dashboard /> : <Navigate to={user.role === 'AUDITOR' ? '/auditor/dashboard' : user.role === 'TELECALLER' ? '/telecaller/dashboard' : '/verifier'} replace />} />
             <Route path="/admin/dashboard" element={<Navigate to="/admin" replace />} />
-            <Route path="/admin/records" element={user.role === 'ADMIN' ? <Records key={`admin-${user.id}`} storageKey={`pc_admin_records_${user.id}`} canAdmin={true} canAudit={true} canRoute={true} /> : <Navigate to="/" replace />} />
+            <Route path="/admin/records" element={user.role === 'ADMIN' ? <Records key={`admin-${user.id}`} storageKey={`pc_admin_records_${user.id}`} canAdmin={true} canAudit={true} canRoute={true} currentUser={user} /> : <Navigate to="/" replace />} />
             <Route path="/admin/users" element={user.role === 'ADMIN' ? <Users /> : <Navigate to="/" replace />} />
             <Route path="/admin/map" element={user.role === 'ADMIN' ? <MapPage /> : <Navigate to="/" replace />} />
             <Route path="/admin/logs" element={user.role === 'ADMIN' ? <Logs /> : <Navigate to="/" replace />} />
@@ -210,7 +210,7 @@ function AppShell() {
             {/* Auditor Portal Routes */}
             <Route path="/auditor" element={<Navigate to="/auditor/dashboard" replace />} />
             <Route path="/auditor/dashboard" element={user.role === 'AUDITOR' || user.role === 'ADMIN' ? <QaDashboard /> : <Navigate to="/" replace />} />
-            <Route path="/auditor/records" element={user.role === 'AUDITOR' || user.role === 'ADMIN' ? <Records key={`qa-${user.id}`} storageKey={`pc_qa_records_${user.id}`} canAdmin={false} auditOnly={true} canAudit={true} canRoute={false} pageTitle="QA Records" roleBadge="QA" /> : <Navigate to="/" replace />} />
+            <Route path="/auditor/records" element={user.role === 'AUDITOR' || user.role === 'ADMIN' ? <Records key={`qa-${user.id}`} storageKey={`pc_qa_records_${user.id}`} canAdmin={false} auditOnly={true} canAudit={true} canRoute={false} pageTitle="QA Records" roleBadge="QA" currentUser={user} /> : <Navigate to="/" replace />} />
             <Route path="/audit/dashboard" element={<Navigate to="/auditor/dashboard" replace />} />
             <Route path="/audit" element={<Navigate to="/auditor/records" replace />} />
 

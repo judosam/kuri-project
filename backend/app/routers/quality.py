@@ -51,6 +51,9 @@ async def column_options(field: str, choice_search: str = Query("", max_length=2
         raise HTTPException(status_code=422, detail="This column does not support multiple selection")
     if user.role == UserRole.AUDITOR and field in ("audited_by", "photo_count"):
         raise HTTPException(status_code=403, detail="This column belongs to the admin portal")
+    if user.role == UserRole.AUDITOR:
+        filters["assigned_auditor_id"] = user.id
+        filters["unassigned_auditor"] = False
     filters["column_filters"] = {k: v for k, v in filters["column_filters"].items() if k != field}
     column = func.coalesce(cast(filter_column(field), String), "")
     query = filtered_query(db, **filters)
@@ -150,6 +153,9 @@ async def field_location_options(
 @router.get("/admin/qa-dashboard")
 async def qa_dashboard(filters: dict = Depends(record_filters), user: User = Depends(require_auditor),
                        db: Session = Depends(get_db)):
+    if user.role == UserRole.AUDITOR:
+        filters["assigned_auditor_id"] = user.id
+        filters["unassigned_auditor"] = False
     query = filtered_query(db, **filters)
     total, done = query.with_entities(func.count(CaptureRecord.id), func.sum(case((has_qc_expression(), 1), else_=0))).one()
     categories = query.with_entities(CaptureRecord.qc_vhr_comment, func.count(CaptureRecord.id)).filter(
@@ -174,7 +180,7 @@ async def save_qc(record_id: int, request: QcRequest, user: User = Depends(requi
     record = db.get(CaptureRecord, record_id)
     if not record:
         raise HTTPException(status_code=404, detail="Record not found")
-    if user.role == UserRole.AUDITOR and record.assigned_auditor_id not in (None, user.id) and request.assigned_auditor_id != user.id:
+    if user.role == UserRole.AUDITOR and record.assigned_auditor_id != user.id and request.assigned_auditor_id != user.id:
         raise HTTPException(status_code=403, detail="This record is assigned to another QA reviewer")
     if not request.qc_vhr_comment.strip():
         raise HTTPException(status_code=422, detail="Select a QC comment")
