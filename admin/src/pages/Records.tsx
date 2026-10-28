@@ -211,15 +211,15 @@ function TierBadge({ tier }: { tier?: string | null }) {
   let color = '#475569';
   let border = '#e2e8f0';
 
-  if (lower.includes('tier 1') || lower.includes('high')) {
+  if (lower.includes('tier 1') || lower.includes('tier-1') || lower.includes('high')) {
     bg = '#ecfdf5';
     color = '#047857';
     border = '#a7f3d0';
-  } else if (lower.includes('tier 2') || lower.includes('moderate') || lower.includes('medium')) {
+  } else if (lower.includes('tier 2') || lower.includes('tier-2') || lower.includes('moderate') || lower.includes('medium')) {
     bg = '#eff6ff';
     color = '#1d4ed8';
     border = '#bfdbfe';
-  } else if (lower.includes('tier 3') || lower.includes('capacity') || lower.includes('low')) {
+  } else if (lower.includes('tier 3') || lower.includes('tier-3') || lower.includes('capacity') || lower.includes('low')) {
     bg = '#fef3c7';
     color = '#b45309';
     border = '#fde68a';

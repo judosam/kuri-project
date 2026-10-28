@@ -2961,7 +2961,7 @@ async def admin_qa_create_record(
         village=village,
         taluk=taluk,
         district=district,
-        priority_tier=(payload.priority_tier or "Medium").title(),
+        priority_tier=(payload.priority_tier or "Tier-1").strip(),
         property_type=payload.property_type,
         owner_name_en=payload.owner_name_en,
         survey_no=payload.survey_no,

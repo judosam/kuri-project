@@ -1175,7 +1175,7 @@ export default function ImportedRecordDetail({
                       </button>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 12px', alignItems: 'start' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px 14px', alignItems: 'start' }}>
                       <div>
                         <label className="sub-field-label" htmlFor="imp-qc-vhr">QC Comments (VHR Imagery)</label>
                         <CustomSelect
@@ -1211,7 +1211,9 @@ export default function ImportedRecordDetail({
                           ]}
                           ariaLabel="QC comments from Street view"
                         />
-                        <label className="sub-field-label" htmlFor="imp-qc-builder" style={{ marginTop: 6 }}>Builder / Contact Details (if seen in Street View)</label>
+                      </div>
+                      <div>
+                        <label className="sub-field-label" htmlFor="imp-qc-builder">Builder / Contact Details (if seen in Street View)</label>
                         <input
                           id="imp-qc-builder"
                           type="text"
@@ -1224,7 +1226,9 @@ export default function ImportedRecordDetail({
                             setAuditStatus('RE_AUDITED');
                           }}
                         />
-                        <label className="sub-field-label" htmlFor="imp-qc-sqfeet" style={{ marginTop: 6 }}>Sq.ft</label>
+                      </div>
+                      <div>
+                        <label className="sub-field-label" htmlFor="imp-qc-sqfeet">Sq.ft</label>
                         <input
                           id="imp-qc-sqfeet"
                           type="text"
@@ -1257,12 +1261,12 @@ export default function ImportedRecordDetail({
                             {showPinPicker ? 'Hide pin map' : 'Edit pin location'}
                           </button>
                         </div>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                           <input
                             id="imp-qc-coordinates"
                             type="text"
                             className="fld"
-                            style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+                            style={{ fontFamily: 'monospace', fontSize: '0.85rem', flex: '1 1 240px', minWidth: 200 }}
                             placeholder="Latitude, Longitude (e.g. 11.016844, 76.955832)"
                             value={editQcCoordinates}
                             onChange={(e) => {
@@ -1275,7 +1279,7 @@ export default function ImportedRecordDetail({
                             qcStreet.trim() !== (record.qc_street_details || '').trim() ||
                             qcBuilder.trim() !== (record.qc_builder_contact || '').trim() ||
                             qcSqfeet.trim() !== (record.qc_sqfeet || '').trim()) && (
-                            <span style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 600, whiteSpace: 'nowrap', background: '#e0f2fe', padding: '4px 8px', borderRadius: 6 }}>
                               QC / Coordinates edited (Re-Audit)
                             </span>
                           )}
@@ -3266,24 +3270,35 @@ export default function ImportedRecordDetail({
             style={{
               background: '#ffffff',
               borderRadius: 16,
-              maxWidth: 720,
+              maxWidth: 820,
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
               display: 'flex',
               flexDirection: 'column',
+              border: '1px solid #e2e8f0',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Icon name="fact_check" size={22} style={{ color: '#0284c7' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 22px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '16px 16px 0 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="fact_check" size={24} style={{ color: '#0284c7' }} />
+                </div>
                 <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#0f172a' }}>QC Audit Details History</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: '#0f172a' }}>QC Audit Details History</h3>
+                    <AuditStatusChip status={record.audit_status} />
+                    {(record.qc_edited_at || record.audit_status === 'RE_AUDITED') && (
+                      <span style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 700 }}>
+                        Edited / Re-audited
+                      </span>
+                    )}
+                  </div>
                   <span style={{ fontSize: 12, color: '#64748b' }}>
-                    Record #{record.id} — {record.unique_id || record.name}
+                    Record #{record.id} — <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{record.unique_id || record.name}</span>
                   </span>
                 </div>
               </div>
@@ -3291,54 +3306,50 @@ export default function ImportedRecordDetail({
                 type="button"
                 className="btn btn-ghost btn-sm"
                 onClick={() => setShowQcHistoryModal(false)}
-                style={{ padding: '4px 8px', fontSize: 18, lineHeight: 1 }}
+                style={{ padding: '6px 10px', fontSize: 18, lineHeight: 1, borderRadius: 8 }}
+                title="Close"
               >
                 ✕
               </button>
             </div>
 
             {/* Modal Content */}
-            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* Latest / Current QC Assessment */}
-              <div style={{ border: '1px solid #bae6fd', borderRadius: 10, background: '#f0f9ff', padding: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ border: '1px solid #bae6fd', borderRadius: 12, background: '#f0f9ff', padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13, color: '#0369a1' }}>
-                    <Icon name="verified" size={16} style={{ color: '#0284c7' }} />
-                    Latest QC Assessment & Decision
+                    <Icon name="verified" size={17} style={{ color: '#0284c7' }} />
+                    Latest QC Assessment & Audit Decision
                   </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {(record.qc_edited_at || record.audit_status === 'RE_AUDITED') && (
-                      <span style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 700 }}>
-                        Edited / Re-audited
-                      </span>
-                    )}
-                    <AuditStatusChip status={record.audit_status} />
-                  </div>
+                  <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 700 }}>
+                    Active Audit Record
+                  </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px 16px', fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px 14px', fontSize: 12, background: '#ffffff', padding: 12, borderRadius: 8, border: '1px solid #e0f2fe' }}>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>Audited By</span>
+                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Audited By</span>
                     <strong style={{ color: '#0f172a' }}>{record.audited_by_name || 'Not audited yet'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>Audited At</span>
+                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Audited At</span>
                     <strong style={{ color: '#0f172a' }}>{record.audited_at ? formatDateTime(record.audited_at) : '—'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>Assigned Auditor / QA User</span>
+                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Assigned QA User</span>
                     <strong style={{ color: '#0f172a' }}>{record.assigned_auditor_name || record.qc_by_name || 'Not assigned'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>QC Last Edited At</span>
+                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>QC Last Edited At</span>
                     <strong style={{ color: '#0f172a' }}>{record.qc_edited_at ? formatDateTime(record.qc_edited_at) : '—'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>QC Coordinates</span>
+                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>QC Coordinates</span>
                     <strong style={{ color: '#0284c7', fontFamily: 'monospace' }}>{record.coordinates || '—'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>Last Modified Date</span>
+                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Last Modified Date</span>
                     <strong style={{ color: '#0f172a' }}>
                       {(record.last_modified_at || record.reassigned_at || record.assigned_at || record.created_at)
                         ? formatDateTime(record.last_modified_at || record.reassigned_at || record.assigned_at || record.created_at)
@@ -3347,44 +3358,86 @@ export default function ImportedRecordDetail({
                   </div>
                 </div>
 
-                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed #bae6fd', display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+                {/* 2-Column Balanced QC Observations */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px 14px', marginTop: 14 }}>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block', marginBottom: 2 }}>QC Comments (VHR Imagery)</span>
-                    <div style={{ background: '#fff', border: '1px solid #e0f2fe', borderRadius: 6, padding: '6px 10px', fontWeight: 600, color: '#0f172a' }}>
+                    <span style={{ color: '#475569', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>QC Comments (VHR Imagery)</span>
+                    <div style={{ background: '#fff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 12px', fontWeight: 600, color: '#0f172a', fontSize: 13 }}>
                       {record.qc_vhr_comment || 'No QC assessment recorded'}
                     </div>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block', marginBottom: 2 }}>QC Additional Details (Street View)</span>
-                    <div style={{ background: '#fff', border: '1px solid #e0f2fe', borderRadius: 6, padding: '6px 10px', color: '#334155', whiteSpace: 'pre-wrap' }}>
+                    <span style={{ color: '#475569', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Street View Comments</span>
+                    <div style={{ background: '#fff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 12px', color: '#1e293b', fontSize: 13, whiteSpace: 'pre-wrap' }}>
                       {record.qc_street_details || '—'}
                     </div>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block', marginBottom: 2 }}>Builder / Contact Details</span>
-                    <div style={{ background: '#fff', border: '1px solid #e0f2fe', borderRadius: 6, padding: '6px 10px', color: '#334155' }}>
+                    <span style={{ color: '#475569', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Builder / Contact Details</span>
+                    <div style={{ background: '#fff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 12px', color: '#1e293b', fontSize: 13 }}>
                       {record.qc_builder_contact || '—'}
                     </div>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block', marginBottom: 2 }}>Sq.ft</span>
-                    <div style={{ background: '#fff', border: '1px solid #e0f2fe', borderRadius: 6, padding: '6px 10px', color: '#0f172a', fontWeight: 600 }}>
+                    <span style={{ color: '#475569', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Sq.ft</span>
+                    <div style={{ background: '#fff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 12px', color: '#0f172a', fontWeight: 600, fontSize: 13 }}>
                       {record.qc_sqfeet || '—'}
                     </div>
                   </div>
-                  {record.audit_comment && (
-                    <div>
-                      <span style={{ color: '#64748b', display: 'block', marginBottom: 2 }}>Audit Remarks / Comment</span>
-                      <div style={{ background: '#fff', border: '1px solid #e0f2fe', borderRadius: 6, padding: '6px 10px', color: '#334155' }}>
-                        {record.audit_comment}
-                      </div>
-                    </div>
-                  )}
                 </div>
+
+                {record.audit_comment && (
+                  <div style={{ marginTop: 12 }}>
+                    <span style={{ color: '#475569', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Audit Remarks / Comment</span>
+                    <div style={{ background: '#fff', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 12px', color: '#334155', fontSize: 13 }}>
+                      {record.audit_comment}
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {/* QC Reference Image Card (if present) */}
+              {record.qc_reference_image_url && (
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, background: '#ffffff', padding: 14, display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div
+                    style={{ position: 'relative', width: 80, height: 64, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', border: '1px solid #cbd5e1', flexShrink: 0, background: '#0f172a' }}
+                    onClick={() => setRefViewerUrl(`${SERVER_BASE}${record.qc_reference_image_url}`)}
+                    title="Click to view full image"
+                  >
+                    <img
+                      src={`${SERVER_BASE}${record.qc_reference_image_url}?thumb=true`}
+                      alt="QC Reference"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = `${SERVER_BASE}${record.qc_reference_image_url}`;
+                      }}
+                    />
+                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name="zoom_in" size={18} style={{ color: '#fff' }} />
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>QC Reference Image</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
+                        <Icon name="cloud_done" size={12} /> GDrive Synced
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>Attached reference photo used during desktop QC & audit verification</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs"
+                    onClick={() => setRefViewerUrl(`${SERVER_BASE}${record.qc_reference_image_url}`)}
+                    style={{ fontSize: 11, height: 28, padding: '0 10px', flexShrink: 0 }}
+                  >
+                    <Icon name="visibility" size={13} /> View Full
+                  </button>
+                </div>
+              )}
+
               {/* Lifecycle & Initial QC Card */}
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff', padding: 14 }}>
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, background: '#ffffff', padding: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13, color: '#334155' }}>
                     <Icon name="history" size={16} style={{ color: '#64748b' }} />
@@ -3394,35 +3447,38 @@ export default function ImportedRecordDetail({
                     Lifecycle
                   </span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px 16px', fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px 14px', fontSize: 12 }}>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>Initial Assigned Auditor</span>
+                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Initial Assigned Auditor</span>
                     <strong style={{ color: '#0f172a' }}>{record.assigned_auditor_name || 'Not assigned'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>Record Created / Staged At</span>
+                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Record Created / Staged At</span>
                     <strong style={{ color: '#0f172a' }}>{record.created_at ? formatDateTime(record.created_at) : '—'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>Initial QC Completed At</span>
+                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Initial QC Completed At</span>
                     <strong style={{ color: '#0f172a' }}>{record.qc_completed_at ? formatDateTime(record.qc_completed_at) : '—'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block' }}>Initial QC Evaluator</span>
+                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Initial QC Evaluator</span>
                     <strong style={{ color: '#0f172a' }}>{record.qc_by_name || record.audited_by_name || '—'}</strong>
                   </div>
                 </div>
               </div>
-
-
             </div>
 
             {/* Modal Footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '0 0 16px 16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 22px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '0 0 16px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b' }}>
+                <Icon name="info" size={14} style={{ color: '#94a3b8' }} />
+                <span>All modifications write immutable audit entries.</span>
+              </div>
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
                 onClick={() => setShowQcHistoryModal(false)}
+                style={{ padding: '6px 16px', fontWeight: 600 }}
               >
                 Close
               </button>

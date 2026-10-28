@@ -30,13 +30,20 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
   const [address, setAddress] = useState('');
 
   // Additional QA details
-  const [priorityTier, setPriorityTier] = useState('High');
-  const [propertyType, setPropertyType] = useState('Residential');
+  const [priorityTier, setPriorityTier] = useState('Tier-1');
+  const [propertyType, setPropertyType] = useState('');
   const [auditStatus, setAuditStatus] = useState('PENDING');
   const [qcVhrComment, setQcVhrComment] = useState('');
   const [qcStreetDetails, setQcStreetDetails] = useState('');
+  const [qcBuilderContact, setQcBuilderContact] = useState('');
   const [qcSqfeet, setQcSqfeet] = useState('');
   const [auditComment, setAuditComment] = useState('');
+
+  // Reference image upload
+  const [referenceImageFile, setReferenceImageFile] = useState<File | Blob | null>(null);
+  const [referenceImagePreview, setReferenceImagePreview] = useState<string | null>(null);
+  const [isDraggingRef, setIsDraggingRef] = useState(false);
+  const refFileInputRef = useRef<HTMLInputElement>(null);
 
   // Optional legal/survey details
   const [showExtraDetails, setShowExtraDetails] = useState(false);
@@ -68,12 +75,17 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
       setTaluk('');
       setDistrict('Coimbatore');
       setAddress('');
-      setPriorityTier('High');
-      setPropertyType('Residential');
+      setPriorityTier('Tier-1');
+      setPropertyType('');
       setAuditStatus('PENDING');
       setQcVhrComment('');
+      setQcStreetDetails('');
+      setQcBuilderContact('');
       setQcSqfeet('');
       setAuditComment('');
+      setReferenceImageFile(null);
+      setReferenceImagePreview(null);
+      setIsDraggingRef(false);
       setShowExtraDetails(false);
       setOwnerName('');
       setSurveyNo('');
@@ -207,11 +219,12 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
         street_address: address.trim() || undefined,
         site_address: address.trim() || undefined,
         priority_tier: priorityTier,
-        property_type: propertyType,
+        property_type: propertyType || undefined,
         audit_status: auditStatus,
         audit_comment: auditComment.trim() || undefined,
         qc_vhr_comment: qcVhrComment.trim() || undefined,
         qc_street_details: qcStreetDetails.trim() || undefined,
+        qc_builder_contact: qcBuilderContact.trim() || undefined,
         qc_sqfeet: qcSqfeet.trim() || undefined,
         owner_name_en: ownerName.trim() || undefined,
         survey_no: surveyNo.trim() || undefined,
@@ -221,7 +234,16 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
       };
 
       const newRecord = await recordsApi.qaCreate(payload);
-      onSuccess(newRecord);
+      if (referenceImageFile) {
+        try {
+          const withImg = await recordsApi.uploadQcReferenceImage(newRecord.id, referenceImageFile);
+          onSuccess(withImg);
+        } catch {
+          onSuccess(newRecord);
+        }
+      } else {
+        onSuccess(newRecord);
+      }
       onClose();
     } catch (err: any) {
       const msg = err.response?.data?.detail || err.message || 'Failed to create record';
@@ -487,9 +509,9 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
                   value={priorityTier}
                   onChange={(e) => setPriorityTier(e.target.value)}
                 >
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
+                  <option value="Tier-1">Tier-1</option>
+                  <option value="Tier-2">Tier-2</option>
+                  <option value="Tier-3">Tier-3</option>
                 </select>
               </div>
             </div>
@@ -575,6 +597,22 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
                 </select>
               </div>
 
+              {/* Builder / Contact Details */}
+              <div>
+                <label className="sub-field-label" htmlFor="qa-create-builder">
+                  Builder / Contact Details (if seen in Street View)
+                </label>
+                <input
+                  id="qa-create-builder"
+                  type="text"
+                  className="fld"
+                  maxLength={2000}
+                  placeholder="e.g. G Square, 089395 40008"
+                  value={qcBuilderContact}
+                  onChange={(e) => setQcBuilderContact(e.target.value)}
+                />
+              </div>
+
               {/* Sq.ft */}
               <div>
                 <label className="sub-field-label" htmlFor="qa-create-sqft">
@@ -601,6 +639,7 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
                   value={propertyType}
                   onChange={(e) => setPropertyType(e.target.value)}
                 >
+                  <option value="">Select Property Type...</option>
                   <option value="Residential">Residential</option>
                   <option value="Commercial">Commercial</option>
                   <option value="Industrial">Industrial</option>
@@ -622,6 +661,127 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
                 value={auditComment}
                 onChange={(e) => setAuditComment(e.target.value)}
               />
+            </div>
+
+            {/* QC Reference Image Upload & GDrive Sync */}
+            <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: 10, display: 'grid', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Icon name="photo_camera" size={15} style={{ color: '#0284c7' }} />
+                  <strong style={{ fontSize: '0.74rem', letterSpacing: '0.04em', color: '#0369a1', textTransform: 'uppercase' }}>
+                    QC Reference Image
+                  </strong>
+                  <span style={{ fontSize: '0.7rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+                    Google Drive Synced
+                  </span>
+                </div>
+                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                  Paste screenshot (Ctrl+V) or click to browse
+                </span>
+              </div>
+
+              {referenceImagePreview ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 10 }}>
+                  <img
+                    src={referenceImagePreview}
+                    alt="Reference preview"
+                    style={{ width: 90, height: 70, objectFit: 'cover', borderRadius: 6, border: '1px solid #cbd5e1', background: '#0f172a' }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>
+                        {referenceImageFile instanceof File ? referenceImageFile.name : 'Pasted Screenshot Ready'}
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>
+                        <Icon name="cloud_upload" size={13} /> Ready to sync
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Will upload and sync to Google Drive upon submit</span>
+                    <div style={{ marginTop: 2 }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        style={{ color: '#dc2626', fontSize: '0.75rem', height: 24, padding: '0 8px' }}
+                        onClick={() => {
+                          setReferenceImageFile(null);
+                          setReferenceImagePreview(null);
+                        }}
+                      >
+                        <Icon name="delete" size={13} /> Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  tabIndex={0}
+                  onPaste={(e) => {
+                    const items = e.clipboardData?.items;
+                    if (!items) return;
+                    for (let i = 0; i < items.length; i++) {
+                      if (items[i].type.indexOf('image') !== -1) {
+                        const f = items[i].getAsFile();
+                        if (f) {
+                          e.preventDefault();
+                          setReferenceImageFile(f);
+                          setReferenceImagePreview(URL.createObjectURL(f));
+                          break;
+                        }
+                      }
+                    }
+                  }}
+                  onDragOver={(e) => { e.preventDefault(); setIsDraggingRef(true); }}
+                  onDragLeave={() => setIsDraggingRef(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDraggingRef(false);
+                    const f = e.dataTransfer.files?.[0];
+                    if (f && f.type.startsWith('image/')) {
+                      setReferenceImageFile(f);
+                      setReferenceImagePreview(URL.createObjectURL(f));
+                    }
+                  }}
+                  onClick={() => refFileInputRef.current?.click()}
+                  style={{
+                    border: isDraggingRef ? '2px dashed #0284c7' : '2px dashed #cbd5e1',
+                    borderRadius: 8,
+                    padding: '12px 14px',
+                    textAlign: 'center',
+                    background: isDraggingRef ? '#f0f9ff' : '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <input
+                    ref={refFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        setReferenceImageFile(f);
+                        setReferenceImagePreview(URL.createObjectURL(f));
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="add_photo_alternate" size={17} />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>
+                      Paste image (Ctrl+V) or click to browse
+                    </span>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.71rem', color: '#64748b' }}>
+                      Automatically uploads and syncs to Google Drive upon record creation
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
