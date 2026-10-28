@@ -4,7 +4,6 @@ import { recordsApi, logsApi, SERVER_BASE } from '../services/api';
 import type { AuditStatus, CaptureRecord, ActivityEntry, User } from '../types';
 import { AuditStatusChip, AUDIT_OPTIONS } from './Records';
 import { CustomSelect } from '../components/ui';
-import { GmapSatellitePanel } from '../components/GmapSatellite';
 import { CoordinateMap } from '../components/CoordinateMap';
 
 import { QC_VHR_OPTIONS, QC_STREET_OPTIONS } from '../utils/qcOptions';
@@ -269,30 +268,29 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
   const [recordActivityLogs, setRecordActivityLogs] = useState<ActivityEntry[]>([]);
   const [loadingActivityLogs, setLoadingActivityLogs] = useState(false);
 
-  useEffect(() => {
-    if (!showQcHistoryModal || !record) return;
-    let active = true;
-    const fetchLogs = async () => {
-      setLoadingActivityLogs(true);
-      try {
-        const res = await logsApi.list({ limit: 500 });
-        if (active && res && Array.isArray(res.items)) {
-          const filtered = res.items.filter(
-            (item) => item.record_id === record.id || (item.record_name && item.record_name === record.name)
-          );
-          setRecordActivityLogs(filtered);
-        }
-      } catch {
-        // ignore if forbidden or error
-      } finally {
-        if (active) setLoadingActivityLogs(false);
+  const fetchActivityLogs = async () => {
+    if (!record?.id) return;
+    setLoadingActivityLogs(true);
+    try {
+      const res = await logsApi.list({ limit: 500 });
+      if (res && Array.isArray(res.items)) {
+        const filtered = res.items.filter(
+          (item) => item.record_id === record.id || (item.record_name && item.record_name === record.name)
+        );
+        setRecordActivityLogs(filtered);
       }
-    };
-    fetchLogs();
-    return () => {
-      active = false;
-    };
-  }, [showQcHistoryModal, record]);
+    } catch {
+      // ignore if forbidden or error
+    } finally {
+      setLoadingActivityLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (record?.id) {
+      fetchActivityLogs();
+    }
+  }, [record?.id, record?.name]);
 
   // Edit / Delete state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -721,6 +719,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
       setRecord(updated);
       setIsEditingField(false);
       setFieldNotice({ ok: true, text: 'Field verification updated successfully.' });
+      fetchActivityLogs();
     } catch (err: any) {
       setFieldNotice({ ok: false, text: err.response?.data?.detail || 'Failed to update field verification.' });
     } finally {
@@ -1649,28 +1648,28 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                           {record.construction_happening === 'Yes' ? 'Active Construction' : 'No Construction'}
                         </span>
                       ) : undefined}
-                      {isRevisitOrEdited && (
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-xs"
-                          onClick={() => setShowEditHistoryModal(true)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            height: 24,
-                            padding: '0 8px',
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            borderRadius: 6,
-                            cursor: 'pointer',
-                          }}
-                          title="View edited history and previous inspection details"
-                        >
-                          <Icon name="history" size={13} />
-                          Edited History
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-xs"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          fontSize: '0.75rem',
+                          height: 26,
+                          padding: '0 10px',
+                          borderRadius: 6,
+                          fontWeight: 600,
+                          color: '#334155',
+                          borderColor: '#cbd5e1',
+                          background: '#ffffff',
+                        }}
+                        onClick={() => setShowEditHistoryModal(true)}
+                        title="View Field Verification history and previous inspection details"
+                      >
+                        <Icon name="history" size={13} />
+                        <span>Field Verification History</span>
+                      </button>
                       {canAdmin && (
                         <button
                           type="button"
@@ -2423,19 +2422,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                 </div>
               )}
 
-              {/* Saved Google Maps satellite mosaic — the same picture the
-                  importer and auditor reviewed, sourced from the shared cache. */}
-              {canAdmin && record.coordinates && (
-                <div style={{ marginTop: 14 }}>
-                  <GmapSatellitePanel
-                    recordId={record.id}
-                    coordinates={record.coordinates}
-                    zoom={record.gmap_zoom}
-                    height={330}
-                    title={`Satellite image for ${record.unique_id || `record #${record.id}`}`}
-                  />
-                </div>
-              )}
+
             </Section>
 
             {/* 7. Capture metadata */}
@@ -2502,6 +2489,57 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                   </div>
                 </div>
               )}
+            </Section>
+
+            {/* 8. Record History */}
+            <Section
+              icon="history"
+              title="Record History"
+              boxed
+              action={
+                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                  {loadingActivityLogs ? 'Loading...' : `${recordActivityLogs.length} event${recordActivityLogs.length === 1 ? '' : 's'}`}
+                </span>
+              }
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto' }}>
+                {loadingActivityLogs && (
+                  <div style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic', padding: 8 }}>
+                    Fetching audit and activity events...
+                  </div>
+                )}
+                {!loadingActivityLogs && recordActivityLogs.length === 0 && (
+                  <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', padding: '12px 8px' }}>
+                    No audit or activity events logged for this record yet.
+                  </div>
+                )}
+                {recordActivityLogs.map((entry) => (
+                  <div
+                    key={entry.id}
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      fontSize: 12,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <strong style={{ color: '#0f172a' }}>{entry.title}</strong>
+                      <span style={{ color: '#64748b', fontSize: 11 }}>{formatDateTime(entry.ts)}</span>
+                    </div>
+                    {entry.detail && <div style={{ color: '#475569', fontSize: 11.5 }}>{entry.detail}</div>}
+                    {entry.user_name && (
+                      <div style={{ color: '#64748b', fontSize: 10.5, marginTop: 2 }}>
+                        By: <strong>{entry.user_name}</strong>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </Section>
           </div>
 
@@ -2987,7 +3025,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Icon name="history" size={22} style={{ color: '#2563eb' }} />
                 <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#0f172a' }}>Edited History</h3>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#0f172a' }}>Field Verification History</h3>
                   <span style={{ fontSize: 12, color: '#64748b' }}>
                     Record #{record.id} — {record.unique_id || record.name}
                   </span>
@@ -3271,53 +3309,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                 </div>
               </div>
 
-              {/* Activity Trail / Events */}
-              {(recordActivityLogs.length > 0 || loadingActivityLogs) && (
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc', padding: 14 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13, color: '#334155' }}>
-                      <Icon name="schedule" size={16} style={{ color: '#0284c7' }} />
-                      Audit & Action Event Trail
-                    </span>
-                    <span style={{ fontSize: 11, color: '#64748b' }}>
-                      {loadingActivityLogs ? 'Loading trail...' : `${recordActivityLogs.length} event${recordActivityLogs.length === 1 ? '' : 's'}`}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
-                    {loadingActivityLogs && (
-                      <div style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic', padding: 8 }}>
-                        Fetching audit and activity events...
-                      </div>
-                    )}
-                    {recordActivityLogs.map((entry) => (
-                      <div
-                        key={entry.id}
-                        style={{
-                          background: '#fff',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: 8,
-                          padding: '8px 12px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 2,
-                          fontSize: 12,
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <strong style={{ color: '#0f172a' }}>{entry.title}</strong>
-                          <span style={{ color: '#64748b', fontSize: 11 }}>{formatDateTime(entry.ts)}</span>
-                        </div>
-                        {entry.detail && <div style={{ color: '#475569', fontSize: 11.5 }}>{entry.detail}</div>}
-                        {entry.user_name && (
-                          <div style={{ color: '#64748b', fontSize: 10.5, marginTop: 2 }}>
-                            By: <strong>{entry.user_name}</strong>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+
             </div>
 
             {/* Modal Footer */}

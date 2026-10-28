@@ -30,7 +30,6 @@ import {
 } from '../components/ui';
 import { DetailValueCell, isFieldEmpty } from '../components/RecordWorkflowFields';
 import { CoordinateMap } from '../components/CoordinateMap';
-import { GmapSatellitePanel } from '../components/GmapSatellite';
 import { enName } from '../utils/english';
 import { useTopHeader } from '../context/HeaderContext';
 import {
@@ -283,7 +282,6 @@ export default function ImportedRecordDetail({
   const [selectedImage, setSelectedImage] = useState(0);
   const [imageBlobUrls, setImageBlobUrls] = useState<Record<number, string>>({});
   const [imageFailures, setImageFailures] = useState<Record<number, boolean>>({});
-  const [expandRemarks, setExpandRemarks] = useState(false);
   const [addressBusy, setAddressBusy] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
 
@@ -318,6 +316,7 @@ export default function ImportedRecordDetail({
   const [isDraggingRef, setIsDraggingRef] = useState(false);
   const [refViewerUrl, setRefViewerUrl] = useState<string | null>(null);
   const refFileInputRef = useRef<HTMLInputElement>(null);
+  const [showEditHistoryModal, setShowEditHistoryModal] = useState(false);
   const [showQcHistoryModal, setShowQcHistoryModal] = useState(false);
   const [recordActivityLogs, setRecordActivityLogs] = useState<ActivityEntry[]>([]);
   const [loadingActivityLogs, setLoadingActivityLogs] = useState(false);
@@ -367,30 +366,29 @@ export default function ImportedRecordDetail({
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (!showQcHistoryModal || !record) return;
-    let active = true;
-    const fetchLogs = async () => {
-      setLoadingActivityLogs(true);
-      try {
-        const res = await logsApi.list({ limit: 500 });
-        if (active && res && Array.isArray(res.items)) {
-          const filtered = res.items.filter(
-            (item) => item.record_id === record.id || (item.record_name && item.record_name === record.name)
-          );
-          setRecordActivityLogs(filtered);
-        }
-      } catch {
-        // ignore if forbidden or error
-      } finally {
-        if (active) setLoadingActivityLogs(false);
+  const fetchActivityLogs = async () => {
+    if (!record?.id) return;
+    setLoadingActivityLogs(true);
+    try {
+      const res = await logsApi.list({ limit: 500 });
+      if (res && Array.isArray(res.items)) {
+        const filtered = res.items.filter(
+          (item) => item.record_id === record.id || (item.record_name && item.record_name === record.name)
+        );
+        setRecordActivityLogs(filtered);
       }
-    };
-    fetchLogs();
-    return () => {
-      active = false;
-    };
-  }, [showQcHistoryModal, record]);
+    } catch {
+      // ignore if forbidden or error
+    } finally {
+      setLoadingActivityLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (record?.id) {
+      fetchActivityLogs();
+    }
+  }, [record?.id, record?.name]);
 
   const sortedImages = [...(record?.images || [])].sort((a, b) => a.photo_order - b.photo_order);
   const currentImage = sortedImages[selectedImage] ?? null;
@@ -442,16 +440,7 @@ export default function ImportedRecordDetail({
         }
       : calculateCoordVariance(record?.coordinates, fieldLat, fieldLon));
 
-  // "lat, lng" as stored on the record — the pin the site map draws.
-  const siteCoords = (() => {
-    const parts = (record?.coordinates || '').split(',').map((part) => parseFloat(part.trim()));
-    if (parts.length !== 2 || Number.isNaN(parts[0]) || Number.isNaN(parts[1])) return null;
-    return { latitude: parts[0], longitude: parts[1] };
-  })();
-  const captureCoords =
-    fieldLat != null && fieldLon != null && (fieldLat !== 0 || fieldLon !== 0)
-      ? { latitude: fieldLat, longitude: fieldLon }
-      : null;
+
   const varianceTone =
     coordVariance?.status === 'exact'
       ? { chip: 'rd-chip-ok', dev: 'rd-deviation-ok', label: 'Exact Match' }
@@ -800,6 +789,7 @@ export default function ImportedRecordDetail({
       setForm(recordToForm(updated));
       setIsEditingField(false);
       setFieldNotice({ ok: true, text: 'Field verification updated successfully.' });
+      fetchActivityLogs();
     } catch (err: any) {
       setFieldNotice({ ok: false, text: err.response?.data?.detail || 'Failed to update field verification.' });
     } finally {
@@ -919,7 +909,6 @@ export default function ImportedRecordDetail({
   const isCompleted = record.status === 'COMPLETED';
   const gpsCount = (record.images || []).filter((i) => i.latitude && i.longitude).length;
   const allFramesLocated = sortedImages.length > 0 && gpsCount === sortedImages.length;
-  const remarksTooLong = (record.remarks || '').length > 220;
 
   const hasPlanning = !!(
     record.unique_id ||
@@ -1671,6 +1660,28 @@ export default function ImportedRecordDetail({
                           {record.construction_happening === 'Yes' ? 'Active Construction' : 'No Construction'}
                         </span>
                       ) : undefined}
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-xs"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          fontSize: '0.75rem',
+                          height: 26,
+                          padding: '0 10px',
+                          borderRadius: 6,
+                          fontWeight: 600,
+                          color: '#334155',
+                          borderColor: '#cbd5e1',
+                          background: '#ffffff',
+                        }}
+                        onClick={() => setShowEditHistoryModal(true)}
+                        title="View Field Verification history and previous inspection details"
+                      >
+                        <Icon name="history" size={13} />
+                        <span>Field Verification History</span>
+                      </button>
                       {canAdmin && (
                         <button
                           type="button"
@@ -2337,18 +2348,7 @@ export default function ImportedRecordDetail({
                 ) : undefined
               }
             >
-              {/* The site pin, plus the spot the photo was captured from when the
-                  record has one — the two together are what this section verifies. */}
-              {siteCoords && (
-                <div style={{ marginBottom: 14 }}>
-                  <CoordinateMap
-                    latitude={siteCoords.latitude}
-                    longitude={siteCoords.longitude}
-                    height={230}
-                    capture={captureCoords}
-                  />
-                </div>
-              )}
+
 
               <div className="rd-coord-grid">
                 {prettyCoords(record.coordinates) ? (
@@ -2407,51 +2407,10 @@ export default function ImportedRecordDetail({
                 </div>
               )}
 
-              {/* Google Maps satellite mosaic for this site. Imported records
-                  without one fetch it on demand and then serve it from cache. */}
-              {record.coordinates && (
-                <div style={{ marginTop: 14 }}>
-                  <GmapSatellitePanel
-                    recordId={record.id}
-                    coordinates={record.coordinates}
-                    zoom={record.gmap_zoom}
-                    height={330}
-                    title={`Satellite image for ${record.unique_id || `record #${record.id}`}`}
-                  />
-                </div>
-              )}
+
             </Section>
 
-            <Section
-              icon="flag"
-              title="Inspection Remarks"
-              action={
-                remarksTooLong ? (
-                  <button
-                    type="button"
-                    className="rd-inline-toggle"
-                    onClick={() => setExpandRemarks((v) => !v)}
-                    aria-expanded={expandRemarks}
-                  >
-                    <span>{expandRemarks ? 'View less' : 'View more'}</span>
-                    <Icon name={expandRemarks ? 'expand_less' : 'expand_more'} size={14} />
-                  </button>
-                ) : undefined
-              }
-            >
-              <div className="rd-rows rd-rows-single">
-                <div className="rd-row">
-                  <span className="rd-label">Inspection Remarks</span>
-                  {record.remarks ? (
-                    <p className={`rd-remarks${expandRemarks || !remarksTooLong ? '' : ' is-clamped'}`}>
-                      {record.remarks}
-                    </p>
-                  ) : (
-                    <span className="rd-remarks-empty">No inspection remarks recorded.</span>
-                  )}
-                </div>
-              </div>
-            </Section>
+
 
             <Section icon="schedule" title="Capture Details">
               <div className="rd-meta-grid">
@@ -2502,6 +2461,57 @@ export default function ImportedRecordDetail({
                   </div>
                 </div>
               )}
+            </Section>
+
+            {/* Record History */}
+            <Section
+              icon="history"
+              title="Record History"
+              boxed
+              action={
+                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                  {loadingActivityLogs ? 'Loading...' : `${recordActivityLogs.length} event${recordActivityLogs.length === 1 ? '' : 's'}`}
+                </span>
+              }
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto' }}>
+                {loadingActivityLogs && (
+                  <div style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic', padding: 8 }}>
+                    Fetching audit and activity events...
+                  </div>
+                )}
+                {!loadingActivityLogs && recordActivityLogs.length === 0 && (
+                  <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', padding: '12px 8px' }}>
+                    No audit or activity events logged for this record yet.
+                  </div>
+                )}
+                {recordActivityLogs.map((entry) => (
+                  <div
+                    key={entry.id}
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      fontSize: 12,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <strong style={{ color: '#0f172a' }}>{entry.title}</strong>
+                      <span style={{ color: '#64748b', fontSize: 11 }}>{formatDateTime(entry.ts)}</span>
+                    </div>
+                    {entry.detail && <div style={{ color: '#475569', fontSize: 11.5 }}>{entry.detail}</div>}
+                    {entry.user_name && (
+                      <div style={{ color: '#64748b', fontSize: 10.5, marginTop: 2 }}>
+                        By: <strong>{entry.user_name}</strong>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </Section>
           </div>
 
@@ -3131,6 +3141,160 @@ export default function ImportedRecordDetail({
         </div>
       )}
 
+      {/* ─── Field Verification History Modal ─── */}
+      {showEditHistoryModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            backdropFilter: 'blur(4px)',
+            padding: 16,
+          }}
+          onClick={() => setShowEditHistoryModal(false)}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 16,
+              width: '100%',
+              maxWidth: 680,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Icon name="history" size={22} style={{ color: '#2563eb' }} />
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#0f172a' }}>Field Verification History</h3>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>
+                    Record #{record.id} — {record.unique_id || record.name}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setShowEditHistoryModal(false)}
+                style={{ padding: '4px 8px', fontSize: 18, lineHeight: 1 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Revision Card: Latest Inspection */}
+              <div style={{ border: '1px solid #bfdbfe', borderRadius: 10, background: '#f8fafc', padding: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13, color: '#1e3a8a' }}>
+                    <Icon name="check_circle" size={16} style={{ color: '#2563eb' }} />
+                    Latest Inspection / Verification Details
+                  </span>
+                  {record.revisit_status && (
+                    <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 700 }}>
+                      {record.revisit_status}
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px 16px', fontSize: 12 }}>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Field Verifier</span>
+                    <strong style={{ color: '#0f172a' }}>{record.reassigned_to_name || record.user_name || '—'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Date of Visit</span>
+                    <strong style={{ color: '#0f172a' }}>{record.date_of_visit || '—'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Captured / Completed At</span>
+                    <strong style={{ color: '#0f172a' }}>{record.field_captured_at ? formatDateTime(record.field_captured_at) : (record.date_of_visit ? formatDateTime(record.date_of_visit) : '—')}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Construction Status</span>
+                    <strong style={{ color: '#0f172a' }}>{record.construction_happening || '—'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Stage of Construction</span>
+                    <strong style={{ color: '#0f172a' }}>{record.stage_of_construction || '—'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>No of Floors</span>
+                    <strong style={{ color: '#0f172a' }}>{record.no_of_floors || '—'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Built-up Area</span>
+                    <strong style={{ color: '#0f172a' }}>{record.built_up_area || '—'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Expected Completion</span>
+                    <strong style={{ color: '#0f172a' }}>{record.expected_completion || '—'}</strong>
+                  </div>
+                </div>
+                {record.remarks && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #cbd5e1', fontSize: 12 }}>
+                    <span style={{ color: '#64748b', display: 'block', marginBottom: 4 }}>Inspection Remarks</span>
+                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', color: '#1e293b', whiteSpace: 'pre-wrap' }}>
+                      {record.remarks}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Initial Visit Card */}
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff', padding: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13, color: '#334155' }}>
+                    <Icon name="assignment_turned_in" size={16} style={{ color: '#64748b' }} />
+                    Original / Initial Field Verification
+                  </span>
+                  <span style={{ background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 700 }}>
+                    Initial Record
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px 16px', fontSize: 12 }}>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Initial Field Verifier</span>
+                    <strong style={{ color: '#0f172a' }}>{record.user_name || '—'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Initial Assigned Date</span>
+                    <strong style={{ color: '#0f172a' }}>{record.assigned_at ? formatDateTime(record.assigned_at) : '—'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Initial Captured Date</span>
+                    <strong style={{ color: '#0f172a' }}>{record.field_captured_at ? formatDateTime(record.field_captured_at) : (record.date_of_visit ? formatDateTime(record.date_of_visit) : '—')}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block' }}>Date of Visit</span>
+                    <strong style={{ color: '#0f172a' }}>{record.date_of_visit || '—'}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '0 0 16px 16px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setShowEditHistoryModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* QC Audit Details History Modal */}
       {showQcHistoryModal && record && (
         <div
@@ -3301,53 +3465,7 @@ export default function ImportedRecordDetail({
                 </div>
               </div>
 
-              {/* Activity Trail / Events */}
-              {(recordActivityLogs.length > 0 || loadingActivityLogs) && (
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc', padding: 14 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13, color: '#334155' }}>
-                      <Icon name="schedule" size={16} style={{ color: '#0284c7' }} />
-                      Audit & Action Event Trail
-                    </span>
-                    <span style={{ fontSize: 11, color: '#64748b' }}>
-                      {loadingActivityLogs ? 'Loading trail...' : `${recordActivityLogs.length} event${recordActivityLogs.length === 1 ? '' : 's'}`}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
-                    {loadingActivityLogs && (
-                      <div style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic', padding: 8 }}>
-                        Fetching audit and activity events...
-                      </div>
-                    )}
-                    {recordActivityLogs.map((entry) => (
-                      <div
-                        key={entry.id}
-                        style={{
-                          background: '#fff',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: 8,
-                          padding: '8px 12px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 2,
-                          fontSize: 12,
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <strong style={{ color: '#0f172a' }}>{entry.title}</strong>
-                          <span style={{ color: '#64748b', fontSize: 11 }}>{formatDateTime(entry.ts)}</span>
-                        </div>
-                        {entry.detail && <div style={{ color: '#475569', fontSize: 11.5 }}>{entry.detail}</div>}
-                        {entry.user_name && (
-                          <div style={{ color: '#64748b', fontSize: 10.5, marginTop: 2 }}>
-                            By: <strong>{entry.user_name}</strong>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+
             </div>
 
             {/* Modal Footer */}

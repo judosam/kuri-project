@@ -3164,12 +3164,41 @@ async def admin_update_record(
             )
 
     role_name = admin.role.value.capitalize() if hasattr(admin.role, "value") else str(admin.role).capitalize()
+    
+    # Granular action classification for accurate record history
+    has_field_update = any(
+        k in update_kwargs
+        for k in [
+            "construction_happening", "date_of_visit", "type_of_construction",
+            "stage_of_construction", "no_of_floors", "built_up_area",
+            "expected_completion", "relationship_with_building", "building_user_name",
+            "spoken_with", "contact_number", "site_contractor_architect_name",
+            "site_contractor_architect_number", "remarks", "follow_up_date",
+        ]
+    )
+    if has_field_update:
+        action_type = "field_verification_update"
+        action_title = "Field verification updated"
+        action_detail = f"Field verification for Record #{record.id} ('{record.name}') updated by {admin.full_name} ({role_name})"
+    elif has_qc_update or ("audit_status" in update_kwargs):
+        action_type = "qc_assessment_update"
+        action_title = "QC assessment updated"
+        action_detail = f"QC assessment for Record #{record.id} ('{record.name}') updated by {admin.full_name} ({role_name})"
+    elif any(k.startswith("telecaller_") for k in update_kwargs):
+        action_type = "telecaller_update"
+        action_title = "Telecaller feedback updated"
+        action_detail = f"Telecaller verification for Record #{record.id} ('{record.name}') updated by {admin.full_name} ({role_name})"
+    else:
+        action_type = "record_edit"
+        action_title = "Field record updated"
+        action_detail = f"Record #{record.id} ('{record.name}') updated by {admin.full_name} ({role_name})"
+
     log_activity(
         db=db,
-        action_type="record_edit",
+        action_type=action_type,
         type="record",
-        title="Field record updated",
-        detail=f"Record #{record.id} ('{record.name}') updated by {admin.full_name} ({role_name})",
+        title=action_title,
+        detail=action_detail,
         user_id=admin.id,
         user_name=admin.full_name,
         record_id=record.id,
