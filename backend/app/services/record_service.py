@@ -559,7 +559,10 @@ class RecordService:
             CaptureRecord.status.ilike("%construction finished%"),
         )
         if user_id is not None:
-            query = query.filter(CaptureRecord.user_id == user_id, CaptureRecord.audit_status == 'APPROVAL')
+            query = query.filter(
+                CaptureRecord.user_id == user_id,
+                or_(CaptureRecord.audit_status.is_(None), CaptureRecord.audit_status != 'DISAPPROVAL')
+            )
         if status == 'COMPLETED':
             query = query.filter(is_completed)
         elif status == 'NOT_COMPLETED':
@@ -573,9 +576,10 @@ class RecordService:
             query = query.filter(captured >= func.julianday(date_from))
         if date_to:
             query = query.filter(captured <= func.julianday(date_to))
-        total, completed, pending, construction = query.with_entities(
+        total, completed, closed, pending, construction = query.with_entities(
             func.count(CaptureRecord.id),
             func.sum(case((is_completed, 1), else_=0)),
+            func.sum(case((is_closed, 1), else_=0)),
             func.sum(case((and_(not_(is_completed), not_(is_closed), or_(CaptureRecord.audit_status.is_(None), CaptureRecord.audit_status != 'DISAPPROVAL')), 1), else_=0)),
             func.sum(case((func.lower(func.trim(CaptureRecord.construction_happening)) == 'yes', 1), else_=0)),
         ).one()
@@ -602,7 +606,7 @@ class RecordService:
         return {'today_records': between(CaptureRecord.created_at, day_start, day_end),
                 'today_completed_records': between(record_date_column('completed_at'), day_start, day_end),
                 'month_records': between(CaptureRecord.created_at, month_start.astimezone(timezone.utc), month_end.astimezone(timezone.utc)),
-                'total_records': total, 'total_completed_records': completed or 0,
+                'total_records': total, 'total_completed_records': completed or 0, 'closed_records': closed or 0,
                 'manually_added_records': query.filter(CaptureRecord.is_manually_added).count(),
                 'qa_new_records': query.filter(or_(CaptureRecord.unique_id.like("QANEW-%"), CaptureRecord.source == "qa_portal")).count(),
                 'pending_records': pending or 0, 'total_photos': photos,
@@ -639,7 +643,10 @@ class RecordService:
             func.sum(case((func.lower(func.trim(CaptureRecord.construction_happening)) == 'yes', 1), else_=0)),
         ).filter(day >= first.isoformat(), day <= last.isoformat())
         if user_id is not None:
-            query = query.filter(CaptureRecord.user_id == user_id, CaptureRecord.audit_status == 'APPROVAL')
+            query = query.filter(
+                CaptureRecord.user_id == user_id,
+                or_(CaptureRecord.audit_status.is_(None), CaptureRecord.audit_status != 'DISAPPROVAL')
+            )
         if status:
             query = query.filter(CaptureRecord.status == status)
         if date_from:
@@ -970,7 +977,13 @@ class RecordService:
             if u.role.value not in ("USER", "FIELD_VERIFIER"):
                 continue
             scoped = self.period_metrics(eff_from, eff_to, status, u.id)
-            assigned, completed, u_pending, rate = scoped['total_records'], scoped['total_completed_records'], scoped['pending_records'], scoped['completion_rate']
+            assigned, completed, u_closed, u_pending, rate = (
+                scoped['total_records'],
+                scoped['total_completed_records'],
+                scoped.get('closed_records', 0),
+                scoped['pending_records'],
+                scoped['completion_rate'],
+            )
             u_today_comp = scoped['today_completed_records']
             u_const = self.db.query(CaptureRecord).filter(
                 CaptureRecord.user_id == u.id,
@@ -991,6 +1004,7 @@ class RecordService:
                 "role": u.role.value,
                 "total_assigned": assigned,
                 "completed": completed,
+                "closed": u_closed,
                 "pending": u_pending,
                 "today_completed": u_today_comp,
                 "completion_rate": rate,

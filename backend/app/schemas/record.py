@@ -611,6 +611,7 @@ class InspectorStat(BaseModel):
     role: str
     total_assigned: int
     completed: int
+    closed: int = 0
     pending: int
     today_completed: int
     completion_rate: float

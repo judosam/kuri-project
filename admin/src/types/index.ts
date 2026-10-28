@@ -176,6 +176,7 @@ export interface InspectorStat {
   role: string;
   total_assigned: number;
   completed: number;
+  closed?: number;
   pending: number;
   today_completed: number;
   completion_rate: number;

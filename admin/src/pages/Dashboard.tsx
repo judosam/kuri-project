@@ -1291,6 +1291,7 @@ export default function Dashboard() {
                       <th style={{ textAlign: 'right' }}>Assigned</th>
                       <th style={{ textAlign: 'right' }}>Pending</th>
                       <th style={{ textAlign: 'right' }}>Completed</th>
+                      <th style={{ textAlign: 'right' }}>Closed</th>
                       <th style={{ textAlign: 'right' }}>Confirmed Sites</th>
                       <th style={{ textAlign: 'right' }}>Phones Found</th>
                       <th style={{ width: '22%' }}>Completion %</th>
@@ -1314,6 +1315,7 @@ export default function Dashboard() {
                             breakdown: [
                               { label: 'Total Assigned Tasks', value: op.total_assigned.toLocaleString() },
                               { label: 'Completed Visits', value: op.completed.toLocaleString() },
+                              { label: 'Closed / Terminal Visits', value: (op.closed ?? 0).toLocaleString() },
                               { label: 'Pending Visits', value: op.pending.toLocaleString() },
                               { label: 'Confirmed Construction Sites', value: (op.confirmed_construction ?? 0).toLocaleString() },
                               { label: 'Phone Numbers Obtained', value: (op.phones_obtained ?? 0).toLocaleString() },
@@ -1347,6 +1349,9 @@ export default function Dashboard() {
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700, color: '#15803d' }}>
                           {op.completed.toLocaleString()}
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, color: '#64748b' }} title="Not Interested / Duplicate / Construction Finished">
+                          {(op.closed ?? 0).toLocaleString()}
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 600 }}>
                           {(op.confirmed_construction ?? 0).toLocaleString()}

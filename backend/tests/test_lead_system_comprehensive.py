@@ -50,6 +50,13 @@ def test_dashboard_reconciliation(db):
     assert completed + closed + disapproved + pending == total
     assert metrics.get("pending_records") == pending
 
+    # Verifier stats reconciliation: Assigned == Completed + Closed + Pending
+    for stat in metrics.get("inspector_stats", []):
+        assert stat["total_assigned"] == stat["completed"] + stat.get("closed", 0) + stat["pending"], (
+            f"Verifier {stat['user_name']} mismatch: "
+            f"Assigned {stat['total_assigned']} != {stat['completed']} + {stat.get('closed', 0)} + {stat['pending']}"
+        )
+
 def test_strict_rbac_matrix(db, client):
     """Strict server-side RBAC: each role accesses only its authorized endpoints, others get 403."""
     auth_svc = AuthService(db)
