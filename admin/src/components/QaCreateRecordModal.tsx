@@ -4,7 +4,7 @@ import { CoordinateMap } from './CoordinateMap';
 import { Icon } from './ui';
 import { recordsApi } from '../services/api';
 import type { CaptureRecord, ResolveCoordsResponse, QaCreateRecordPayload } from '../types';
-import { QC_VHR_OPTIONS } from '../utils/qcOptions';
+import { QC_VHR_OPTIONS, QC_STREET_OPTIONS } from '../utils/qcOptions';
 
 interface Props {
   isOpen: boolean;
@@ -34,6 +34,7 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
   const [propertyType, setPropertyType] = useState('Residential');
   const [auditStatus, setAuditStatus] = useState('PENDING');
   const [qcVhrComment, setQcVhrComment] = useState('');
+  const [qcStreetDetails, setQcStreetDetails] = useState('');
   const [qcSqfeet, setQcSqfeet] = useState('');
   const [auditComment, setAuditComment] = useState('');
 
@@ -210,6 +211,7 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
         audit_status: auditStatus,
         audit_comment: auditComment.trim() || undefined,
         qc_vhr_comment: qcVhrComment.trim() || undefined,
+        qc_street_details: qcStreetDetails.trim() || undefined,
         qc_sqfeet: qcSqfeet.trim() || undefined,
         owner_name_en: ownerName.trim() || undefined,
         survey_no: surveyNo.trim() || undefined,
@@ -546,6 +548,26 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
                 >
                   <option value="">Select QC Assessment…</option>
                   {QC_VHR_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Street View Comments */}
+              <div>
+                <label className="sub-field-label" htmlFor="qa-create-street">
+                  Street View Comments
+                </label>
+                <select
+                  id="qa-create-street"
+                  className="fld"
+                  value={qcStreetDetails}
+                  onChange={(e) => setQcStreetDetails(e.target.value)}
+                >
+                  <option value="">Select Street View Assessment…</option>
+                  {QC_STREET_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>
                       {opt}
                     </option>

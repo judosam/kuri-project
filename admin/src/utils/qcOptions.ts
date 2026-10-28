@@ -1,8 +1,9 @@
 /**
- * Standardized QC assessment dropdown options for the QA/QC portal.
+ * Standardized QC assessment dropdown options for the QA/QC portal and Admin portal.
  */
 
 export const QC_VHR_OPTIONS: string[] = [
+  'No recent VHR imagery',
   'Possible Construction',
   'Possible construction - site clearing stage',
   'Possible construction - soil excavation stage',
@@ -24,6 +25,8 @@ export const QC_VHR_OPTIONS: string[] = [
 ];
 
 export const QC_STREET_OPTIONS: string[] = [
+  'No recent street view',
+  'No Street view',
   'No street view available',
   'Active construction (2025)',
   'Active construction (2026)',
