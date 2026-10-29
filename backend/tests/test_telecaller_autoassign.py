@@ -33,6 +33,20 @@ def test_has_valid_contact():
     rec.qc_builder_contact = "Builder John 9840123456"
     assert has_valid_contact(rec)
 
+    # Non-phone notes should NOT be treated as valid contacts
+    rec.qc_builder_contact = "Temple"
+    assert not has_valid_contact(rec)
+    rec.qc_builder_contact = "CIT clg"
+    assert not has_valid_contact(rec)
+    rec.qc_builder_contact = "Greenfield Daffodil Apartment"
+    assert not has_valid_contact(rec)
+
+    # Multi-number / formatted numbers with 10 digits
+    rec.qc_builder_contact = "Might be part of Sirila Life Spaces, 98439 65000, 90434 65000"
+    assert has_valid_contact(rec)
+    rec.qc_builder_contact = "8270056005"
+    assert has_valid_contact(rec)
+
 def test_get_target_telecaller_and_auto_assign():
     db = SessionLocal()
     try:
@@ -56,6 +70,49 @@ def test_get_target_telecaller_and_auto_assign():
 
         # Clean up
         db.delete(dummy)
+        db.commit()
+    finally:
+        db.close()
+
+def test_eligible_contact_filter_excludes_non_numbers_and_includes_qc_builder():
+    db = SessionLocal()
+    try:
+        r_valid_qc = CaptureRecord(
+            name="Valid QC Contact",
+            unique_id="TST-QC-001",
+            qc_builder_contact="8270056005",
+        )
+        r_multi_qc = CaptureRecord(
+            name="Multi QC Contact",
+            unique_id="TST-QC-002",
+            qc_builder_contact="Sirila Life Spaces, 98439 65000, 90434 65000",
+        )
+        r_invalid_text = CaptureRecord(
+            name="Invalid Text QC",
+            unique_id="TST-QC-003",
+            qc_builder_contact="Temple",
+        )
+        db.add_all([r_valid_qc, r_multi_qc, r_invalid_text])
+        db.commit()
+
+        # Query using the telecaller eligible contact filter
+        matched_ids = [
+            r.id for r in db.query(CaptureRecord)
+            .filter(
+                _eligible_contact_filter(),
+                CaptureRecord.id.in_([r_valid_qc.id, r_multi_qc.id, r_invalid_text.id]),
+            )
+            .all()
+        ]
+
+        assert r_valid_qc.id in matched_ids
+        assert r_multi_qc.id in matched_ids
+        assert r_invalid_text.id not in matched_ids
+
+        # Clean up
+        db.delete(r_valid_qc)
+        db.delete(r_multi_qc)
+        db.delete(r_invalid_text)
         db.commit()
     finally:
         db.close()

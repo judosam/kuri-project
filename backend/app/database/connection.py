@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Generator
 
 from sqlalchemy import create_engine, event, inspect, text
@@ -9,6 +10,35 @@ from app.core.config import get_settings
 from app.database.base import Base
 
 settings = get_settings()
+
+def has_ten_digit_phone_sql(val) -> int:
+    """Checks whether the input string contains at least one valid 10-digit phone number."""
+    if not val:
+        return 0
+    s = str(val).strip()
+    if not s or s.lower() in ("-", "--", "na", "n/a", "nil", "none", "null"):
+        return 0
+    # Search for 10-digit candidate numbers (starting with 6-9 or generic 10 digits)
+    # allowing optional prefix (+91, 91, 0) and optional spaces/dashes
+    pattern = re.compile(r'(?:(?:\+91|91|0)[\s\-]?)?([6-9]\d{4}[\s\-]?\d{5}|[6-9]\d{9})')
+    for m in pattern.findall(s):
+        d = re.sub(r'\D', '', m)
+        if len(d) == 10:
+            return 1
+    generic = re.compile(r'(?:(?:\+91|91|0)[\s\-]?)?(\d{5}[\s\-]?\d{5}|\b\d{10}\b)')
+    for m in generic.findall(s):
+        d = re.sub(r'\D', '', m)
+        if len(d) == 10:
+            return 1
+    return 0
+
+def register_sqlite_functions(dbapi_connection):
+    """Registers custom SQL functions on SQLite connections."""
+    if hasattr(dbapi_connection, "create_function"):
+        try:
+            dbapi_connection.create_function("has_ten_digit_phone", 1, has_ten_digit_phone_sql)
+        except Exception:
+            pass
 
 # Ensure data directory exists for SQLite
 db_path = settings.DATABASE_URL.replace("sqlite:///", "")
@@ -37,6 +67,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.execute("PRAGMA temp_store=MEMORY")
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
+    register_sqlite_functions(dbapi_connection)
 
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

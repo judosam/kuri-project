@@ -4,6 +4,7 @@ import type { CaptureRecord } from '../types';
 import { telecallerApi } from '../services/api';
 import { Icon, AuthThumbnail, formatDateTime } from './ui';
 import { TelecallerHistoryTable } from './TelecallerHistoryTable';
+import { extractPhoneNumbers, extractContactLabel, formatPhoneNumber } from '../utils/phoneUtils';
 
 interface TelecallerRecordModalProps {
   record: CaptureRecord;
@@ -38,6 +39,11 @@ export const STAGES_OF_CONSTRUCTION = [
 export function TelecallerRecordModal({ record, onClose, onUpdated }: TelecallerRecordModalProps) {
   // A fresh/next lead is one that hasn't had telecaller feedback logged yet
   const isFreshLead = !record.telecaller_called_at || !record.telecaller_status || record.telecaller_status === 'PENDING';
+
+  const ownerPhones = extractPhoneNumbers(record.contact_number);
+  const contractorPhones = extractPhoneNumbers(record.site_contractor_architect_number);
+  const qcPhones = extractPhoneNumbers(record.qc_builder_contact);
+  const qcLabel = extractContactLabel(record.qc_builder_contact);
 
   const [status, setStatus] = useState<string>(record.telecaller_status || 'PENDING');
   const [noOfFloors, setNoOfFloors] = useState<string>(record.telecaller_no_of_floors || '');
@@ -273,113 +279,200 @@ export function TelecallerRecordModal({ record, onClose, onUpdated }: Telecaller
               border: '1px solid #cbd5e1',
             }}
           >
-            {record.contact_number && record.contact_number.trim() && record.contact_number !== '-' ? (
+            {ownerPhones.length > 0 && (
               <div
                 style={{
                   flex: 1,
-                  minWidth: 220,
+                  minWidth: 230,
                   background: '#ffffff',
                   padding: '10px 14px',
                   borderRadius: 8,
                   border: '1px solid #e2e8f0',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
+                  flexDirection: 'column',
+                  gap: 8,
                 }}
               >
-                <div>
-                  <div style={{ fontSize: 10, textTransform: 'uppercase', fontWeight: 700, color: '#64748b' }}>
-                    Owner / Contact No
-                  </div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', letterSpacing: '0.02em' }}>
-                    {record.contact_number}
-                  </div>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', fontWeight: 700, color: '#64748b' }}>
+                  Owner / Contact No
                 </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => copyToClipboard(record.contact_number!, 'Contact Number')}
-                    title="Copy number"
-                    style={{ height: 30, padding: '0 8px' }}
-                  >
-                    <Icon name="content_copy" size={14} />
-                  </button>
-                  <a
-                    href={`tel:${record.contact_number}`}
-                    className="btn btn-primary btn-sm"
+                {ownerPhones.map((phone) => (
+                  <div
+                    key={phone}
                     style={{
-                      height: 30,
-                      padding: '0 12px',
-                      textDecoration: 'none',
-                      display: 'inline-flex',
+                      display: 'flex',
                       alignItems: 'center',
-                      gap: 4,
-                      background: '#059669',
-                      borderColor: '#059669',
+                      justifyContent: 'space-between',
+                      gap: 8,
                     }}
                   >
-                    <Icon name="call" size={14} /> Call
-                  </a>
-                </div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', letterSpacing: '0.02em' }}>
+                      {formatPhoneNumber(phone)}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => copyToClipboard(phone, 'Contact Number')}
+                        title="Copy number"
+                        style={{ height: 28, padding: '0 8px' }}
+                      >
+                        <Icon name="content_copy" size={13} />
+                      </button>
+                      <a
+                        href={`tel:${phone}`}
+                        className="btn btn-primary btn-sm"
+                        style={{
+                          height: 28,
+                          padding: '0 10px',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          background: '#059669',
+                          borderColor: '#059669',
+                          fontSize: 12,
+                        }}
+                      >
+                        <Icon name="call" size={13} /> Call
+                      </a>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ) : null}
+            )}
 
-            {record.site_contractor_architect_number &&
-            record.site_contractor_architect_number.trim() &&
-            record.site_contractor_architect_number !== '-' ? (
+            {contractorPhones.length > 0 && (
               <div
                 style={{
                   flex: 1,
-                  minWidth: 220,
+                  minWidth: 230,
                   background: '#ffffff',
                   padding: '10px 14px',
                   borderRadius: 8,
                   border: '1px solid #e2e8f0',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
+                  flexDirection: 'column',
+                  gap: 8,
                 }}
               >
-                <div>
-                  <div style={{ fontSize: 10, textTransform: 'uppercase', fontWeight: 700, color: '#64748b' }}>
-                    Contractor / Architect ({record.site_contractor_architect_name || 'Site'})
-                  </div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', letterSpacing: '0.02em' }}>
-                    {record.site_contractor_architect_number}
-                  </div>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', fontWeight: 700, color: '#64748b' }}>
+                  Contractor / Architect {record.site_contractor_architect_name ? `(${record.site_contractor_architect_name})` : ''}
                 </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() =>
-                      copyToClipboard(record.site_contractor_architect_number!, 'Contractor Number')
-                    }
-                    title="Copy number"
-                    style={{ height: 30, padding: '0 8px' }}
-                  >
-                    <Icon name="content_copy" size={14} />
-                  </button>
-                  <a
-                    href={`tel:${record.site_contractor_architect_number}`}
-                    className="btn btn-primary btn-sm"
+                {contractorPhones.map((phone) => (
+                  <div
+                    key={phone}
                     style={{
-                      height: 30,
-                      padding: '0 12px',
-                      textDecoration: 'none',
-                      display: 'inline-flex',
+                      display: 'flex',
                       alignItems: 'center',
-                      gap: 4,
-                      background: '#0284c7',
-                      borderColor: '#0284c7',
+                      justifyContent: 'space-between',
+                      gap: 8,
                     }}
                   >
-                    <Icon name="call" size={14} /> Call
-                  </a>
-                </div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', letterSpacing: '0.02em' }}>
+                      {formatPhoneNumber(phone)}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => copyToClipboard(phone, 'Contractor Number')}
+                        title="Copy number"
+                        style={{ height: 28, padding: '0 8px' }}
+                      >
+                        <Icon name="content_copy" size={13} />
+                      </button>
+                      <a
+                        href={`tel:${phone}`}
+                        className="btn btn-primary btn-sm"
+                        style={{
+                          height: 28,
+                          padding: '0 10px',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          background: '#0284c7',
+                          borderColor: '#0284c7',
+                          fontSize: 12,
+                        }}
+                      >
+                        <Icon name="call" size={13} /> Call
+                      </a>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ) : null}
+            )}
+
+            {qcPhones.length > 0 && (
+              <div
+                style={{
+                  flex: 1,
+                  minWidth: 230,
+                  background: '#ffffff',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
+                <div style={{ fontSize: 10, textTransform: 'uppercase', fontWeight: 700, color: '#64748b' }}>
+                  QC Builder / Contact {qcLabel ? `(${qcLabel})` : ''}
+                </div>
+                {qcPhones.map((phone) => (
+                  <div
+                    key={phone}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', letterSpacing: '0.02em' }}>
+                      {formatPhoneNumber(phone)}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => copyToClipboard(phone, 'QC Builder Contact')}
+                        title="Copy number"
+                        style={{ height: 28, padding: '0 8px' }}
+                      >
+                        <Icon name="content_copy" size={13} />
+                      </button>
+                      <a
+                        href={`tel:${phone}`}
+                        className="btn btn-primary btn-sm"
+                        style={{
+                          height: 28,
+                          padding: '0 10px',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          background: '#7c3aed',
+                          borderColor: '#7c3aed',
+                          fontSize: 12,
+                        }}
+                      >
+                        <Icon name="call" size={13} /> Call
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {ownerPhones.length === 0 && contractorPhones.length === 0 && qcPhones.length === 0 && (
+              <div style={{ color: '#64748b', fontSize: 13, fontStyle: 'italic', padding: '4px 0' }}>
+                No 10-digit phone number recorded for this lead
+              </div>
+            )}
           </div>
 
           {/* Side by side: Imported Details and Field Verification Details */}
@@ -448,7 +541,36 @@ export function TelecallerRecordModal({ record, onClose, onUpdated }: Telecaller
                 {record.qc_builder_contact && (
                   <>
                     <span style={{ color: '#64748b' }}>QC Builder / Contact:</span>
-                    <span style={{ color: '#0f172a' }}>{record.qc_builder_contact}</span>
+                    <span style={{ color: '#0f172a' }}>
+                      {(() => {
+                        const phones = extractPhoneNumbers(record.qc_builder_contact);
+                        const label = extractContactLabel(record.qc_builder_contact);
+                        if (phones.length === 0) return record.qc_builder_contact;
+                        return (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            {phones.map((p) => (
+                              <a
+                                key={p}
+                                href={`tel:${p}`}
+                                style={{
+                                  color: '#7c3aed',
+                                  fontWeight: 700,
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 3,
+                                }}
+                                title={`Call ${p}`}
+                              >
+                                <Icon name="call" size={13} />
+                                {formatPhoneNumber(p)}
+                              </a>
+                            ))}
+                            {label && <span style={{ color: '#64748b', fontSize: 12 }}>({label})</span>}
+                          </span>
+                        );
+                      })()}
+                    </span>
                   </>
                 )}
 

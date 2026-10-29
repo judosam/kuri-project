@@ -9,18 +9,15 @@ from app.repositories.record_repository import RecordRepository
 
 
 def has_valid_contact(record: Any) -> bool:
-    """Returns True if record has a non-blank, non-placeholder contact number or contractor number or QC contact."""
-    import re
+    """Returns True if record has a contact number, contractor contact, or QC contact with at least one 10-digit phone number."""
+    from app.database.connection import has_ten_digit_phone_sql
     for val in [
         getattr(record, "contact_number", None),
         getattr(record, "site_contractor_architect_number", None),
         getattr(record, "qc_builder_contact", None),
     ]:
-        if val and isinstance(val, str):
-            clean = val.strip().lower()
-            if clean and clean not in ("-", "--", "na", "n/a", "nil", "none", "null"):
-                if re.search(r'\d{6,}', clean):
-                    return True
+        if val and has_ten_digit_phone_sql(val):
+            return True
     return False
 
 

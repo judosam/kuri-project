@@ -34,29 +34,11 @@ router = APIRouter(prefix="/telecaller", tags=["Telecaller"])
 
 
 def _eligible_contact_filter():
-    """Only records that have at least one valid phone number (Contact Number, Contractor Contact, or QC Builder Contact)."""
+    """Only records that have at least one valid 10-digit phone number (Contact Number, Contractor Contact, or QC Builder Contact)."""
     return or_(
-        and_(
-            CaptureRecord.contact_number.isnot(None),
-            func.trim(CaptureRecord.contact_number) != "",
-            CaptureRecord.contact_number != "-",
-            func.lower(func.trim(CaptureRecord.contact_number)) != "na",
-            func.lower(func.trim(CaptureRecord.contact_number)) != "nil",
-        ),
-        and_(
-            CaptureRecord.site_contractor_architect_number.isnot(None),
-            func.trim(CaptureRecord.site_contractor_architect_number) != "",
-            CaptureRecord.site_contractor_architect_number != "-",
-            func.lower(func.trim(CaptureRecord.site_contractor_architect_number)) != "na",
-            func.lower(func.trim(CaptureRecord.site_contractor_architect_number)) != "nil",
-        ),
-        and_(
-            CaptureRecord.qc_builder_contact.isnot(None),
-            func.trim(CaptureRecord.qc_builder_contact) != "",
-            CaptureRecord.qc_builder_contact != "-",
-            func.lower(func.trim(CaptureRecord.qc_builder_contact)) != "na",
-            func.lower(func.trim(CaptureRecord.qc_builder_contact)) != "nil",
-        ),
+        func.has_ten_digit_phone(CaptureRecord.contact_number) == 1,
+        func.has_ten_digit_phone(CaptureRecord.site_contractor_architect_number) == 1,
+        func.has_ten_digit_phone(CaptureRecord.qc_builder_contact) == 1,
     )
 
 
@@ -144,6 +126,7 @@ async def list_telecaller_records(
                 func.lower(CaptureRecord.contact_number).like(term),
                 func.lower(CaptureRecord.site_contractor_architect_number).like(term),
                 func.lower(CaptureRecord.site_contractor_architect_name).like(term),
+                func.lower(CaptureRecord.qc_builder_contact).like(term),
                 func.lower(CaptureRecord.village).like(term),
                 func.lower(CaptureRecord.taluk).like(term),
                 func.lower(CaptureRecord.district).like(term),

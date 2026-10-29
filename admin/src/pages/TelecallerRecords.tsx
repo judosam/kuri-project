@@ -67,6 +67,7 @@ import { useTopHeader } from '../context/HeaderContext';
 import { TelecallerRecordModal, TELECALLER_STATUS_OPTIONS } from '../components/TelecallerRecordModal';
 import { ExpandableCellText } from '../components/ExpandableCellText';
 import { getLatestCommentSummary } from '../utils/telecallerHistory';
+import { extractPhoneNumbers, extractContactLabel, formatPhoneNumber } from '../utils/phoneUtils';
 
 const PAGE_SIZE = 25;
 
@@ -340,7 +341,8 @@ export default function TelecallerRecords() {
                   <th style={{ width: 170, minWidth: 150, maxWidth: 200, textAlign: 'left' }}>Owner / Client</th>
                   <th style={{ width: 65, minWidth: 60, maxWidth: 75, textAlign: 'left' }} className="col-photos">Photos</th>
                   <th style={{ width: 125, minWidth: 115, maxWidth: 135, textAlign: 'left' }}>Contact Number</th>
-                  <th style={{ width: 150, minWidth: 140, maxWidth: 165, textAlign: 'left' }}>Contractor Contact</th>
+                  <th style={{ width: 140, minWidth: 130, maxWidth: 155, textAlign: 'left' }}>Contractor Contact</th>
+                  <th style={{ width: 155, minWidth: 145, maxWidth: 175, textAlign: 'left' }}>QC Builder / Contact</th>
                   <th style={{ width: 130, minWidth: 115, maxWidth: 140, textAlign: 'left' }}>Village / District</th>
                   <th style={{ width: 95, minWidth: 85, maxWidth: 105, textAlign: 'left' }}>Field Status</th>
                   <th style={{ width: 150, minWidth: 135, maxWidth: 175, textAlign: 'left' }}>Stage / Building</th>
@@ -428,72 +430,131 @@ export default function TelecallerRecords() {
                       </td>
 
                       {/* 4. Contact Number */}
-                      <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>
-                        {r.contact_number && r.contact_number.trim() && r.contact_number !== '-' ? (
-                          <a
-                            href={`tel:${r.contact_number.trim()}`}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              color: '#059669',
-                              fontWeight: 700,
-                              textDecoration: 'none',
-                              fontSize: 12,
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={`Call ${r.contact_number.trim()}`}
-                          >
-                            <Icon name="call" size={13} />
-                            <span>{r.contact_number.trim()}</span>
-                          </a>
-                        ) : (
-                          nil
-                        )}
+                      <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'left' }}>
+                        {(() => {
+                          const phones = extractPhoneNumbers(r.contact_number);
+                          if (phones.length === 0) return nil;
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                              {phones.map((phone) => (
+                                <a
+                                  key={phone}
+                                  href={`tel:${phone}`}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    color: '#059669',
+                                    fontWeight: 700,
+                                    textDecoration: 'none',
+                                    fontSize: 12,
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={`Call ${phone}`}
+                                >
+                                  <Icon name="call" size={13} />
+                                  <span>{formatPhoneNumber(phone)}</span>
+                                </a>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* 5. Contractor Contact */}
                       <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'left' }}>
-                        {r.site_contractor_architect_number &&
-                        r.site_contractor_architect_number.trim() &&
-                        r.site_contractor_architect_number !== '-' ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            <a
-                              href={`tel:${r.site_contractor_architect_number.trim()}`}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 4,
-                                color: '#0284c7',
-                                fontWeight: 700,
-                                textDecoration: 'none',
-                                fontSize: 12,
-                                whiteSpace: 'nowrap',
-                              }}
-                              title={`Call ${r.site_contractor_architect_number.trim()}`}
-                            >
-                              <Icon name="call" size={13} />
-                              <span>{r.site_contractor_architect_number.trim()}</span>
-                            </a>
-                            {r.site_contractor_architect_name && (
-                              <div
-                                style={{
-                                  fontSize: 10,
-                                  color: '#64748b',
-                                  maxWidth: 155,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                                title={r.site_contractor_architect_name}
-                              >
-                                {r.site_contractor_architect_name}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          nil
-                        )}
+                        {(() => {
+                          const phones = extractPhoneNumbers(r.site_contractor_architect_number);
+                          const contractorName = r.site_contractor_architect_name?.trim();
+                          if (phones.length === 0 && !contractorName) return nil;
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              {phones.map((phone) => (
+                                <a
+                                  key={phone}
+                                  href={`tel:${phone}`}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    color: '#0284c7',
+                                    fontWeight: 700,
+                                    textDecoration: 'none',
+                                    fontSize: 12,
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={`Call Contractor: ${phone}`}
+                                >
+                                  <Icon name="call" size={13} />
+                                  <span>{formatPhoneNumber(phone)}</span>
+                                </a>
+                              ))}
+                              {contractorName && (
+                                <div
+                                  style={{
+                                    fontSize: 10,
+                                    color: '#64748b',
+                                    maxWidth: 140,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={contractorName}
+                                >
+                                  {contractorName}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
+
+                      {/* 6. QC Builder / Contact */}
+                      <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'left' }}>
+                        {(() => {
+                          const phones = extractPhoneNumbers(r.qc_builder_contact);
+                          const label = extractContactLabel(r.qc_builder_contact);
+                          if (phones.length === 0 && !label) return nil;
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              {phones.map((phone) => (
+                                <a
+                                  key={phone}
+                                  href={`tel:${phone}`}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    color: '#7c3aed',
+                                    fontWeight: 700,
+                                    textDecoration: 'none',
+                                    fontSize: 12,
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={`Call QC Builder: ${phone}`}
+                                >
+                                  <Icon name="call" size={13} />
+                                  <span>{formatPhoneNumber(phone)}</span>
+                                </a>
+                              ))}
+                              {label && (
+                                <div
+                                  style={{
+                                    fontSize: 10,
+                                    color: '#64748b',
+                                    maxWidth: 155,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={label}
+                                >
+                                  {label}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* 6. Village / District */}

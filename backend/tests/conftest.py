@@ -52,6 +52,8 @@ def db_engine():
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
+        from app.database.connection import register_sqlite_functions
+        register_sqlite_functions(dbapi_connection)
 
     Base.metadata.create_all(bind=engine)
     yield engine
