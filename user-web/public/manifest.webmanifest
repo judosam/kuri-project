@@ -1,6 +1,6 @@
 ﻿{
-  "name": "PhotoCapture - Field Audit Platform",
-  "short_name": "PhotoCapture",
+  "name": "Kuri - Field App",
+  "short_name": "Kuri",
   "description": "Geotagged site inspection and field audit camera app with real-time GPS synchronization",
   "start_url": "/",
   "scope": "/",

@@ -111,7 +111,7 @@ export default function PermissionModal({ isOpen, onClose }: PermissionModalProp
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <p style={{ margin: 0, fontSize: '0.875rem', color: '#475569', lineHeight: 1.5 }}>
-          PhotoCapture needs access to your <strong>Location</strong> and <strong>Camera</strong> to record authoritative, geotagged inspection evidence.
+          Kuri needs access to your <strong>Location</strong> and <strong>Camera</strong> to record authoritative, geotagged inspection evidence.
         </p>
 
         {/* Permission Item: GPS */}

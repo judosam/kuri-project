@@ -248,7 +248,7 @@ export default function App() {
       >
         <span className="spinner" style={{ width: '36px', height: '36px', borderWidth: '3px' }} />
         <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-          {authError ? 'Could not connect. Your login is saved.' : 'Connecting to PhotoCapture...'}
+          {authError ? 'Could not connect. Your login is saved.' : 'Connecting to Kuri...'}
         </span>
         {authError && <button className="btn btn-secondary" onClick={() => setAuthAttempt((n) => n + 1)}>Retry connection</button>}
       </div>

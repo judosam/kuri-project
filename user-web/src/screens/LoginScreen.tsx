@@ -127,8 +127,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           }}
         >
           <img
-            src="/app/brand-logo.png"
-            alt="PhotoCapture"
+            src="/app/kuri-icon.png"
+            alt="Kuri"
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             onError={(e) => {
               // Fallback to camera icon if image path fails
@@ -147,7 +147,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             lineHeight: 1.2,
           }}
         >
-          PhotoCapture
+          Kuri
         </h1>
         <p
           style={{
@@ -159,7 +159,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             textTransform: 'uppercase',
           }}
         >
-          GPS Geotagging & Field Audit Platform
+          Construction Lead Platform
         </p>
       </div>
 

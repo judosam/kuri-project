@@ -11,8 +11,8 @@ export default defineConfig(({ mode }) => {
     registerType: 'autoUpdate',
     includeAssets: ['favicon.png', 'brand-logo.png', 'icon.png'],
     manifest: {
-      name: 'PhotoCapture - Field Audit Platform',
-      short_name: 'PhotoCapture',
+      name: 'Kuri - Field App',
+      short_name: 'Kuri',
       description: 'Geotagged site inspection and field audit camera app with real-time GPS synchronization',
       theme_color: '#ffffff',
       background_color: '#f8fafc',

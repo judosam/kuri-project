@@ -51,17 +51,17 @@ export default function AppShell({
                 width: 40,
                 height: 40,
                 borderRadius: 12,
-                backgroundColor: '#FF6467',
+                backgroundColor: 'transparent',
                 padding: 6,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 10px rgba(255, 100, 103, 0.3)',
+                boxShadow: 'none',
               }}
             >
               <img
-                src="/app/brand-logo.png"
-                alt="Logo"
+                src="/app/kuri-icon.png"
+                alt="Kuri"
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = 'none';
@@ -70,10 +70,10 @@ export default function AppShell({
             </div>
             <div>
               <div style={{ fontWeight: 800, fontSize: '1rem', letterSpacing: '-0.02em', color: '#0f172a' }}>
-                PhotoCapture
+                Kuri
               </div>
-              <div style={{ fontSize: '0.68rem', color: '#FF6467', fontWeight: 800, letterSpacing: '0.5px' }}>
-                FIELD AUDIT PLATFORM
+              <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, letterSpacing: '0.5px' }}>
+                LEAD MANAGEMENT
               </div>
             </div>
           </div>
@@ -218,8 +218,8 @@ export default function AppShell({
               // Plain logo — no frame or tint so the mark and the wordmark read
               // as one lockup with the title and subtitle beside it.
               <img
-                src="/app/brand-logo.png"
-                alt="PhotoCapture"
+                src="/app/kuri-icon.png"
+                alt="Kuri"
                 style={{ width: 38, height: 38, objectFit: 'contain', flexShrink: 0 }}
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = 'none';
@@ -239,7 +239,7 @@ export default function AppShell({
                   letterSpacing: '-0.3px',
                 }}
               >
-                {showBack ? title : 'PhotoCapture'}
+                {showBack ? title : 'Kuri'}
               </div>
               {subtitle && (
                 <div

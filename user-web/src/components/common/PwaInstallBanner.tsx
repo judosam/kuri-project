@@ -61,7 +61,7 @@ export default function PwaInstallBanner() {
         </div>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#0f172a' }}>
-            Install PhotoCapture App
+            Install Kuri App
           </div>
           <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
             Fast access from your home screen with offline capability
