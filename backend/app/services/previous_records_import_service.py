@@ -40,7 +40,6 @@ KEY_COLUMNS = {
     *EMAIL_HEADERS,
     *COORDINATE_HEADERS,
     "site_address",
-    "unique_id",
     "street_address",
     "survey_no",
     "owner_name_en",
@@ -48,7 +47,6 @@ KEY_COLUMNS = {
 
 # 15 task/site planning columns — accepted as written.
 PLANNING_COLUMNS = (
-    "unique_id",
         "street_address",
     "land_use",
     "survey_no",
@@ -282,12 +280,13 @@ class PreviousRecordsImportService:
         data_rows = raw_rows[1:]
         rows: List[ImportRow] = []
         seen_unique_ids: Dict[str, int] = {}
+        seen_coordinates: Dict[str, int] = {}
 
         for index, raw in enumerate(data_rows, start=2):
             record = {headers[i]: raw[i] if i < len(raw) else "" for i in range(len(headers))}
             if not any(str(v).strip() for v in record.values()):
                 continue
-            rows.append(self._validate_row(index, record, seen_unique_ids))
+            rows.append(self._validate_row(index, record, seen_unique_ids, seen_coordinates))
 
         return ParsedSheet(sheet_name=sheet.title, total_rows=len(rows), rows=rows)
 
@@ -296,7 +295,10 @@ class PreviousRecordsImportService:
         row_number: int,
         record: Dict[str, str],
         seen_unique_ids: Dict[str, int],
+        seen_coordinates: Optional[Dict[str, int]] = None,
     ) -> ImportRow:
+        if seen_coordinates is None:
+            seen_coordinates = {}
         row = ImportRow(row_number=row_number)
         row.values = {
             "unique_id": (record.get("unique_id") or "").strip(),
@@ -384,6 +386,14 @@ class PreviousRecordsImportService:
                 )
             else:
                 row.values["coordinates"] = coords
+                if not row.values.get("unique_id"):
+                    parsed_c = parse_coordinates(coords)
+                    if parsed_c:
+                        from app.services.record_service import generate_unique_id
+                        try:
+                            row.values["unique_id"] = generate_unique_id(parsed_c[0], parsed_c[1], prefix="CBE")
+                        except Exception:
+                            pass
 
         # ── Date of visit (optional, validated when present) ──
         raw_date = next(
@@ -419,39 +429,55 @@ class PreviousRecordsImportService:
                 row.values["construction_happening"] = normalized
 
         # ── Duplicate defence ──
-        unique_id = row.values["unique_id"]
-        if unique_id:
-            if unique_id in seen_unique_ids:
-                row.errors.append(
-                    {
-                        "column": "unique_id",
-                        "message": (
-                            f"Duplicate of row {seen_unique_ids[unique_id]} in this sheet "
-                            f"(unique_id '{unique_id}')."
-                        ),
-                    }
-                )
-            else:
+        unique_id = row.values.get("unique_id") or ""
+        coords_val = row.values.get("coordinates") or ""
+
+        is_dup = False
+        if unique_id and unique_id in seen_unique_ids:
+            row.errors.append({
+                "column": "coordinates",
+                "message": f"Duplicate of row {seen_unique_ids[unique_id]} in this sheet (unique_id '{unique_id}'). Skipped duplicate row.",
+            })
+            is_dup = True
+        elif coords_val and coords_val in seen_coordinates:
+            row.errors.append({
+                "column": "coordinates",
+                "message": f"Duplicate coordinates of row {seen_coordinates[coords_val]} in this sheet ('{coords_val}'). Skipped duplicate row.",
+            })
+            is_dup = True
+
+        if not is_dup:
+            if unique_id:
                 seen_unique_ids[unique_id] = row_number
-                if row.user_id is not None:
-                    existing = (
-                        self.db.query(CaptureRecord)
-                        .filter(
-                            CaptureRecord.unique_id == unique_id,
-                            CaptureRecord.user_id == row.user_id,
-                        )
-                        .first()
-                    )
-                    if existing:
-                        row.errors.append(
-                            {
-                                "column": "unique_id",
-                                "message": (
-                                    f"Already imported as record #{existing.id} "
-                                    f"(unique_id '{unique_id}')."
-                                ),
-                            }
-                        )
+            if coords_val:
+                seen_coordinates[coords_val] = row_number
+
+            # Check database for existing duplicates (across all records, imported or inspected)
+            filter_clauses = []
+            if unique_id:
+                filter_clauses.append(CaptureRecord.unique_id == unique_id)
+            if coords_val:
+                filter_clauses.extend([
+                    CaptureRecord.coordinates == coords_val,
+                    CaptureRecord.updated_coordinates == coords_val,
+                ])
+                lat_lng = parse_coordinates(coords_val)
+                if lat_lng:
+                    filter_clauses.extend([
+                        CaptureRecord.coordinates == f"{lat_lng[0]}, {lat_lng[1]}",
+                        CaptureRecord.coordinates == f"{lat_lng[0]},{lat_lng[1]}",
+                        CaptureRecord.updated_coordinates == f"{lat_lng[0]}, {lat_lng[1]}",
+                        CaptureRecord.updated_coordinates == f"{lat_lng[0]},{lat_lng[1]}",
+                    ])
+            if filter_clauses:
+                from sqlalchemy import or_
+                existing = self.db.query(CaptureRecord).filter(or_(*filter_clauses)).first()
+                if existing:
+                    dup_ref = existing.unique_id or existing.coordinates or existing.updated_coordinates or f"record #{existing.id}"
+                    row.errors.append({
+                        "column": "coordinates",
+                        "message": f"Duplicate: Coordinates/Unique ID matches existing record #{existing.id} ({dup_ref}) in database. Skipped duplicate row.",
+                    })
 
         return row
 

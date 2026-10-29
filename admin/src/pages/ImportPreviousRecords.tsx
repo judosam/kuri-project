@@ -281,8 +281,8 @@ export default function ImportPreviousRecords() {
               to.
               <br />
               <br />
-              <strong>Optional:</strong> <code>unique_id</code>, <code>visit_order</code>,{' '}
-              <code>coordinates</code>, <code>site_address</code>, <code>street_address</code>,{' '}
+              <strong>Optional:</strong> <code>visit_order</code>,{' '}
+              <code>coordinates</code> (auto-generates unique ID & prevents duplicates), <code>site_address</code>, <code>street_address</code>,{' '}
               <code>owner_name_en</code>, <code>land_use</code>, <code>survey_no</code>,{' '}
               <code>subdivision_no</code>, <code>survey_number</code>, <code>sub_division</code>,{' '}
               <code>taluk</code>, <code>village</code>, <code>district</code>,{' '}
@@ -357,7 +357,10 @@ export default function ImportPreviousRecords() {
             </div>
             <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6, color: '#475569' }}>
               <li>
-                <strong>Planning Columns:</strong> <code>operator_email</code> (required), <code>visit_order</code>, <code>unique_id</code>, <code>coordinates</code>, <code>site_address</code>, <code>street_address</code>, <code>village</code>, <code>taluk</code>, <code>district</code>, <code>survey_no</code>, <code>subdivision_no</code>, <code>land_use</code>, <code>owner_name_en</code>.
+                <strong>Planning Columns:</strong> <code>operator_email</code> (required), <code>coordinates</code> (lat, lng), <code>site_address</code>, <code>street_address</code>, <code>village</code>, <code>taluk</code>, <code>district</code>, <code>survey_no</code>, <code>subdivision_no</code>, <code>land_use</code>, <code>owner_name_en</code>, <code>visit_order</code>.
+              </li>
+              <li>
+                <strong>Auto-Generated Unique ID & Duplicate Protection:</strong> Unique ID is automatically generated from GPS coordinates. Duplicate coordinates or records matching existing database records are safely skipped with a warning.
               </li>
               <li>
                 <strong>Inspection Columns:</strong> <code>date_of_visit</code>, <code>construction_happening</code> (Yes/No), <code>type_of_construction</code>, <code>stage_of_construction</code>, <code>building_user_name</code>, <code>relationship_with_building</code>, <code>contact_number</code>, <code>site_contractor_architect_name</code>, <code>site_contractor_architect_number</code>, <code>remarks</code>.

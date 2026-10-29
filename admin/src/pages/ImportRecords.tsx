@@ -32,6 +32,8 @@ interface DispatchResult {
   total_rows: number;
   total_dispatched: number;
   failed_count: number;
+  skipped_duplicates_count?: number;
+  duplicate_warnings?: Array<{ row: number; column: string; message: string }>;
   auto_resolved_count?: number;
   sheet_name: string;
   errors: Array<{ row: number; column: string; message: string }>;
@@ -464,7 +466,10 @@ export default function ImportRecords({ canImportHistory = false }: { canImportH
             </div>
             <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6, color: '#475569' }}>
               <li>
-                <strong>Template Columns:</strong> <code>unique_id</code>, <code>coordinates</code> (lat, lng), <code>site_address</code>, <code>street_address</code>, <code>village</code>, <code>taluk</code>, <code>district</code>, <code>survey_no</code>, <code>subdivision_no</code>, <code>land_use</code>, <code>owner_name_en</code>, <code>visit_order</code>, <code>auditor_email</code>, <code>operator_email</code>.
+                <strong>Template Columns:</strong> <code>coordinates</code> (lat, lng), <code>site_address</code>, <code>street_address</code>, <code>village</code>, <code>taluk</code>, <code>district</code>, <code>survey_no</code>, <code>subdivision_no</code>, <code>land_use</code>, <code>owner_name_en</code>, <code>contact_number</code>, <code>stage_of_construction</code>, <code>no_of_floors</code>, <code>built_up_area</code>, <code>expected_completion</code>, <code>visit_order</code>, <code>auditor_email</code>, <code>operator_email</code>.
+              </li>
+              <li>
+                <strong>Auto-Generated Unique ID & Duplicate Protection:</strong> Unique ID is automatically generated from GPS coordinates. Duplicate coordinates or records matching existing database records are safely skipped with a warning.
               </li>
               <li>
                 <strong>Optional Assignments:</strong> Both <code>auditor_email</code> and <code>operator_email</code> are optional. If left blank, tasks are imported into the QA pool as unassigned pending records, ready for assignment at any time.
@@ -517,6 +522,37 @@ export default function ImportRecords({ canImportHistory = false }: { canImportH
               </button>
             </div>
           </div>
+
+          {/* Duplicate skipped banner */}
+          {((result.skipped_duplicates_count ?? 0) > 0 || ((result as any).duplicate_warnings?.length ?? 0) > 0) && (
+            <div
+              className="card"
+              style={{
+                padding: '14px 18px',
+                marginBottom: 16,
+                background: '#fffbeb',
+                border: '1px solid #fde68a',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                color: '#b45309',
+                fontSize: '0.85rem',
+              }}
+            >
+              <Icon name="warning" size={20} style={{ color: '#d97706' }} />
+              <div>
+                <strong>Duplicate Protection:</strong> Skipped{' '}
+                <strong>
+                  {result.skipped_duplicates_count ?? (result as any).duplicate_warnings?.length}
+                </strong>{' '}
+                duplicate record
+                {(result.skipped_duplicates_count ?? (result as any).duplicate_warnings?.length) === 1
+                  ? ''
+                  : 's'}{' '}
+                already existing in the database or duplicated within the sheet.
+              </div>
+            </div>
+          )}
 
           {/* Auto-resolved locations banner */}
           {(result.auto_resolved_count ?? 0) > 0 && (

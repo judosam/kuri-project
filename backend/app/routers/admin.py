@@ -882,7 +882,6 @@ async def download_dispatch_template(admin: User = Depends(require_admin)):
     ws.views.sheetView[0].showGridLines = True
 
     headers = [
-        "unique_id",
         "coordinates",
         "site_address",
         "street_address",
@@ -898,13 +897,12 @@ async def download_dispatch_template(admin: User = Depends(require_admin)):
         "no_of_floors",
         "built_up_area",
         "expected_completion",
-                "auditor_email",
+        "auditor_email",
         "operator_email",
     ]
 
     sample_rows = [
         [
-            "UID-1001",
             "11.016844, 76.955832",
             "142/3A, Trichy Road, Kurichy, Coimbatore",
             "Trichy Road",
@@ -920,12 +918,10 @@ async def download_dispatch_template(admin: User = Depends(require_admin)):
             "G+2",
             "2500 sq.ft",
             "Dec 2026",
-            ""
             "",
             "",
         ],
         [
-            "UID-1002",
             "11.040756, 77.030313",
             "89/1, Avinashi Road, Saravanampatty, Coimbatore",
             "Avinashi Road",
@@ -941,7 +937,6 @@ async def download_dispatch_template(admin: User = Depends(require_admin)):
             "G+3",
             "4500 sq.ft",
             "Mar 2027",
-            ""
             "",
             "",
         ],
@@ -1357,6 +1352,9 @@ async def upload_tasks_sheet(
     created_records = []
     dispatched_tasks = []
     errors = []
+    duplicate_warnings = []
+    seen_unique_ids = {}
+    seen_coordinates = {}
     record_coordinates = {}
     data_rows = raw_rows[1:]
 
@@ -1482,6 +1480,8 @@ async def upload_tasks_sheet(
         if lat_col and lng_col:
             coords_str = f"{lat_col}, {lng_col}"
 
+        lat_val = None
+        lng_val = None
         if coords_str:
             parts = [p.strip() for p in coords_str.split(",") if p.strip()]
             if len(parts) == 2:
@@ -1509,6 +1509,59 @@ async def upload_tasks_sheet(
                     "message": f"Invalid coordinate format '{coords_str}'. Expected 'lat, lng'.",
                 })
                 continue
+
+        # ── Auto-generate unique_id from coordinates if omitted ──
+        if not unique_id and lat_val is not None and lng_val is not None:
+            from app.services.record_service import generate_unique_id
+            try:
+                unique_id = generate_unique_id(lat_val, lng_val, prefix="CBE")
+            except Exception:
+                pass
+
+        # ── Duplicate Prevention & Warning ──
+        # Compare against intra-sheet records and existing database records.
+        # Skip duplicate row and add a warning.
+        if unique_id and unique_id in seen_unique_ids:
+            msg = f"Duplicate of row {seen_unique_ids[unique_id]} in this sheet (unique_id: '{unique_id}'). Skipped duplicate row."
+            duplicate_warnings.append({"row": idx, "column": "coordinates", "message": msg})
+            errors.append({"row": idx, "column": "coordinates", "message": msg})
+            continue
+        if coords_str and coords_str in seen_coordinates:
+            msg = f"Duplicate coordinates of row {seen_coordinates[coords_str]} in this sheet ('{coords_str}'). Skipped duplicate row."
+            duplicate_warnings.append({"row": idx, "column": "coordinates", "message": msg})
+            errors.append({"row": idx, "column": "coordinates", "message": msg})
+            continue
+
+        # Database lookup across all existing records (imported or inspected)
+        filter_clauses = []
+        if unique_id:
+            filter_clauses.append(CaptureRecord.unique_id == unique_id)
+        if coords_str:
+            filter_clauses.extend([
+                CaptureRecord.coordinates == coords_str,
+                CaptureRecord.updated_coordinates == coords_str,
+            ])
+            if lat_val is not None and lng_val is not None:
+                filter_clauses.extend([
+                    CaptureRecord.coordinates == f"{lat_val}, {lng_val}",
+                    CaptureRecord.coordinates == f"{lat_val},{lng_val}",
+                    CaptureRecord.updated_coordinates == f"{lat_val}, {lng_val}",
+                    CaptureRecord.updated_coordinates == f"{lat_val},{lng_val}",
+                ])
+        if filter_clauses:
+            from sqlalchemy import or_
+            db_dup = db.query(CaptureRecord).filter(or_(*filter_clauses)).first()
+            if db_dup:
+                dup_ref = db_dup.unique_id or db_dup.coordinates or db_dup.updated_coordinates or f"record #{db_dup.id}"
+                msg = f"Duplicate: Coordinates/ID matches existing record #{db_dup.id} ({dup_ref}) in database. Skipped duplicate row."
+                duplicate_warnings.append({"row": idx, "column": "coordinates", "message": msg})
+                errors.append({"row": idx, "column": "coordinates", "message": msg})
+                continue
+
+        if unique_id:
+            seen_unique_ids[unique_id] = idx
+        if coords_str:
+            seen_coordinates[coords_str] = idx
 
         # ── Auto-resolve Village, Taluk, District if empty ──
         if not (taluk.strip() and village.strip() and district.strip()):
@@ -1644,6 +1697,8 @@ async def upload_tasks_sheet(
         "total_rows": len(data_rows),
         "total_dispatched": len(created_records),
         "failed_count": len(errors),
+        "skipped_duplicates_count": len(duplicate_warnings),
+        "duplicate_warnings": duplicate_warnings,
         "sheet_name": ws.title,
         "mode": mode,
         "created_ids": created_records,
@@ -1772,6 +1827,9 @@ async def upload_tasks_sheet_stream(
         created_records = []
         dispatched_tasks = []
         errors = []
+        duplicate_warnings = []
+        seen_unique_ids = {}
+        seen_coordinates = {}
         auto_resolved_count = 0
 
         yield json.dumps({
@@ -1955,6 +2013,8 @@ async def upload_tasks_sheet_stream(
             if lat_col and lng_col:
                 coords_str = f"{lat_col}, {lng_col}"
 
+            lat_val = None
+            lng_val = None
             if coords_str:
                 parts = [p.strip() for p in coords_str.split(",") if p.strip()]
                 if len(parts) == 2:
@@ -2006,6 +2066,80 @@ async def upload_tasks_sheet_stream(
                         "error": err,
                     }) + "\n"
                     continue
+
+            # ── Auto-generate unique_id from coordinates if omitted ──
+            if not unique_id and lat_val is not None and lng_val is not None:
+                from app.services.record_service import generate_unique_id
+                try:
+                    unique_id = generate_unique_id(lat_val, lng_val, prefix="CBE")
+                except Exception:
+                    pass
+
+            # ── Duplicate Prevention & Warning ──
+            if unique_id and unique_id in seen_unique_ids:
+                msg = f"Duplicate of row {seen_unique_ids[unique_id]} in this sheet (unique_id: '{unique_id}'). Skipped duplicate row."
+                err = {"row": excel_row_num, "column": "coordinates", "message": msg}
+                duplicate_warnings.append(err)
+                errors.append(err)
+                yield json.dumps({
+                    "type": "row_error",
+                    "row_index": idx,
+                    "total_rows": total_data_rows,
+                    "percent": round((idx / total_data_rows) * 100),
+                    "error": err,
+                }) + "\n"
+                continue
+            if coords_str and coords_str in seen_coordinates:
+                msg = f"Duplicate coordinates of row {seen_coordinates[coords_str]} in this sheet ('{coords_str}'). Skipped duplicate row."
+                err = {"row": excel_row_num, "column": "coordinates", "message": msg}
+                duplicate_warnings.append(err)
+                errors.append(err)
+                yield json.dumps({
+                    "type": "row_error",
+                    "row_index": idx,
+                    "total_rows": total_data_rows,
+                    "percent": round((idx / total_data_rows) * 100),
+                    "error": err,
+                }) + "\n"
+                continue
+
+            filter_clauses = []
+            if unique_id:
+                filter_clauses.append(CaptureRecord.unique_id == unique_id)
+            if coords_str:
+                filter_clauses.extend([
+                    CaptureRecord.coordinates == coords_str,
+                    CaptureRecord.updated_coordinates == coords_str,
+                ])
+                if lat_val is not None and lng_val is not None:
+                    filter_clauses.extend([
+                        CaptureRecord.coordinates == f"{lat_val}, {lng_val}",
+                        CaptureRecord.coordinates == f"{lat_val},{lng_val}",
+                        CaptureRecord.updated_coordinates == f"{lat_val}, {lng_val}",
+                        CaptureRecord.updated_coordinates == f"{lat_val},{lng_val}",
+                    ])
+            if filter_clauses:
+                from sqlalchemy import or_
+                db_dup = db.query(CaptureRecord).filter(or_(*filter_clauses)).first()
+                if db_dup:
+                    dup_ref = db_dup.unique_id or db_dup.coordinates or db_dup.updated_coordinates or f"record #{db_dup.id}"
+                    msg = f"Duplicate: Coordinates/ID matches existing record #{db_dup.id} ({dup_ref}) in database. Skipped duplicate row."
+                    err = {"row": excel_row_num, "column": "coordinates", "message": msg}
+                    duplicate_warnings.append(err)
+                    errors.append(err)
+                    yield json.dumps({
+                        "type": "row_error",
+                        "row_index": idx,
+                        "total_rows": total_data_rows,
+                        "percent": round((idx / total_data_rows) * 100),
+                        "error": err,
+                    }) + "\n"
+                    continue
+
+            if unique_id:
+                seen_unique_ids[unique_id] = idx
+            if coords_str:
+                seen_coordinates[coords_str] = idx
 
             # ── Auto-resolve Village / Taluk / District using Master Sheet ──
             was_auto_resolved = False
@@ -2244,7 +2378,7 @@ async def download_previous_template(admin: User = Depends(require_admin)):
     ws.title = "Previous Records"
     ws.views.sheetView[0].showGridLines = True
     headers = [
-        "operator_email", "unique_id", "coordinates", "site_address",
+        "operator_email", "coordinates", "site_address",
         "street_address", "village", "taluk", "district", "survey_no", "subdivision_no",
         "land_use", "owner_name_en", "date_of_visit",
         "construction_happening", "type_of_construction", "stage_of_construction",
@@ -2253,17 +2387,17 @@ async def download_previous_template(admin: User = Depends(require_admin)):
     ]
     sample_rows = [
         [
-            "operator1@company.com", 1, "PREV-1001", "11.016844, 76.955832",
+            "operator1@company.com", "11.016844, 76.955832",
             "142/3A, Trichy Road, Kurichy, Coimbatore", "Trichy Road", "Kurichy",
             "Coimbatore South", "Coimbatore", "142/3A", "1", "Residential", "Ramesh Kumar",
-            "2.5", "2024-03-15", "Yes", "Residential", "Roof Level", "Ramesh Kumar", "Owner",
+            "2024-03-15", "Yes", "Residential", "Roof Level", "Ramesh Kumar", "Owner", "Owner",
             "9876543210", "Suresh Builders", "9876500001", "Construction in progress, boundary wall completed",
         ],
         [
-            "operator1@company.com", 2, "PREV-1002", "11.040756, 77.030313",
+            "operator1@company.com", "11.040756, 77.030313",
             "89/1, Avinashi Road, Saravanampatty, Coimbatore", "Avinashi Road", "Saravanampatty",
             "Coimbatore North", "Coimbatore", "89/1", "2", "Commercial", "Suresh Reddy",
-            "5.1", "2024-03-16", "No", "Commercial", "Vacant Plot", "Suresh Reddy", "Owner",
+            "2024-03-16", "No", "Commercial", "Vacant Plot", "Suresh Reddy", "Owner", "Owner",
             "9876543211", "", "", "Vacant plot, no active construction observed",
         ],
     ]

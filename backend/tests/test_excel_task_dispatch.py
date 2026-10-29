@@ -41,7 +41,7 @@ class TestExcelTaskDispatch:
         assert "operator_email" in headers
         assert "coordinates" in headers
         assert "site_address" in headers
-        assert "unique_id" in headers
+        assert "unique_id" not in headers
         assert "user_id" not in headers  # Strictly removed in favor of email
 
     def test_export_records_is_valid_xlsx(self, client, admin_token, test_user):
@@ -102,22 +102,22 @@ class TestExcelTaskDispatch:
     def test_upload_successful_by_operator_email(self, client, admin_token, test_user):
         """Tasks are created STAGED for audit: audit_status PENDING, user_id
         NULL, intended operator parked in staged_operator_id until an auditor
-        approves."""
+        approves. Unique ID is auto-generated from coordinates."""
         headers = [
-            "operator_email", "visit_order", "unique_id",
+            "operator_email", "visit_order",
             "coordinates", "street_address", "land_use", "survey_no", "subdivision_no",
             "owner_name_en", "site_address", "survey_number", "sub_division", "taluk",
             "village", "district"
         ]
         rows = [
             [
-                test_user.email, 1, "TASK-101", "3.2",
+                test_user.email, 1,
                 "12.971598, 77.594566", "100 Feet Rd", "Commercial", "45", "A",
                 "Anand Sharma", "100 Feet Road, Indiranagar, Bengaluru", "45", "A",
                 "Bangalore East", "Indiranagar", "Bengaluru Urban"
             ],
             [
-                test_user.email, 2, "TASK-102", "5.1",
+                test_user.email, 2,
                 "12.935242, 77.624462", "Hosur Rd", "Residential", "12", "1",
                 "Priya Nair", "Hosur Main Road, Koramangala, Bengaluru", "12", "1",
                 "Bangalore South", "Koramangala", "Bengaluru Urban"
@@ -138,7 +138,7 @@ class TestExcelTaskDispatch:
         assert len(data["errors"]) == 0
         assert len(data["dispatched_tasks"]) == 2
         assert data["dispatched_tasks"][0]["operator_email"] == test_user.email
-        assert data["dispatched_tasks"][0]["unique_id"] == "TASK-101"
+        assert data["dispatched_tasks"][0]["unique_id"] == "CBE-129716-775946"
 
         # The field-inspection address means "where the operator stood", so a
         # freshly dispatched task has none — the admin's text stays in
@@ -194,3 +194,41 @@ class TestExcelTaskDispatch:
         assert 5 in err_msgs
         assert err_msgs[5][0] == "coordinates"
         assert "out of range" in err_msgs[5][1]
+
+    def test_upload_skips_duplicates_with_warning(self, client, admin_token, test_user):
+        """Duplicates (intra-sheet or existing in DB) are skipped with clear warning."""
+        headers = [
+            "operator_email", "visit_order",
+            "coordinates", "street_address", "site_address"
+        ]
+        # Upload first batch
+        rows_1 = [
+            [test_user.email, 1, "13.082680, 80.270718", "Poonamallee High Rd", "Chennai Central"],
+        ]
+        resp1 = client.post(
+            "/api/admin/records/upload-sheet",
+            files={"file": ("tasks.xlsx", io.BytesIO(create_test_excel(headers, rows_1)), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp1.status_code == 200
+        assert resp1.json()["total_dispatched"] == 1
+
+        # Upload second batch:
+        # Row 1: same coordinates as existing DB record
+        # Row 2: new coordinates
+        # Row 3: intra-sheet duplicate of Row 2
+        rows_2 = [
+            [test_user.email, 1, "13.082680, 80.270718", "Poonamallee High Rd", "Chennai Central"],
+            [test_user.email, 2, "13.041800, 80.250700", "Anna Salai", "T Nagar"],
+            [test_user.email, 3, "13.041800, 80.250700", "Anna Salai", "T Nagar Dup"],
+        ]
+        resp2 = client.post(
+            "/api/admin/records/upload-sheet",
+            files={"file": ("tasks.xlsx", io.BytesIO(create_test_excel(headers, rows_2)), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp2.status_code == 200
+        data2 = resp2.json()
+        assert data2["total_dispatched"] == 1
+        assert data2["skipped_duplicates_count"] == 2
+        assert len(data2["duplicate_warnings"]) == 2
