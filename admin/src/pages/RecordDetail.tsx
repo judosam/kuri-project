@@ -1,5 +1,5 @@
 import { SourceBadge } from '../components/SourceBadge';
-import { useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
+import React, { useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { recordsApi, logsApi, SERVER_BASE } from '../services/api';
 import type { AuditStatus, CaptureRecord, ActivityEntry, User } from '../types';
@@ -164,11 +164,15 @@ function FourColumnTable({ fields }: { fields: TableField[] }) {
                 <span style={{ color: 'oklch(50% 0.134 242.749)' }}>{fieldA.label}</span>
               </td>
               <td className="imported-table-value-cell">
-                <DetailValueCell
-                  value={String(fieldA.value)}
-                  isExpanded={!!expandedKeys[fieldA.key]}
-                  onToggle={() => toggleField(fieldA.key)}
-                />
+                {React.isValidElement(fieldA.value) ? (
+                  <div className="imported-table-value">{fieldA.value}</div>
+                ) : (
+                  <DetailValueCell
+                    value={fieldA.value != null ? String(fieldA.value) : ''}
+                    isExpanded={!!expandedKeys[fieldA.key]}
+                    onToggle={() => toggleField(fieldA.key)}
+                  />
+                )}
               </td>
               {fieldB ? (
                 <>
@@ -176,11 +180,15 @@ function FourColumnTable({ fields }: { fields: TableField[] }) {
                     <span style={{ color: 'oklch(50% 0.134 242.749)' }}>{fieldB.label}</span>
                   </td>
                   <td className="imported-table-value-cell">
-                    <DetailValueCell
-                      value={String(fieldB.value)}
-                      isExpanded={!!expandedKeys[fieldB.key]}
-                      onToggle={() => toggleField(fieldB.key)}
-                    />
+                    {React.isValidElement(fieldB.value) ? (
+                      <div className="imported-table-value">{fieldB.value}</div>
+                    ) : (
+                      <DetailValueCell
+                        value={fieldB.value != null ? String(fieldB.value) : ''}
+                        isExpanded={!!expandedKeys[fieldB.key]}
+                        onToggle={() => toggleField(fieldB.key)}
+                      />
+                    )}
                   </td>
                 </>
               ) : (

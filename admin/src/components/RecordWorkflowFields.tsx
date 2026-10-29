@@ -1,5 +1,5 @@
 import { SourceBadge } from './SourceBadge';
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { CaptureRecord } from '../types';
 import { AuthThumbnail, formatDate, formatDateTime, parseUtcDate, Icon } from './ui';
 import { getFieldCoordinates } from '../utils/geo';
@@ -139,14 +139,19 @@ export function DetailValueCell({
   isExpanded,
   onToggle,
 }: {
-  value: string;
+  value: React.ReactNode;
   isExpanded: boolean;
   onToggle: () => void;
 }) {
   const textRef = useRef<HTMLSpanElement>(null);
   const [overflows, setOverflows] = useState(false);
 
-  const clean = value?.trim() ?? '';
+  if (React.isValidElement(value)) {
+    return <div className="imported-table-value">{value}</div>;
+  }
+
+  const strVal = typeof value === 'string' ? value : (value != null ? String(value) : '');
+  const clean = strVal.trim();
   const isHyphen = clean === '—' || clean === '' || clean === '-';
   const likelyLong = clean.length > 35 || clean.includes('\n');
 
@@ -267,11 +272,15 @@ export function RecordWorkflowDetails({ record }: { record: CaptureRecord }) {
                         <span style={{ color: 'oklch(50% 0.134 242.749)' }}>{fieldA.label}</span>
                       </td>
                       <td className="imported-table-value-cell">
-                        <DetailValueCell
-                          value={fieldA.value(record)}
-                          isExpanded={!!expandedKeys[fieldA.key]}
-                          onToggle={() => toggleField(fieldA.key)}
-                        />
+                        {React.isValidElement(fieldA.value(record)) ? (
+                          <div className="imported-table-value">{fieldA.value(record)}</div>
+                        ) : (
+                          <DetailValueCell
+                            value={fieldA.value(record)}
+                            isExpanded={!!expandedKeys[fieldA.key]}
+                            onToggle={() => toggleField(fieldA.key)}
+                          />
+                        )}
                       </td>
                       {fieldB ? (
                         <>
@@ -279,11 +288,15 @@ export function RecordWorkflowDetails({ record }: { record: CaptureRecord }) {
                             <span style={{ color: 'oklch(50% 0.134 242.749)' }}>{fieldB.label}</span>
                           </td>
                           <td className="imported-table-value-cell">
-                            <DetailValueCell
-                              value={fieldB.value(record)}
-                              isExpanded={!!expandedKeys[fieldB.key]}
-                              onToggle={() => toggleField(fieldB.key)}
-                            />
+                            {React.isValidElement(fieldB.value(record)) ? (
+                              <div className="imported-table-value">{fieldB.value(record)}</div>
+                            ) : (
+                              <DetailValueCell
+                                value={fieldB.value(record)}
+                                isExpanded={!!expandedKeys[fieldB.key]}
+                                onToggle={() => toggleField(fieldB.key)}
+                              />
+                            )}
                           </td>
                         </>
                       ) : (
