@@ -1,3 +1,4 @@
+import { SourceBadge } from '../components/SourceBadge';
 /**
  * Imported Record — the dedicated detail page for old field records that an
  * admin backfilled from Excel (source === "imported").
@@ -1011,6 +1012,7 @@ export default function ImportedRecordDetail({
               <Section icon="receipt_long" title="Imported Details">
                 <div className="rd-rows">
                   <Row label="Unique ID" value={record.unique_id} mono />
+                  <Row label="Source" value={<SourceBadge source={record.source} isManual={record.is_manually_added} />} />
                   <Row label="Survey No" value={record.survey_no || record.survey_number} />
                   <Row label="Subdivision No" value={record.subdivision_no || record.sub_division} />
                   
@@ -1983,6 +1985,12 @@ export default function ImportedRecordDetail({
                     </div>
                   ) : (
                     <>
+                      {!record.user_id && !record.reassigned_to_id && !record.date_of_visit && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.78rem', color: '#64748b', marginBottom: 10 }}>
+                          <Icon name="info" size={15} style={{ color: '#0284c7' }} />
+                          <span>Field verifier not yet assigned. On-site verification details will be recorded after assignment.</span>
+                        </div>
+                      )}
                       <FourColumnTable
                         fields={[
                           {
@@ -1990,19 +1998,31 @@ export default function ImportedRecordDetail({
                             label: 'Field Verifier',
                             value: record.reassigned_to_name
                               ? `${record.reassigned_to_name}${record.user_name && record.user_name !== record.reassigned_to_name ? ` (Reassigned from ${record.user_name})` : ''}`
-                              : (record.user_name ?? 'Imported Record'),
+                              : (record.user_name ? record.user_name : 'Not assigned yet'),
                           },
                           {
                             key: 'assigned_at',
                             label: 'Date of Visit / Assigned',
                             value: record.date_of_visit
                               ? record.date_of_visit
-                              : (record.assigned_at ? formatDateTime(record.assigned_at) : undefined),
+                              : ((record.user_id || record.reassigned_to_id) && record.assigned_at ? formatDateTime(record.assigned_at) : undefined),
                           },
                           {
                             key: 'v_status',
                             label: 'Verification Status',
-                            value: 'Uploaded / Imported',
+                            value: (() => {
+                              if (!record.user_id && !record.reassigned_to_id && !record.date_of_visit && (record.status === 'NOT_COMPLETED' || !record.status)) {
+                                return 'Not Assigned';
+                              }
+                              const s = (record.status || '').toUpperCase();
+                              if (s === 'COMPLETED' || record.revisit_status === 'COMPLETED') return 'Completed';
+                              if (s === 'UPDATED_REVISITED' || s === 'UPDATED REVISITED') return 'Completed (Revisited)';
+                              if (s === 'NOT_INTERESTED' || s === 'NOT INTERESTED') return 'Not Interested';
+                              if (s === 'DUPLICATE') return 'Duplicate';
+                              if (s === 'CONSTRUCTION_FINISHED' || s === 'CONSTRUCTION FINISHED') return 'Construction Finished';
+                              if (record.user_id || record.reassigned_to_id) return 'Assigned';
+                              return 'Pending';
+                            })(),
                           },
                           {
                             key: 'captured_at',

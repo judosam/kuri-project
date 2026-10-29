@@ -1,3 +1,4 @@
+import { SourceBadge } from '../components/SourceBadge';
 import { useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { recordsApi, logsApi, SERVER_BASE } from '../services/api';
@@ -973,6 +974,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                 <FourColumnTable
                   fields={[
                     { key: 'uid', label: 'Unique ID', value: record.unique_id },
+                    { key: 'source', label: 'Source', value: <SourceBadge source={record.source} isManual={record.is_manually_added} /> },
                     { key: 'property_type', label: 'Property Type', value: record.property_type },
                     { key: 'survey_no', label: 'Survey No', value: record.survey_no || record.survey_number },
                     { key: 'subdiv_no', label: 'Subdivision No', value: record.subdivision_no || record.sub_division },
@@ -1960,6 +1962,12 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                     </div>
                   ) : (
                     <>
+                      {!record.user_id && !record.reassigned_to_id && !record.date_of_visit && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.78rem', color: '#64748b', marginBottom: 10 }}>
+                          <Icon name="info" size={15} style={{ color: '#0284c7' }} />
+                          <span>Field verifier not yet assigned. On-site verification details will be recorded after assignment.</span>
+                        </div>
+                      )}
                       <FourColumnTable
                         fields={[
                           {
@@ -1967,19 +1975,22 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                             label: 'Field Verifier',
                             value: record.reassigned_to_name
                               ? `${record.reassigned_to_name}${record.user_name && record.user_name !== record.reassigned_to_name ? ` (Reassigned from ${record.user_name})` : ''}`
-                              : (record.user_name ?? 'Not assigned yet'),
+                              : (record.user_name ? record.user_name : 'Not assigned yet'),
                           },
                           {
                             key: 'assigned_at',
                             label: 'Assigned At',
                             value: record.reassigned_at
                               ? formatDateTime(record.reassigned_at)
-                              : (record.assigned_at ? formatDateTime(record.assigned_at) : undefined),
+                              : ((record.user_id || record.reassigned_to_id) && record.assigned_at ? formatDateTime(record.assigned_at) : undefined),
                           },
                           {
                             key: 'v_status',
                             label: 'Verification Status',
                             value: (() => {
+                              if (!record.user_id && !record.reassigned_to_id && !record.date_of_visit && (record.status === 'NOT_COMPLETED' || !record.status)) {
+                                return 'Not Assigned';
+                              }
                               const s = (record.status || '').toUpperCase();
                               if (s === 'NOT_INTERESTED' || s === 'NOT INTERESTED') return 'Not Interested';
                               if (s === 'DUPLICATE') return 'Duplicate';
@@ -1988,7 +1999,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                               if (record.status === 'Updated Revisited' || record.status === 'UPDATED_REVISITED' || record.revisit_status === 'COMPLETED' || record.status === 'COMPLETED') {
                                 return isRevisitOrEdited ? 'Completed (Revisited)' : 'Completed';
                               }
-                              return (record.reassigned_to_id != null || record.revisit_status === 'REASSIGNED' || record.revisit_status === 'PENDING_REVISIT') ? 'Reassigned' : 'Pending';
+                              return (record.reassigned_to_id != null || record.revisit_status === 'REASSIGNED' || record.revisit_status === 'PENDING_REVISIT') ? 'Reassigned' : (record.user_id ? 'Assigned' : 'Not Assigned');
                             })(),
                           },
                           {

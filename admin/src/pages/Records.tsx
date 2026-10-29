@@ -1,3 +1,4 @@
+import { SourceBadge } from '../components/SourceBadge';
 import { TelecallingInfoModal, FieldVerifierInfoModal, QaInfoModal } from '../components/LeadInfoModals';
 import BulkEditModal from '../components/BulkEditModal';
 import QaCreateRecordModal from '../components/QaCreateRecordModal';
@@ -1527,6 +1528,29 @@ export default function Records({
                 ]} />
             </div>
           )}
+          <div className="filter-bar-group filter-source">
+            <span className="filter-bar-label">Source</span>
+            <CustomSelect
+              value={columnFilters.source?.[0] || ''}
+              onChange={(value) => {
+                setColumnFilters((prev) => {
+                  const copy = { ...prev };
+                  if (value) copy.source = [value];
+                  else delete copy.source;
+                  return copy;
+                });
+                setPage(1);
+              }}
+              ariaLabel="Filter by record source"
+              options={[
+                { value: '', label: 'All sources' },
+                { value: 'imported', label: 'Imported' },
+                { value: 'qa_portal', label: 'QA User Added' },
+                { value: 'captured', label: 'Field User Added' },
+                { value: 'manual', label: 'Admin Added' },
+              ]}
+            />
+          </div>
           <div className="filter-bar-group filter-qc-status">
             <span className="filter-bar-label">QC Status</span>
             <CustomSelect
@@ -1950,6 +1974,7 @@ export default function Records({
   : <th key={item.key}>{item.label}</th>) : isAuditorView ? (
   <>
     {sortHeader('Unique ID', 'unique_id', 225, true, 260, 210)}
+    {sortHeader('Source', 'source', 140, true, 160)}
     {sortHeader('Last Modified Date', 'last_modified_at', 172, true, 185, 165)}
     {sortHeader('QA Done at', 'qc_completed_at', 145, true, 155)}
     {sortHeader('QC Status', 'qc_status', 125, true, 135, 115)}
@@ -1968,6 +1993,7 @@ export default function Records({
 ) : (
   <>
     {sortHeader('Unique ID', 'unique_id', 225, true, 260, 210)}
+    {sortHeader('Source', 'source', 140, true, 160)}
     {sortHeader('Last Modified Date', 'last_modified_at', 172, true, 185, 165)}
     {sortHeader('QC Status', 'qc_status', 125, true, 135, 115)}
     {sortHeader('Audit Status', 'audit_status', 160, true, 180, 150)}
@@ -2064,6 +2090,7 @@ export default function Records({
         <span className="mono-sm rec-unique-id" style={{ fontWeight: 700, color: '#0f172a' }}>{r.unique_id}</span>
       ) : nil}
     </td>
+    <td><SourceBadge source={r.source} isManual={r.is_manually_added} /></td>
     <td className="rec-last-modified col-last-modified" style={{ whiteSpace: 'nowrap' }} title="When lead was assigned or reassigned">
       {(() => {
         const t = r.last_modified_at || r.reassigned_at || r.assigned_at || r.created_at;
@@ -2105,6 +2132,7 @@ export default function Records({
     <span className="mono-sm rec-unique-id" style={{ fontWeight: 700, color: '#0f172a' }}>{r.unique_id}</span>
   ) : nil}
 </td>
+<td><SourceBadge source={r.source} isManual={r.is_manually_added} /></td>
 {/* 2. Last Modified Date — when lead was assigned or reassigned */}
 <td className="rec-last-modified col-last-modified" style={{ whiteSpace: 'nowrap' }} title="When lead was assigned or reassigned">
   {(() => {

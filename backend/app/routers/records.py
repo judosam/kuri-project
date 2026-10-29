@@ -952,10 +952,12 @@ async def serve_record_image(
 def _record_to_detail(record, errors=None) -> RecordDetail:
     from app.services.record_service import compute_record_deviation
     deviation = compute_record_deviation(record)
-    assigned_at = getattr(record, "assigned_at", None) or record.created_at
+    raw_assigned_at = getattr(record, "assigned_at", None)
+    # Only populate assigned_at if the record is actually assigned to a field operator
+    assigned_at = raw_assigned_at if (record.user_id or getattr(record, "reassigned_to_id", None)) else None
     assigned_date = (
         assigned_at.strftime("%Y-%m-%d")
-        if hasattr(assigned_at, "strftime")
+        if (assigned_at and hasattr(assigned_at, "strftime"))
         else (str(assigned_at)[:10] if assigned_at else None)
     )
 
