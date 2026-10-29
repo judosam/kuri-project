@@ -113,25 +113,21 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         {/* Brand Logo Container */}
         <div
           style={{
-            width: 72,
-            height: 72,
-            borderRadius: 20,
+            padding: '12px 20px',
+            borderRadius: 16,
             backgroundColor: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-            marginBottom: 14,
-            overflow: 'hidden',
-            padding: 8,
+            marginBottom: 16,
           }}
         >
           <img
             src="/app/kuri-icon.png"
             alt="Kuri"
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            style={{ height: 44, width: 'auto', maxWidth: 180, objectFit: 'contain' }}
             onError={(e) => {
-              // Fallback to camera icon if image path fails
               (e.target as HTMLElement).style.display = 'none';
             }}
           />

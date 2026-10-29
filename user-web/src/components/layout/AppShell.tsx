@@ -220,7 +220,7 @@ export default function AppShell({
               <img
                 src="/app/kuri-icon.png"
                 alt="Kuri"
-                style={{ width: 38, height: 38, objectFit: 'contain', flexShrink: 0 }}
+                style={{ height: 28, width: 'auto', maxWidth: 130, objectFit: 'contain', flexShrink: 0 }}
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = 'none';
                 }}

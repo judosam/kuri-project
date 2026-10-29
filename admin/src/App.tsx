@@ -397,14 +397,15 @@ function Sidebar({
       <div>
         <div className="fos-side-brand">
           <div className="brand-id">
-            <span className="brand-mark brand-mark-image-wrap">
-              <img className="brand-mark-image" src="/kuri-icon.png" alt="Kuri" style={{ objectFit: 'contain' }} />
-            </span>
-            {!isCollapsed && (
-              <div className="brand-title-wrap">
-                <span className="brand-name">Kuri</span>
-                <span className="brand-sub">Lead Management</span>
+            {!isCollapsed ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                <img src="/kuri-icon.png" alt="Kuri" style={{ height: 32, width: 'auto', maxWidth: 160, objectFit: 'contain', display: 'block' }} />
+                <span className="brand-sub" style={{ fontSize: 9, fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Lead Management</span>
               </div>
+            ) : (
+              <span className="brand-mark brand-mark-image-wrap" title="Kuri — Lead Management">
+                <img className="brand-mark-image" src="/kuri-icon.png" alt="Kuri" style={{ objectFit: 'contain' }} />
+              </span>
             )}
           </div>
           <button
