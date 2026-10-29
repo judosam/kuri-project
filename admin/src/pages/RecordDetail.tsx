@@ -982,7 +982,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                 <FourColumnTable
                   fields={[
                     { key: 'uid', label: 'Unique ID', value: record.unique_id },
-                    { key: 'source', label: 'Source', value: <SourceBadge source={record.source} isManual={record.is_manually_added} /> },
+                    { key: 'source', label: 'Source', value: <SourceBadge source={record.source} isManual={record.is_manually_added} uploadedByName={record.uploaded_by_name} /> },
                     { key: 'property_type', label: 'Property Type', value: record.property_type },
                     { key: 'survey_no', label: 'Survey No', value: record.survey_no || record.survey_number },
                     { key: 'subdiv_no', label: 'Subdivision No', value: record.subdivision_no || record.sub_division },

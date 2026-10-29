@@ -1020,7 +1020,7 @@ export default function ImportedRecordDetail({
               <Section icon="receipt_long" title="Imported Details">
                 <div className="rd-rows">
                   <Row label="Unique ID" value={record.unique_id} mono />
-                  <Row label="Source" value={<SourceBadge source={record.source} isManual={record.is_manually_added} />} />
+                  <Row label="Source" value={<SourceBadge source={record.source} isManual={record.is_manually_added} uploadedByName={record.uploaded_by_name} />} />
                   <Row label="Survey No" value={record.survey_no || record.survey_number} />
                   <Row label="Subdivision No" value={record.subdivision_no || record.sub_division} />
                   

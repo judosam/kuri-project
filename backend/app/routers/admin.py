@@ -3561,7 +3561,11 @@ def _record_to_detail(record, errors: Optional[List[str]] = None) -> RecordDetai
         audited_by_name=(record.audited_by.full_name if getattr(record, "audited_by", None) else None),
         audited_at=getattr(record, "audited_at", None),
         uploaded_by_id=getattr(record, "uploaded_by_id", None),
-        uploaded_by_name=(record.uploaded_by.full_name if getattr(record, "uploaded_by", None) else None),
+        uploaded_by_name=(
+            record.uploaded_by.full_name
+            if getattr(record, "uploaded_by", None)
+            else ("System Admin" if getattr(record, "source", None) == "captured" else None)
+        ),
         staged_operator_id=getattr(record, "staged_operator_id", None),
         staged_operator_name=(record.staged_operator.full_name if getattr(record, "staged_operator", None) else None),
         assigned_auditor_id=getattr(record, "assigned_auditor_id", None),

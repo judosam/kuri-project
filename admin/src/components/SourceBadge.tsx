@@ -1,26 +1,38 @@
 import type { CSSProperties } from 'react';
 
-export function formatSourceLabel(source?: string | null, isManual?: boolean): string {
+export function formatSourceLabel(
+  source?: string | null,
+  isManual?: boolean,
+  uploadedByName?: string | null,
+): string {
   if (isManual) return 'Field User Added';
   if (!source) return 'Imported';
   const s = source.toLowerCase().trim();
-  if (s === 'imported') return 'Imported';
   if (s === 'qa_portal' || s === 'qa portal' || s === 'qa') return 'QA User Added';
   if (s === 'manual' || s === 'field' || s === 'field_user' || s === 'field_captured') return 'Field User Added';
-  if (s === 'captured' || s === 'admin' || s === 'admin_added') return 'Admin Added';
+  if (s === 'captured' || s === 'admin' || s === 'admin_added') {
+    const name = uploadedByName?.trim();
+    return name ? `Imported by ${name}` : 'Imported by Admin';
+  }
+  if (s === 'imported') {
+    const name = uploadedByName?.trim();
+    return name ? `Imported by ${name}` : 'Imported';
+  }
   return source;
 }
 
 export function SourceBadge({
   source,
   isManual,
+  uploadedByName,
   style,
 }: {
   source?: string | null;
   isManual?: boolean;
+  uploadedByName?: string | null;
   style?: CSSProperties;
 }) {
-  const label = formatSourceLabel(source, isManual);
+  const label = formatSourceLabel(source, isManual, uploadedByName);
 
   let bg = '#f0f9ff';
   let text = '#0284c7';
@@ -34,7 +46,7 @@ export function SourceBadge({
     bg = '#f0fdf4';
     text = '#15803d';
     border = '#bbf7d0';
-  } else if (label === 'Admin Added') {
+  } else if (label === 'Admin Added' || label.startsWith('Imported by')) {
     bg = '#fffbeb';
     text = '#b45309';
     border = '#fde68a';
@@ -59,13 +71,10 @@ export function SourceBadge({
         color: text,
         border: `1px solid ${border}`,
         whiteSpace: 'nowrap',
-        lineHeight: 1.4,
         ...style,
       }}
-      title={`Source: ${label}`}
     >
       {label}
     </span>
   );
 }
-export default SourceBadge;

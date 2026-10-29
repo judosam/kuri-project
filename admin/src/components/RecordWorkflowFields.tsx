@@ -51,7 +51,7 @@ export function getUnifiedQcStatus(record: CaptureRecord): string {
 export const RECORD_GROUPS: { key: 'imported' | 'audit' | 'field'; label: string; fields: Field[] }[] = [
   { key: 'imported', label: 'Imported Details', fields: [
     field('id', 'Record ID', 'id'), field('unique_id', 'Unique ID', 'unique_id'),
-    { key: 'source', label: 'Source', sort: 'source', value: r => <SourceBadge source={r.source} isManual={r.is_manually_added} /> },
+    { key: 'source', label: 'Source', sort: 'source', value: r => <SourceBadge source={r.source} isManual={r.is_manually_added} uploadedByName={r.uploaded_by_name} /> },
     { key: 'last_modified_at', label: 'Last Modified Date', sort: 'last_modified_at', value: r => { const t = lastModifiedTime(r); return t ? formatDateTime(String(t)) : '—'; } },
     field('name', 'Record Name', 'name'),
     field('is_manually_added', 'Manually Added'), field('uploaded_by_name', 'Imported By', 'uploaded_by'),
@@ -319,7 +319,7 @@ export function RecordWorkflowDetails({ record }: { record: CaptureRecord }) {
 
 export function RecordFieldValue({ record, item }: { record: CaptureRecord; item: Field }) {
   if (item.key === 'photos') return <div className="workflow-photos">{record.images?.[0]?.image_url && <AuthThumbnail imageUrl={record.images[0].image_url} alt="Field verification photo" size={34} />}<span>{item.value(record)}</span></div>;
-  if (item.key === 'source') return <SourceBadge source={record.source} isManual={record.is_manually_added} />;
+  if (item.key === 'source') return <SourceBadge source={record.source} isManual={record.is_manually_added} uploadedByName={record.uploaded_by_name} />;
   return <span className="workflow-value" title={typeof item.value(record) === 'string' ? item.value(record) : undefined}>{item.value(record)}</span>;
 }
 

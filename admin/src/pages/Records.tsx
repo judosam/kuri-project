@@ -1547,7 +1547,7 @@ export default function Records({
                 { value: 'imported', label: 'Imported' },
                 { value: 'qa_portal', label: 'QA User Added' },
                 { value: 'manual', label: 'Field User Added' },
-                { value: 'captured', label: 'Admin Added' },
+                { value: 'captured', label: 'Imported by Admin' },
               ]}
             />
           </div>
@@ -2090,7 +2090,7 @@ export default function Records({
         <span className="mono-sm rec-unique-id" style={{ fontWeight: 700, color: '#0f172a' }}>{r.unique_id}</span>
       ) : nil}
     </td>
-    <td><SourceBadge source={r.source} isManual={r.is_manually_added} /></td>
+    <td><SourceBadge source={r.source} isManual={r.is_manually_added} uploadedByName={r.uploaded_by_name} /></td>
     <td className="rec-last-modified col-last-modified" style={{ whiteSpace: 'nowrap' }} title="When lead was assigned or reassigned">
       {(() => {
         const t = r.last_modified_at || r.reassigned_at || r.assigned_at || r.created_at;
@@ -2132,7 +2132,7 @@ export default function Records({
     <span className="mono-sm rec-unique-id" style={{ fontWeight: 700, color: '#0f172a' }}>{r.unique_id}</span>
   ) : nil}
 </td>
-<td><SourceBadge source={r.source} isManual={r.is_manually_added} /></td>
+<td><SourceBadge source={r.source} isManual={r.is_manually_added} uploadedByName={r.uploaded_by_name} /></td>
 {/* 2. Last Modified Date — when lead was assigned or reassigned */}
 <td className="rec-last-modified col-last-modified" style={{ whiteSpace: 'nowrap' }} title="When lead was assigned or reassigned">
   {(() => {
