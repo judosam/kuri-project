@@ -1546,8 +1546,8 @@ export default function Records({
                 { value: '', label: 'All sources' },
                 { value: 'imported', label: 'Imported' },
                 { value: 'qa_portal', label: 'QA User Added' },
-                { value: 'captured', label: 'Field User Added' },
-                { value: 'manual', label: 'Admin Added' },
+                { value: 'manual', label: 'Field User Added' },
+                { value: 'captured', label: 'Admin Added' },
               ]}
             />
           </div>
