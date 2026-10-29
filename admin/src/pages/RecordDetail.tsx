@@ -976,14 +976,15 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                     { key: 'property_type', label: 'Property Type', value: record.property_type },
                     { key: 'survey_no', label: 'Survey No', value: record.survey_no || record.survey_number },
                     { key: 'subdiv_no', label: 'Subdivision No', value: record.subdivision_no || record.sub_division },
-                    { key: 'land_use', label: 'Land Use', value: record.land_use },
+                    { key: 'land_use', label: 'Land Type / Land Use', value: record.land_use },
                     { key: 'owner_name', label: 'Owner Name', value: record.owner_name_en },
                     { key: 'taluk', label: 'Taluk', value: record.taluk },
                     { key: 'village', label: 'Village', value: record.village },
                     { key: 'district', label: 'District', value: record.district },
                     { key: 'priority_tier', label: 'Priority Tier', value: record.priority_tier },
-                    { key: 'dtcp_permit_date', label: 'DTCP Permit Date', value: record.dtcp_permit_date },
+                    { key: 'govt_dtcp_permit', label: 'Govt DTCP Permit', value: record.govt_dtcp_permit ? 'Yes (Granted)' : (record.govt_dtcp_permit === false ? 'No' : undefined) },
                     { key: 'dtcp_application_no', label: 'DTCP Application No', value: record.dtcp_application_no },
+                    { key: 'dtcp_permit_date', label: 'DTCP Permit Date', value: record.dtcp_permit_date },
                     { key: 'site_addr', label: 'Site Address', value: record.site_address },
                   ]}
                 />

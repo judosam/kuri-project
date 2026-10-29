@@ -1008,20 +1008,21 @@ export default function ImportedRecordDetail({
             )}
 
             {hasPlanning && (
-              <Section icon="receipt_long" title="Admin Given Information">
+              <Section icon="receipt_long" title="Imported Details">
                 <div className="rd-rows">
                   <Row label="Unique ID" value={record.unique_id} mono />
                   <Row label="Survey No" value={record.survey_no || record.survey_number} />
                   <Row label="Subdivision No" value={record.subdivision_no || record.sub_division} />
                   
-                  <Row label="Land Use" value={record.land_use} />
+                  <Row label="Land Type / Land Use" value={record.land_use} />
                   <Row label="Owner Name" value={record.owner_name_en} wide />
                   <Row label="Taluk" value={record.taluk} />
                   <Row label="Village" value={record.village} />
                   <Row label="District" value={record.district} />
                   {record.priority_tier && <Row label="Priority Tier" value={record.priority_tier} />}
-                  {record.dtcp_permit_date && <Row label="DTCP Permit Date" value={record.dtcp_permit_date} />}
+                  <Row label="Govt DTCP Permit" value={record.govt_dtcp_permit ? 'Yes (Granted)' : (record.govt_dtcp_permit === false ? 'No' : undefined)} />
                   {record.dtcp_application_no && <Row label="DTCP Application No" value={record.dtcp_application_no} />}
+                  {record.dtcp_permit_date && <Row label="DTCP Permit Date" value={record.dtcp_permit_date} />}
                   <Row label="Site Address" value={record.site_address} wide />
                 </div>
               </Section>
