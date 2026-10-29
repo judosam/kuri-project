@@ -89,6 +89,9 @@ class RecordRepository:
         self.db.add(record)
         self.db.commit()
         self.db.refresh(record)
+        if not record.assigned_telecaller_id:
+            from app.services.record_service import auto_assign_telecaller_if_contact
+            auto_assign_telecaller_if_contact(self.db, record)
         return record
 
     def get_by_id(self, record_id: int) -> Optional[CaptureRecord]:
@@ -395,6 +398,9 @@ class RecordRepository:
             record.updated_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(record)
+        if not record.assigned_telecaller_id:
+            from app.services.record_service import auto_assign_telecaller_if_contact
+            auto_assign_telecaller_if_contact(self.db, record)
         return record
 
     def delete(self, record: CaptureRecord) -> None:

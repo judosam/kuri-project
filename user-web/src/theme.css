@@ -2,14 +2,14 @@
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  /* Primary Palette (Coral Red - Stitch Field Ops Precision System) */
-  --primary: #FF6467;
-  --primary-hover: #EA4E51;
-  --primary-dark: #B12A33;
-  --primary-light: #FFF1F2;
+  /* Primary Palette (Kuri Signature Theme) */
+  --primary: #ea580c;
+  --primary-hover: #c2410c;
+  --primary-dark: #9a3412;
+  --primary-light: #fff7ed;
   --primary-contrast: #ffffff;
-  --code-ink: #B12A33;
-  --primary-container: #FF6467;
+  --code-ink: #9a3412;
+  --primary-container: #ea580c;
 
   /* Accent Colors matching Stitch template */
   --accent-emerald: #006C4A;

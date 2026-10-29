@@ -325,33 +325,25 @@ async def create_record(
             coordinates=cur_coords,
         )
 
-    # Auto-route to telecaller if phone contact exists and sole active telecaller is present
-    has_contact = bool(
-        (record.contact_number and record.contact_number.strip() and record.contact_number.strip() != "-") or
-        (record.site_contractor_architect_number and record.site_contractor_architect_number.strip() and record.site_contractor_architect_number.strip() != "-")
-    )
-    if has_contact and not record.assigned_telecaller_id:
-        active_telecallers = (
-            db.query(User)
-            .filter(User.role == UserRole.TELECALLER, User.is_active == True)
-            .all()
-        )
-        if len(active_telecallers) == 1:
-            record = record_service.record_repo.update(
-                record, assigned_telecaller_id=active_telecallers[0].id
-            )
-            log_activity(
-                db=db,
-                action_type="telecaller_lead_routed",
-                type="record",
-                title=f"Contact lead routed to {active_telecallers[0].full_name}",
-                detail=f"Field verifier {user.full_name} added contact details (Contact: {record.contact_number or '-'}, Contractor: {record.site_contractor_architect_number or '-'}). Auto-routed to telecaller {active_telecallers[0].full_name}.",
-                user_id=user.id,
-                user_name=user.full_name,
-                record_id=record.id,
-                record_name=record.name,
-                status="success",
-            )
+    # Auto-route to telecaller if phone contact exists
+    if not record.assigned_telecaller_id:
+        from app.services.record_service import auto_assign_telecaller_if_contact
+        telecaller_id = auto_assign_telecaller_if_contact(db, record)
+        if telecaller_id:
+            assigned_u = db.query(User).filter(User.id == telecaller_id).first()
+            if assigned_u:
+                log_activity(
+                    db=db,
+                    action_type="telecaller_lead_routed",
+                    type="record",
+                    title=f"Contact lead routed to {assigned_u.full_name}",
+                    detail=f"Field verifier {user.full_name} added contact details (Contact: {record.contact_number or '-'}, Contractor: {record.site_contractor_architect_number or '-'}). Auto-routed to telecaller {assigned_u.full_name}.",
+                    user_id=user.id,
+                    user_name=user.full_name,
+                    record_id=record.id,
+                    record_name=record.name,
+                    status="success",
+                )
 
     # Register metadata for each photo (actual bytes arrive via /upload)
     next_order = max((img.photo_order for img in record.images), default=0)

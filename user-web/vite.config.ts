@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
 
   const pwaPlugin = VitePWA({
     registerType: 'autoUpdate',
-    includeAssets: ['favicon.png', 'brand-logo.png', 'icon.png'],
+    includeAssets: ['favicon.png', 'brand-logo.png', 'icon.png', 'kuri-icon.png', 'kuri-logo.png'],
     manifest: {
       name: 'Kuri - Field App',
       short_name: 'Kuri',

@@ -73,7 +73,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       {/* ─── Pinned Coral Hero (Exact match to mobile LoginScreen) ─── */}
       <div
         style={{
-          backgroundColor: '#FF6467',
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
           padding: '40px 20px 50px 20px',
           display: 'flex',
           flexDirection: 'column',
@@ -93,7 +93,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             width: 220,
             height: 220,
             borderRadius: '50%',
-            backgroundColor: 'rgba(255, 255, 255, 0.12)',
+            backgroundColor: 'rgba(234, 88, 12, 0.15)',
             pointerEvents: 'none',
           }}
         />
@@ -124,7 +124,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           }}
         >
           <img
-            src="/app/kuri-icon.png"
+            src="/app/brand-logo.png"
             alt="Kuri"
             style={{ height: 44, width: 'auto', maxWidth: 180, objectFit: 'contain' }}
             onError={(e) => {
@@ -366,7 +366,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  style={{ accentColor: '#FF6467', width: 16, height: 16, borderRadius: 4 }}
+                  style={{ accentColor: '#ea580c', width: 16, height: 16, borderRadius: 4 }}
                 />
                 <span>Remember Email</span>
               </label>
@@ -379,7 +379,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               style={{
                 height: 54,
                 borderRadius: 14,
-                backgroundColor: '#FF6467',
+                backgroundColor: '#ea580c',
                 color: '#ffffff',
                 border: 'none',
                 fontSize: '0.95rem',
@@ -389,7 +389,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 justifyContent: 'center',
                 gap: 8,
                 cursor: loading ? 'not-allowed' : 'pointer',
-                boxShadow: '0 6px 16px rgba(255, 100, 103, 0.35)',
+                boxShadow: '0 6px 16px rgba(234, 88, 12, 0.35)',
                 transition: 'all 0.15s ease',
                 marginTop: 6,
               }}

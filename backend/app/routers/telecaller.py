@@ -34,7 +34,7 @@ router = APIRouter(prefix="/telecaller", tags=["Telecaller"])
 
 
 def _eligible_contact_filter():
-    """Only records that have at least one valid phone number (Contact Number or Contractor Contact)."""
+    """Only records that have at least one valid phone number (Contact Number, Contractor Contact, or QC Builder Contact)."""
     return or_(
         and_(
             CaptureRecord.contact_number.isnot(None),
@@ -50,34 +50,37 @@ def _eligible_contact_filter():
             func.lower(func.trim(CaptureRecord.site_contractor_architect_number)) != "na",
             func.lower(func.trim(CaptureRecord.site_contractor_architect_number)) != "nil",
         ),
+        and_(
+            CaptureRecord.qc_builder_contact.isnot(None),
+            func.trim(CaptureRecord.qc_builder_contact) != "",
+            CaptureRecord.qc_builder_contact != "-",
+            func.lower(func.trim(CaptureRecord.qc_builder_contact)) != "na",
+            func.lower(func.trim(CaptureRecord.qc_builder_contact)) != "nil",
+        ),
     )
 
 
 def sync_unassigned_telecaller_leads(db: Session) -> Optional[int]:
-    """If there is exactly one active telecaller, ensure all unassigned contact records are assigned to them."""
-    active_telecallers = (
-        db.query(User)
-        .filter(User.role == UserRole.TELECALLER, User.is_active == True)
-        .all()
-    )
-    if len(active_telecallers) == 1:
-        telecaller_id = active_telecallers[0].id
-        updated = (
-            db.query(CaptureRecord)
-            .filter(
-                _eligible_contact_filter(),
-                CaptureRecord.assigned_telecaller_id.is_(None),
-            )
-            .update(
-                {CaptureRecord.assigned_telecaller_id: telecaller_id},
-                synchronize_session=False,
-            )
+    """Ensure all unassigned contact records are assigned to active telecallers."""
+    from app.services.record_service import get_target_telecaller
+    target = get_target_telecaller(db)
+    if not target:
+        return None
+    updated = (
+        db.query(CaptureRecord)
+        .filter(
+            _eligible_contact_filter(),
+            CaptureRecord.assigned_telecaller_id.is_(None),
         )
-        if updated > 0:
-            db.commit()
-            logger.info("Auto-assigned %d eligible contact lead(s) to sole active telecaller ID %d", updated, telecaller_id)
-        return telecaller_id
-    return None
+        .update(
+            {CaptureRecord.assigned_telecaller_id: target.id},
+            synchronize_session=False,
+        )
+    )
+    if updated > 0:
+        db.commit()
+        logger.info("Auto-assigned %d eligible contact lead(s) to telecaller ID %d (%s)", updated, target.id, target.full_name)
+    return target.id
 
 
 @router.get("/records", response_model=RecordListResponse)

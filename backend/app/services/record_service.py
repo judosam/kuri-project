@@ -1,11 +1,74 @@
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from sqlalchemy.orm import Session
 
 from app.models.capture_record import CaptureRecord
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.repositories.record_repository import RecordRepository
+
+
+def has_valid_contact(record: Any) -> bool:
+    """Returns True if record has a non-blank, non-placeholder contact number or contractor number or QC contact."""
+    import re
+    for val in [
+        getattr(record, "contact_number", None),
+        getattr(record, "site_contractor_architect_number", None),
+        getattr(record, "qc_builder_contact", None),
+    ]:
+        if val and isinstance(val, str):
+            clean = val.strip().lower()
+            if clean and clean not in ("-", "--", "na", "n/a", "nil", "none", "null"):
+                if re.search(r'\d{6,}', clean):
+                    return True
+    return False
+
+
+def get_target_telecaller(db: Session) -> Optional[User]:
+    """Find the best active telecaller to route leads to.
+    Prioritizes real telecallers over system test accounts, then selects the one
+    with the lowest assigned count for balanced workload.
+    """
+    active_telecallers = (
+        db.query(User)
+        .filter(User.role == UserRole.TELECALLER, User.is_active == True)
+        .all()
+    )
+    if not active_telecallers:
+        return None
+    real_telecallers = [
+        u for u in active_telecallers
+        if not (u.email.endswith("@system.local") or "test" in u.email.lower())
+    ]
+    candidate_telecallers = real_telecallers if real_telecallers else active_telecallers
+    if len(candidate_telecallers) == 1:
+        return candidate_telecallers[0]
+
+    from sqlalchemy import func
+    counts = (
+        db.query(CaptureRecord.assigned_telecaller_id, func.count(CaptureRecord.id))
+        .filter(CaptureRecord.assigned_telecaller_id.in_([u.id for u in candidate_telecallers]))
+        .group_by(CaptureRecord.assigned_telecaller_id)
+        .all()
+    )
+    count_map = {row[0]: row[1] for row in counts}
+    candidate_telecallers.sort(key=lambda u: (count_map.get(u.id, 0), u.id))
+    return candidate_telecallers[0]
+
+
+def auto_assign_telecaller_if_contact(db: Session, record: CaptureRecord) -> Optional[int]:
+    """Auto-assigns record to an active telecaller if contact exists and not already assigned."""
+    if record.assigned_telecaller_id:
+        return None
+    if not has_valid_contact(record):
+        return None
+    target = get_target_telecaller(db)
+    if target:
+        record.assigned_telecaller_id = target.id
+        db.commit()
+        return target.id
+    return None
+
 
 
 def _has_gps(image) -> bool:

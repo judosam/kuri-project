@@ -89,7 +89,7 @@ export default function AppShell({
               justifyContent: 'flex-start',
               padding: '12px 14px',
               borderRadius: 12,
-              backgroundColor: isDashboardActive ? '#FF6467' : 'transparent',
+              backgroundColor: isDashboardActive ? 'var(--primary)' : 'transparent',
               color: isDashboardActive ? '#ffffff' : '#475569',
             }}
           >
@@ -135,7 +135,7 @@ export default function AppShell({
                   width: 34,
                   height: 34,
                   borderRadius: 10,
-                  background: 'linear-gradient(135deg, #FF6467 0%, #EA4E51 100%)',
+                  background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
                   color: '#ffffff',
                   fontWeight: 600,
                   WebkitTextStroke: '0.5px currentColor',
@@ -143,7 +143,7 @@ export default function AppShell({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(255, 100, 103, 0.3)',
+                  boxShadow: '0 2px 8px rgba(234, 88, 12, 0.3)',
                   flexShrink: 0,
                 }}
               >
@@ -193,69 +193,68 @@ export default function AppShell({
         <header className="app-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
             {showBack && onBack ? (
-              <button
-                type="button"
-                onClick={onBack}
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 12,
-                  backgroundColor: 'var(--primary)',
-                  border: '1px solid var(--primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: 'var(--primary-contrast)',
-                  flexShrink: 0,
-                  transition: 'all 0.15s ease',
-                }}
-                title="Go Back"
-              >
-                <Icon name="arrow_back" size={20} color="#ffffff" />
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={onBack}
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 12,
+                    backgroundColor: 'var(--primary)',
+                    border: '1px solid var(--primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: 'var(--primary-contrast)',
+                    flexShrink: 0,
+                    transition: 'all 0.15s ease',
+                  }}
+                  title="Go Back"
+                >
+                  <Icon name="arrow_back" size={20} color="#ffffff" />
+                </button>
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: '1rem',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      letterSpacing: '-0.3px',
+                    }}
+                  >
+                    {title}
+                  </div>
+                  {subtitle && (
+                    <div
+                      style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        color: '#64748b',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {subtitle}
+                    </div>
+                  )}
+                </div>
+              </>
             ) : (
-              // Plain logo — no frame or tint so the mark and the wordmark read
-              // as one lockup with the title and subtitle beside it.
               <img
-                src="/app/kuri-icon.png"
+                src="/app/brand-logo.png"
                 alt="Kuri"
-                style={{ height: 28, width: 'auto', maxWidth: 130, objectFit: 'contain', flexShrink: 0 }}
+                style={{ height: 26, width: 'auto', maxWidth: 140, objectFit: 'contain', flexShrink: 0 }}
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = 'none';
                 }}
               />
             )}
-
-            <div style={{ minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: '1rem',
-                  fontWeight: 800,
-                  color: '#0f172a',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  letterSpacing: '-0.3px',
-                }}
-              >
-                {showBack ? title : 'Kuri'}
-              </div>
-              {subtitle && (
-                <div
-                  style={{
-                    fontSize: '0.7rem',
-                    fontWeight: 600,
-                    color: '#64748b',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {subtitle}
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Right Header Actions matching Stitch template */}

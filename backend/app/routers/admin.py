@@ -3364,21 +3364,10 @@ async def admin_update_record(
         update_kwargs["updated_at"] = datetime.now(timezone.utc)
         record = record_service.record_repo.update(record, touch_updated_at=False, **update_kwargs)
 
-    # Auto-route to telecaller if phone contact exists and sole active telecaller is present
-    has_contact = bool(
-        (record.contact_number and record.contact_number.strip() and record.contact_number.strip() != "-") or
-        (record.site_contractor_architect_number and record.site_contractor_architect_number.strip() and record.site_contractor_architect_number.strip() != "-")
-    )
-    if has_contact and not record.assigned_telecaller_id:
-        active_telecallers = (
-            db.query(User)
-            .filter(User.role == UserRole.TELECALLER, User.is_active == True)
-            .all()
-        )
-        if len(active_telecallers) == 1:
-            record = record_service.record_repo.update(
-                record, assigned_telecaller_id=active_telecallers[0].id
-            )
+    # Auto-route to telecaller if phone contact exists
+    if not record.assigned_telecaller_id:
+        from app.services.record_service import auto_assign_telecaller_if_contact
+        auto_assign_telecaller_if_contact(db, record)
 
     role_name = admin.role.value.capitalize() if hasattr(admin.role, "value") else str(admin.role).capitalize()
     
