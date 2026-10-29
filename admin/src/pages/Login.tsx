@@ -80,10 +80,10 @@ export default function Login({ onLogin }: LoginProps) {
         <div className="auth-panel">
           {/* Brand Header */}
           <div className="auth-logo-row">
-            <img className="auth-logo" src="/brand-logo.png" alt="PhotoCapture" />
+            <img className="auth-logo" src="/kuri-logo.png" alt="Kuri" style={{ height: 44, width: 'auto', background: 'transparent', padding: 0 }} />
             <div className="auth-brand-identity">
-              <span className="auth-brand-title">PhotoCapture</span>
-              <span className="auth-brand-sub">Field Geotagging &amp; Audit</span>
+              <span className="auth-brand-title">Kuri</span>
+              <span className="auth-brand-sub">Construction Lead Platform</span>
             </div>
           </div>
 

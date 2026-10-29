@@ -47,6 +47,7 @@ interface StatDetailModalData {
     userId?: number;
     auditStatus?: string;
     propertyType?: string;
+    assignedAuditorId?: number;
   };
 }
 
@@ -115,6 +116,7 @@ export default function Dashboard() {
     userId?: number;
     auditStatus?: string;
     propertyType?: string;
+    assignedAuditorId?: number;
   }) => {
     const params = new URLSearchParams();
     if (options?.status) {
@@ -123,6 +125,7 @@ export default function Dashboard() {
       params.set('status', statusFilter);
     }
     if (options?.userId) params.set('user_id', String(options.userId));
+    if (options?.assignedAuditorId) params.set('assigned_auditor_id', String(options.assignedAuditorId));
     if (options?.auditStatus) params.set('audit_status', options.auditStatus);
     if (options?.propertyType) params.set('property_type', options.propertyType);
     params.set('preset', preset);
@@ -158,6 +161,34 @@ export default function Dashboard() {
       .filter((o) => o.role === 'USER' || o.role === 'FIELD_VERIFIER')
       .sort((a, b) => b.completed - a.completed || b.pending - a.pending);
   }, [data?.inspector_stats]);
+
+  const qaUsers = useMemo(() => {
+    return [...(data?.qa_user_stats ?? [])].sort(
+      (a, b) => b.qc_done - a.qc_done || b.total_assigned - a.total_assigned
+    );
+  }, [data?.qa_user_stats]);
+
+  const totalQcReviewed = useMemo(() => {
+    return qaUsers.reduce((acc, u) => acc + u.qc_done, 0);
+  }, [qaUsers]);
+
+  const totalApproved = useMemo(() => {
+    return qaUsers.reduce((acc, u) => acc + u.approved, 0);
+  }, [qaUsers]);
+
+  const totalDisapproved = useMemo(() => {
+    return qaUsers.reduce((acc, u) => acc + u.disapproved, 0);
+  }, [qaUsers]);
+
+  const totalCommercial = useMemo(() => {
+    return qaUsers.reduce((acc, u) => acc + u.commercial, 0);
+  }, [qaUsers]);
+
+  const totalQaCreated = useMemo(() => {
+    return qaUsers.reduce((acc, u) => acc + u.qa_created, 0);
+  }, [qaUsers]);
+
+  const overallApprovalRate = totalQcReviewed > 0 ? Math.round((totalApproved / totalQcReviewed) * 100) : 0;
 
   return (
     <PageShell>
@@ -1411,6 +1442,247 @@ export default function Dashboard() {
               </div>
             ) : (
               <EmptyPanel icon="group" text="No active field verifiers found." />
+            )}
+          </section>
+
+          {/* ── Lower Tier: QA Reviewer & Auditor Performance ──────────────── */}
+          <section className="cc-workload-card" aria-label="QA Reviewer & Auditor Performance" style={{ marginTop: '24px' }}>
+            <div className="cc-card-head">
+              <div>
+                <h3 className="cc-card-title">
+                  <Icon name="fact_check" size={18} style={{ verticalAlign: 'middle', marginRight: 6, color: '#7c3aed' }} />
+                  QA Reviewer &amp; Auditor Performance
+                </h3>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  Satellite VHR imagery reviews, street-view audits, false positive filtering, and QANEW site creations.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => navigate('/auditor/dashboard')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Icon name="visibility" size={14} />
+                  QC Dashboard
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => navigate('/audit')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Icon name="map" size={14} />
+                  Open QA Portal
+                </button>
+              </div>
+            </div>
+
+            {/* QA Summary Highlight Strip */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                gap: 10,
+                margin: '16px 0 18px',
+              }}
+            >
+              <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Total Reviewed
+                </div>
+                <div style={{ fontSize: '1.30rem', fontWeight: 800, color: '#0f172a', marginTop: 2 }}>
+                  {totalQcReviewed.toLocaleString()}
+                </div>
+                <div style={{ fontSize: '0.70rem', color: '#059669', marginTop: 1, fontWeight: 500 }}>
+                  {overallApprovalRate}% approved
+                </div>
+              </div>
+
+              <div style={{ padding: '10px 14px', background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0' }}>
+                <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Approved
+                </div>
+                <div style={{ fontSize: '1.30rem', fontWeight: 800, color: '#15803d', marginTop: 2 }}>
+                  {totalApproved.toLocaleString()}
+                </div>
+                <div style={{ fontSize: '0.70rem', color: '#16a34a', marginTop: 1, fontWeight: 500 }}>
+                  Eligible for field
+                </div>
+              </div>
+
+              <div style={{ padding: '10px 14px', background: '#fef2f2', borderRadius: 10, border: '1px solid #fecaca' }}>
+                <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  False Positives
+                </div>
+                <div style={{ fontSize: '1.30rem', fontWeight: 800, color: '#dc2626', marginTop: 2 }}>
+                  {totalDisapproved.toLocaleString()}
+                </div>
+                <div style={{ fontSize: '0.70rem', color: '#ef4444', marginTop: 1, fontWeight: 500 }}>
+                  Disapproved / blocked
+                </div>
+              </div>
+
+              <div style={{ padding: '10px 14px', background: '#eff6ff', borderRadius: 10, border: '1px solid #bfdbfe' }}>
+                <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Commercial
+                </div>
+                <div style={{ fontSize: '1.30rem', fontWeight: 800, color: '#2563eb', marginTop: 2 }}>
+                  {totalCommercial.toLocaleString()}
+                </div>
+                <div style={{ fontSize: '0.70rem', color: '#3b82f6', marginTop: 1, fontWeight: 500 }}>
+                  Big Builder / corporate
+                </div>
+              </div>
+
+              <div style={{ padding: '10px 14px', background: '#faf5ff', borderRadius: 10, border: '1px solid #e9d5ff' }}>
+                <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#6b21a8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  QA Created
+                </div>
+                <div style={{ fontSize: '1.30rem', fontWeight: 800, color: '#7c3aed', marginTop: 2 }}>
+                  {totalQaCreated.toLocaleString()}
+                </div>
+                <div style={{ fontSize: '0.70rem', color: '#8b5cf6', marginTop: 1, fontWeight: 500 }}>
+                  QANEW-CBE discoveries
+                </div>
+              </div>
+            </div>
+
+            {/* QA Reviewers Table */}
+            {qaUsers.length > 0 ? (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="cc-workload-table">
+                  <thead>
+                    <tr>
+                      <th>QA Reviewer / Auditor</th>
+                      <th style={{ textAlign: 'right' }}>Assigned</th>
+                      <th style={{ textAlign: 'right' }}>QC Done</th>
+                      <th style={{ textAlign: 'right' }}>Approved</th>
+                      <th style={{ textAlign: 'right' }}>Disapproved</th>
+                      <th style={{ textAlign: 'right' }}>Commercial</th>
+                      <th style={{ textAlign: 'right' }}>Pending</th>
+                      <th style={{ textAlign: 'right' }}>QA Added</th>
+                      <th style={{ width: '22%' }}>Review Progress</th>
+                      <th style={{ width: '40px' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {qaUsers.map((aud) => (
+                      <tr
+                        key={aud.user_id}
+                        className="clickable-row"
+                        onClick={() =>
+                          setModalStat({
+                            title: `${aud.user_name} – QA Review & Audit Performance`,
+                            category: 'QA Auditor Profile',
+                            value: `${aud.qc_done.toLocaleString()} Reviews Done`,
+                            badgeText: `${Math.round(aud.completion_rate)}% Progress`,
+                            badgeTone: aud.completion_rate > 80 ? 'green' : 'purple',
+                            icon: 'fact_check',
+                            description: `Quality review, satellite VHR verification, and audit decisions completed by ${aud.user_name} (${aud.email}).`,
+                            breakdown: [
+                              { label: 'Assigned Scope', value: aud.total_assigned.toLocaleString() },
+                              { label: 'Total QC Done', value: aud.qc_done.toLocaleString() },
+                              { label: 'Approved Sites (Eligible)', value: aud.approved.toLocaleString() },
+                              { label: 'Disapproved (False Positives)', value: aud.disapproved.toLocaleString() },
+                              { label: 'Commercial Properties Flagged', value: aud.commercial.toLocaleString() },
+                              { label: 'Pending in Auditor Queue', value: aud.pending.toLocaleString() },
+                              { label: 'Newly Created from QA Map (QANEW-CBE)', value: aud.qa_created.toLocaleString() },
+                              { label: 'Reviewed Today', value: aud.today_done.toLocaleString() },
+                              { label: 'Review Progress Rate', value: `${Math.round(aud.completion_rate)}%` },
+                            ],
+                            recordLinkOptions: { assignedAuditorId: aud.user_id },
+                          })
+                        }
+                      >
+                        <td>
+                          <div className="cc-operator-cell">
+                            <Avatar name={aud.user_name} size="sm" />
+                            <div className="cc-operator-info">
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <strong>{aud.user_name}</strong>
+                                <span
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    padding: '1px 6px',
+                                    borderRadius: 4,
+                                    background: aud.role === 'ADMIN' ? '#fef3c7' : '#ede9fe',
+                                    color: aud.role === 'ADMIN' ? '#92400e' : '#6d28d9',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {aud.role === 'ADMIN' ? 'Admin' : 'Auditor'}
+                                </span>
+                              </div>
+                              <span>{aud.email}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                          {aud.total_assigned.toLocaleString()}
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: '#7c3aed' }}>
+                          {aud.qc_done.toLocaleString()}
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, color: '#15803d' }}>
+                          {aud.approved.toLocaleString()}
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, color: aud.disapproved > 0 ? '#dc2626' : '#94a3b8' }}>
+                          {aud.disapproved.toLocaleString()}
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, color: aud.commercial > 0 ? '#2563eb' : '#94a3b8' }}>
+                          {aud.commercial.toLocaleString()}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <span
+                            style={{
+                              color: aud.pending > 0 ? '#b45309' : '#64748b',
+                              fontWeight: aud.pending > 0 ? 700 : 400,
+                            }}
+                          >
+                            {aud.pending.toLocaleString()}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: aud.qa_created > 0 ? '#7c3aed' : '#94a3b8' }}>
+                          {aud.qa_created.toLocaleString()}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div className="cc-tele-progress-wrap" style={{ flex: 1 }}>
+                              <div
+                                className="cc-tele-progress-fill"
+                                style={{
+                                  width: `${Math.min(100, Math.round(aud.completion_rate))}%`,
+                                  background: aud.completion_rate >= 80 ? '#10b981' : aud.completion_rate >= 40 ? '#8b5cf6' : '#f59e0b',
+                                }}
+                              />
+                            </div>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 700, minWidth: '32px' }}>
+                              {Math.round(aud.completion_rate)}%
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-xs"
+                            title="Filter records reviewed by this auditor"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(recordLink({ assignedAuditorId: aud.user_id }));
+                            }}
+                          >
+                            <Icon name="chevron_right" size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyPanel icon="fact_check" text="No active QA auditors found." />
             )}
           </section>
 

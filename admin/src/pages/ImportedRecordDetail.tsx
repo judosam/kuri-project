@@ -175,11 +175,11 @@ function FourColumnTable({ fields }: { fields: TableField[] }) {
                 <span style={{ color: 'oklch(50% 0.134 242.749)' }}>{fieldA.label}</span>
               </td>
               <td className="imported-table-value-cell">
-                {React.isValidElement(fieldA.value) ? (
+                {React.isValidElement(fieldA.value) || (typeof fieldA.value === 'object' && fieldA.value !== null) ? (
                   <div className="imported-table-value">{fieldA.value}</div>
                 ) : (
                   <DetailValueCell
-                    value={fieldA.value != null ? String(fieldA.value) : ''}
+                    value={fieldA.value}
                     isExpanded={!!expandedKeys[fieldA.key]}
                     onToggle={() => toggleField(fieldA.key)}
                   />
@@ -191,11 +191,11 @@ function FourColumnTable({ fields }: { fields: TableField[] }) {
                     <span style={{ color: 'oklch(50% 0.134 242.749)' }}>{fieldB.label}</span>
                   </td>
                   <td className="imported-table-value-cell">
-                    {React.isValidElement(fieldB.value) ? (
+                    {React.isValidElement(fieldB.value) || (typeof fieldB.value === 'object' && fieldB.value !== null) ? (
                       <div className="imported-table-value">{fieldB.value}</div>
                     ) : (
                       <DetailValueCell
-                        value={fieldB.value != null ? String(fieldB.value) : ''}
+                        value={fieldB.value}
                         isExpanded={!!expandedKeys[fieldB.key]}
                         onToggle={() => toggleField(fieldB.key)}
                       />

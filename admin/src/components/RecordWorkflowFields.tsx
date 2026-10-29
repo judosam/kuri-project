@@ -146,7 +146,7 @@ export function DetailValueCell({
   const textRef = useRef<HTMLSpanElement>(null);
   const [overflows, setOverflows] = useState(false);
 
-  if (React.isValidElement(value)) {
+  if (React.isValidElement(value) || (typeof value === 'object' && value !== null)) {
     return <div className="imported-table-value">{value}</div>;
   }
 
@@ -217,8 +217,6 @@ export function isFieldEmpty(value: unknown): boolean {
       s === 'None' ||
       s === 'null' ||
       s === 'undefined' ||
-      s === 'Not assigned' ||
-      s === 'Not assigned yet' ||
       s === 'Not audited yet' ||
       s === 'No QC assessment recorded' ||
       s === 'No call recorded' ||
@@ -272,7 +270,7 @@ export function RecordWorkflowDetails({ record }: { record: CaptureRecord }) {
                         <span style={{ color: 'oklch(50% 0.134 242.749)' }}>{fieldA.label}</span>
                       </td>
                       <td className="imported-table-value-cell">
-                        {React.isValidElement(fieldA.value(record)) ? (
+                        {React.isValidElement(fieldA.value(record)) || (typeof fieldA.value(record) === 'object' && fieldA.value(record) !== null) ? (
                           <div className="imported-table-value">{fieldA.value(record)}</div>
                         ) : (
                           <DetailValueCell
@@ -288,7 +286,7 @@ export function RecordWorkflowDetails({ record }: { record: CaptureRecord }) {
                             <span style={{ color: 'oklch(50% 0.134 242.749)' }}>{fieldB.label}</span>
                           </td>
                           <td className="imported-table-value-cell">
-                            {React.isValidElement(fieldB.value(record)) ? (
+                            {React.isValidElement(fieldB.value(record)) || (typeof fieldB.value(record) === 'object' && fieldB.value(record) !== null) ? (
                               <div className="imported-table-value">{fieldB.value(record)}</div>
                             ) : (
                               <DetailValueCell

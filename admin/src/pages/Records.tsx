@@ -726,6 +726,8 @@ export default function Records({
     }
     const operator = searchParams.get('user_id');
     if (operator) setUserId(operator);
+    const auditor = searchParams.get('assigned_auditor_id') || searchParams.get('auditor_id');
+    if (auditor) setAuditorId(auditor);
     if (!isAuditorView) {
       const status = searchParams.get('status');
       if (status === 'COMPLETED' || status === 'NOT_COMPLETED' || status === 'MANUALLY_ADDED') setStatusFilter(status);

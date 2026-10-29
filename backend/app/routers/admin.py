@@ -119,6 +119,7 @@ async def get_dashboard(
         total_photos=metrics.get("total_photos", 0),
         completion_rate=metrics.get("completion_rate", 0.0),
         inspector_stats=metrics.get("inspector_stats", []),
+        qa_user_stats=metrics.get("qa_user_stats", []),
         recent_records=[_record_to_detail(r) for r in metrics["recent_records"]],
         total_commercial_properties=metrics.get("total_commercial_properties", 0),
         eligible_for_field=metrics.get("eligible_for_field", 0),

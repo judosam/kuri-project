@@ -617,6 +617,22 @@ class InspectorStat(BaseModel):
     completion_rate: float
 
 
+class QaUserStat(BaseModel):
+    user_id: int
+    user_name: str
+    email: str
+    role: str
+    total_assigned: int = 0
+    qc_done: int = 0
+    approved: int = 0
+    disapproved: int = 0
+    commercial: int = 0
+    pending: int = 0
+    qa_created: int = 0
+    today_done: int = 0
+    completion_rate: float = 0.0
+
+
 class DailyActivity(BaseModel):
     date: str
     completed: int = 0
@@ -722,6 +738,7 @@ class DashboardResponse(BaseModel):
     total_photos: int = 0
     completion_rate: float = 0.0
     inspector_stats: List[InspectorStat] = []
+    qa_user_stats: List[QaUserStat] = []
     recent_records: List[RecordDetail]
 
     # Command Center Analytics extensions

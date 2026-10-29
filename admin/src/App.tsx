@@ -81,6 +81,19 @@ function AppShell() {
   const location = useLocation();
   const isRecordDetail = location.pathname.startsWith('/records/') && location.pathname !== '/records';
 
+  useEffect(() => {
+    const path = location.pathname;
+    let title = 'Kuri — Construction Lead Platform';
+    if (path === '/admin' || path === '/admin/dashboard') title = 'Dashboard · Kuri';
+    else if (path.startsWith('/records')) title = 'Records · Kuri';
+    else if (path.startsWith('/auditor/dashboard') || path.startsWith('/audit/dashboard')) title = 'QC Dashboard · Kuri';
+    else if (path.startsWith('/qa') || path.startsWith('/audit')) title = 'QA Portal · Kuri';
+    else if (path.startsWith('/telecaller')) title = 'Telecaller · Kuri';
+    else if (path.startsWith('/users')) title = 'Users · Kuri';
+    else if (path === '/login') title = 'Sign in · Kuri';
+    document.title = title;
+  }, [location.pathname]);
+
   const toggleSidebar = () => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
@@ -139,7 +152,7 @@ function AppShell() {
     return (
       <div className="fos-loading">
         <div className="brand-mark brand-mark-image-wrap">
-          <img className="brand-mark-image loading-brand-logo" src="/brand-logo.png" alt="" />
+          <img className="brand-mark-image loading-brand-logo" src="/kuri-icon.png" alt="Kuri" />
         </div>
         <p>{authError ? "Could not connect. Your login is saved." : "Connecting to PhotoCapture API…"}</p>
         {authError && <button className="btn btn-secondary" onClick={() => { setLoading(true); setAuthAttempt((n) => n + 1); }}>Retry connection</button>}
@@ -385,12 +398,12 @@ function Sidebar({
         <div className="fos-side-brand">
           <div className="brand-id">
             <span className="brand-mark brand-mark-image-wrap">
-              <img className="brand-mark-image" src="/brand-logo.png" alt="" />
+              <img className="brand-mark-image" src="/kuri-icon.png" alt="Kuri" style={{ objectFit: 'contain' }} />
             </span>
             {!isCollapsed && (
               <div className="brand-title-wrap">
-                <span className="brand-name">PhotoCapture</span>
-                <span className="brand-sub">Field Geotagging</span>
+                <span className="brand-name">Kuri</span>
+                <span className="brand-sub">Lead Management</span>
               </div>
             )}
           </div>

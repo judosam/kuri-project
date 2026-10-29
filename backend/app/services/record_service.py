@@ -1012,7 +1012,70 @@ class RecordService:
                 "phones_obtained": u_phones,
             })
 
-        # 8. Recent Activities
+                # 8. QA Users / Auditors Stats
+        qa_user_stats = []
+        try:
+            from app.models.user import UserRole
+            auditor_users = (
+                self.db.query(User)
+                .filter(User.role.in_([UserRole.AUDITOR, UserRole.ADMIN]), User.is_active == True)
+                .order_by(User.full_name)
+                .all()
+            )
+            today_str = today_start.strftime("%Y-%m-%d")
+            for aud in auditor_users:
+                assigned = self.db.query(CaptureRecord).filter(CaptureRecord.assigned_auditor_id == aud.id).count()
+                qc_done = self.db.query(CaptureRecord).filter(
+                    or_(CaptureRecord.qc_by_id == aud.id, CaptureRecord.audited_by_id == aud.id)
+                ).count()
+                if assigned == 0 and qc_done == 0:
+                    continue
+
+                aud_approved = self.db.query(CaptureRecord).filter(
+                    or_(CaptureRecord.qc_by_id == aud.id, CaptureRecord.audited_by_id == aud.id),
+                    CaptureRecord.audit_status == "APPROVAL",
+                ).count()
+                aud_disapproved = self.db.query(CaptureRecord).filter(
+                    or_(CaptureRecord.qc_by_id == aud.id, CaptureRecord.audited_by_id == aud.id),
+                    CaptureRecord.audit_status == "DISAPPROVAL",
+                ).count()
+                aud_commercial = self.db.query(CaptureRecord).filter(
+                    or_(CaptureRecord.qc_by_id == aud.id, CaptureRecord.audited_by_id == aud.id),
+                    CaptureRecord.audit_status == "COMMERCIAL_PROPERTY",
+                ).count()
+                aud_pending = self.db.query(CaptureRecord).filter(
+                    CaptureRecord.assigned_auditor_id == aud.id,
+                    or_(CaptureRecord.audit_status.is_(None), CaptureRecord.audit_status == "PENDING"),
+                ).count()
+                aud_created = self.db.query(CaptureRecord).filter(
+                    CaptureRecord.uploaded_by_id == aud.id,
+                    CaptureRecord.source == "qa_portal",
+                ).count()
+                aud_today = self.db.query(CaptureRecord).filter(
+                    or_(CaptureRecord.qc_by_id == aud.id, CaptureRecord.audited_by_id == aud.id),
+                    func.substr(cast(func.coalesce(CaptureRecord.qc_completed_at, CaptureRecord.audited_at), String), 1, 10) == today_str,
+                ).count()
+                rate = round((qc_done / assigned * 100), 1) if assigned else (100.0 if qc_done else 0.0)
+
+                qa_user_stats.append({
+                    "user_id": aud.id,
+                    "user_name": aud.full_name,
+                    "email": aud.email,
+                    "role": aud.role.value if hasattr(aud.role, "value") else str(aud.role),
+                    "total_assigned": assigned,
+                    "qc_done": qc_done,
+                    "approved": aud_approved,
+                    "disapproved": aud_disapproved,
+                    "commercial": aud_commercial,
+                    "pending": aud_pending,
+                    "qa_created": aud_created,
+                    "today_done": aud_today,
+                    "completion_rate": min(100.0, rate),
+                })
+        except Exception as e:
+            pass
+
+        # 9. Recent Activities
         recent_activities = []
         try:
             logs = self.db.query(ActivityLog).order_by(desc(ActivityLog.created_at)).limit(10).all()
@@ -1039,6 +1102,7 @@ class RecordService:
             "trends": trends,
             "distribution": distribution,
             "inspector_stats": inspector_stats,
+            "qa_user_stats": qa_user_stats,
             "recent_activities": recent_activities,
             "total_commercial_properties": commercial_records,
             "eligible_for_field": eligible_for_field,

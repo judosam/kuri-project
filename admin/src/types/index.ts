@@ -169,6 +169,22 @@ export interface CaptureRecord {
   qc_reference_image_url?: string | null;
 }
 
+export interface QaUserStat {
+  user_id: number;
+  user_name: string;
+  email: string;
+  role: string;
+  total_assigned: number;
+  qc_done: number;
+  approved: number;
+  disapproved: number;
+  commercial: number;
+  pending: number;
+  qa_created: number;
+  today_done: number;
+  completion_rate: number;
+}
+
 export interface InspectorStat {
   user_id: number;
   user_name: string;
@@ -280,6 +296,7 @@ export interface DashboardData {
   total_photos?: number;
   completion_rate?: number;
   inspector_stats?: InspectorStat[];
+  qa_user_stats?: QaUserStat[];
   recent_records: CaptureRecord[];
 
   // Analytics Command Center extensions
