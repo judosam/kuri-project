@@ -5,7 +5,6 @@ import type { ActivityEntry, ActivityLog, User } from '../types';
 import {
   Icon,
   Avatar,
-  StatCard,
   EmptyPanel,
   LoadingPanel,
   PageShell,
@@ -214,43 +213,7 @@ export default function Logs() {
         </div>
       </div>
 
-      {/* Summary tiles */}
-      {data && (
-        <div className="stat-grid log-stats">
-          <StatCard
-            label="Activity Today"
-            value={data.summary.today}
-            icon="schedule"
-            tone="blue"
-            note="Events in the last 24 hours"
-            codeNote="24H"
-          />
-          <StatCard
-            label="This Week"
-            value={data.summary.week}
-            icon="history"
-            tone="sky"
-            note="Events since Monday"
-            codeNote="7D"
-          />
-          <StatCard
-            label="This Month"
-            value={data.summary.month}
-            icon="calendar_today"
-            tone="purple"
-            note="Current calendar month"
-            codeNote="30D"
-          />
-          <StatCard
-            label="Team Size"
-            value={users.filter((u) => u.is_active).length}
-            icon="badge"
-            tone="green"
-            note="Active user accounts"
-            codeNote="USERS"
-          />
-        </div>
-      )}
+
 
       {loading && <LoadingPanel text="Loading activity feed…" />}
       {!loading && data && data.items.length === 0 && (
