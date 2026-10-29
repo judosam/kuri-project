@@ -400,7 +400,6 @@ export default function Records({
     }>;
   } | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [downloadingRef, setDownloadingRef] = useState(false);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
@@ -1286,17 +1285,6 @@ export default function Records({
     }
   };
 
-  const handleDownloadIdRef = async () => {
-    try {
-      setDownloadingRef(true);
-      await recordsApi.downloadIdReference();
-    } catch (e) {
-      alert('Failed to download ID reference mapping.');
-    } finally {
-      setDownloadingRef(false);
-    }
-  };
-
   const handleExportClick = () => {
     setShowExportModal(true);
   };
@@ -1444,24 +1432,13 @@ export default function Records({
           <Icon name="table_view" size={14} />
           <span className="btn-label">{exporting ? 'Exporting…' : 'Export Excel'}</span>
         </button>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          onClick={handleDownloadIdRef}
-          disabled={downloadingRef}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, height: 30, borderRadius: 6 }}
-          title="Download complete Old Unique ID vs New Unique ID reference mapping (.xlsx)"
-        >
-          <Icon name="badge" size={14} />
-          <span className="btn-label">{downloadingRef ? 'Downloading…' : 'ID Reference'}</span>
-        </button>
         <span className="topbar-badge-pill" style={{ padding: '3px 8px', fontSize: 11, height: 28, borderRadius: 6 }}>
           <Icon name="cloud_done" size={13} style={{ color: '#10b981' }} />
           <span className="btn-label">Sync Active</span>
         </span>
       </div>
     ) : <span className="topbar-badge-pill">Review and monitor records</span>,
-  }, [total, exporting, downloadingRef, statusFilter, userId, auditorId, search, dateFrom, dateTo, dateField, canAdmin, auditOnly, qcStatusFilter, columnFilterKey]);
+  }, [total, exporting, statusFilter, userId, auditorId, search, dateFrom, dateTo, dateField, canAdmin, auditOnly, qcStatusFilter, columnFilterKey]);
 
   return (
     <PageShell>

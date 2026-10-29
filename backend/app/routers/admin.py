@@ -1213,26 +1213,6 @@ async def bulk_edit_leads(
     }
 
 
-@router.get("/records/export-id-reference")
-async def download_id_reference(admin: User = Depends(require_record_manager)):
-    """Return the complete Old Unique ID vs New Unique ID reference mapping spreadsheet (.xlsx)."""
-    from pathlib import Path
-    from fastapi.responses import FileResponse
-    candidate_paths = [
-        Path(__file__).parent.parent.parent / "data" / "Updated_Unique_IDs_Reference.xlsx",
-        Path("data/Updated_Unique_IDs_Reference.xlsx"),
-        Path("/opt/photocapture/backend/data/Updated_Unique_IDs_Reference.xlsx"),
-    ]
-    for p in candidate_paths:
-        if p.exists():
-            return FileResponse(
-                str(p),
-                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                filename="Updated_Unique_IDs_Reference.xlsx",
-            )
-    raise HTTPException(status_code=404, detail="ID reference spreadsheet not found on server.")
-
-
 @router.get("/records/export")
 async def export_records(
     status: Optional[str] = Query(None, pattern="^(COMPLETED|NOT_COMPLETED|MANUALLY_ADDED|REASSIGNED|PENDING|NOT_INTERESTED|DUPLICATE|CONSTRUCTION_FINISHED|CLOSED|OTHER)$"),

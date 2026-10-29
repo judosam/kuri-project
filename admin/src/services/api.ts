@@ -585,23 +585,6 @@ export const recordsApi = {
     a.remove();
     window.URL.revokeObjectURL(blobUrl);
   },
-  downloadIdReference: async (): Promise<void> => {
-    const token = localStorage.getItem('token');
-    const url = `${SERVER_BASE}/api/admin/records/export-id-reference`;
-    const resp = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!resp.ok) throw new Error('Failed to download ID reference mapping');
-    const blob = await resp.blob();
-    const blobUrl = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = 'Updated_Unique_IDs_Reference.xlsx';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(blobUrl);
-  },
   downloadTemplateUrl: (): string => `${SERVER_BASE}/api/admin/records/template`,
   downloadExport: async (params?: {
     status?: string;
