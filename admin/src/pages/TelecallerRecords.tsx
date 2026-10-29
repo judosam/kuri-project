@@ -342,7 +342,7 @@ export default function TelecallerRecords() {
                   <th style={{ width: 65, minWidth: 60, maxWidth: 75, textAlign: 'left' }} className="col-photos">Photos</th>
                   <th style={{ width: 125, minWidth: 115, maxWidth: 135, textAlign: 'left' }}>Contact Number</th>
                   <th style={{ width: 140, minWidth: 130, maxWidth: 155, textAlign: 'left' }}>Contractor Contact</th>
-                  <th style={{ width: 155, minWidth: 145, maxWidth: 175, textAlign: 'left' }}>QC Builder / Contact</th>
+                  <th style={{ width: 160, minWidth: 150, maxWidth: 180, textAlign: 'left' }}>QC Builder / Contact:</th>
                   <th style={{ width: 130, minWidth: 115, maxWidth: 140, textAlign: 'left' }}>Village / District</th>
                   <th style={{ width: 95, minWidth: 85, maxWidth: 105, textAlign: 'left' }}>Field Status</th>
                   <th style={{ width: 150, minWidth: 135, maxWidth: 175, textAlign: 'left' }}>Stage / Building</th>
@@ -360,7 +360,8 @@ export default function TelecallerRecords() {
                       key={r.id}
                       className="rowlink"
                       onClick={() => setSelectedRecord(r)}
-                      title="Click to open caller notes & details"
+                      title="Click anywhere to open record details and caller notes"
+                      style={{ cursor: 'pointer' }}
                     >
                       {/* 1. Unique ID */}
                       <td
@@ -402,7 +403,7 @@ export default function TelecallerRecords() {
                       </td>
 
                       {/* 3. Photos */}
-                      <td className="col-photos cell-thumb" onClick={(e) => e.stopPropagation()} style={{ textAlign: 'left' }}>
+                      <td className="col-photos cell-thumb" style={{ textAlign: 'left' }}>
                         {r.images && r.images.length > 0 ? (
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <button
@@ -430,7 +431,7 @@ export default function TelecallerRecords() {
                       </td>
 
                       {/* 4. Contact Number */}
-                      <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'left' }}>
+                      <td style={{ textAlign: 'left' }}>
                         {(() => {
                           const phones = extractPhoneNumbers(r.contact_number);
                           if (phones.length === 0) return nil;
@@ -440,6 +441,7 @@ export default function TelecallerRecords() {
                                 <a
                                   key={phone}
                                   href={`tel:${phone}`}
+                                  onClick={(e) => e.stopPropagation()}
                                   style={{
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -462,7 +464,7 @@ export default function TelecallerRecords() {
                       </td>
 
                       {/* 5. Contractor Contact */}
-                      <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'left' }}>
+                      <td style={{ textAlign: 'left' }}>
                         {(() => {
                           const phones = extractPhoneNumbers(r.site_contractor_architect_number);
                           const contractorName = r.site_contractor_architect_name?.trim();
@@ -473,6 +475,7 @@ export default function TelecallerRecords() {
                                 <a
                                   key={phone}
                                   href={`tel:${phone}`}
+                                  onClick={(e) => e.stopPropagation()}
                                   style={{
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -509,18 +512,19 @@ export default function TelecallerRecords() {
                         })()}
                       </td>
 
-                      {/* 6. QC Builder / Contact */}
-                      <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'left' }}>
+                      {/* 6. QC Builder / Contact: */}
+                      <td style={{ textAlign: 'left' }}>
                         {(() => {
                           const phones = extractPhoneNumbers(r.qc_builder_contact);
                           const label = extractContactLabel(r.qc_builder_contact);
-                          if (phones.length === 0 && !label) return nil;
+                          if (phones.length === 0 && !label && !r.qc_builder_contact) return nil;
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                               {phones.map((phone) => (
                                 <a
                                   key={phone}
                                   href={`tel:${phone}`}
+                                  onClick={(e) => e.stopPropagation()}
                                   style={{
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -537,7 +541,7 @@ export default function TelecallerRecords() {
                                   <span>{formatPhoneNumber(phone)}</span>
                                 </a>
                               ))}
-                              {label && (
+                              {label ? (
                                 <div
                                   style={{
                                     fontSize: 10,
@@ -551,7 +555,21 @@ export default function TelecallerRecords() {
                                 >
                                   {label}
                                 </div>
-                              )}
+                              ) : (phones.length === 0 && r.qc_builder_contact ? (
+                                <div
+                                  style={{
+                                    fontSize: 11,
+                                    color: '#475569',
+                                    maxWidth: 155,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={r.qc_builder_contact}
+                                >
+                                  {r.qc_builder_contact}
+                                </div>
+                              ) : null)}
                             </div>
                           );
                         })()}
@@ -687,7 +705,7 @@ export default function TelecallerRecords() {
                       </td>
 
                       {/* 10. Action Button */}
-                      <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'left' }}>
+                      <td style={{ textAlign: 'left' }}>
                         <button
                           type="button"
                           className="btn btn-primary btn-sm"
