@@ -269,6 +269,7 @@ class RecordRepository:
             "assigned_at": record_date_column('assigned_at'),
             "name": CaptureRecord.name,
             "id": CaptureRecord.id,
+            "source": CaptureRecord.source,
             "status": filter_column("status"),
             "unique_id": CaptureRecord.unique_id,
             "owner_name_en": CaptureRecord.owner_name_en,

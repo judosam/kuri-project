@@ -7,6 +7,13 @@ type Choice = { value: string; label: string; count: number };
 
 function formatChoiceLabel(val: string, field?: string): string {
   if (!val || val === '__EMPTY__' || val === '__BLANK__' || val === '(Blanks)') return '(Blanks)';
+  if (field === 'source') {
+    if (val === 'imported') return 'Imported';
+    if (val === 'qa_portal' || val === 'qa') return 'QA User Added';
+    if (val === 'manual' || val === 'field') return 'Field User Added';
+    if (val === 'captured' || val === 'admin') return 'Imported by Admin';
+    return val;
+  }
   if (field === 'qc_status' || val === 'DONE' || val === 'QC Done' || val === 'QC_DONE') {
     if (val === 'DONE' || val === 'QC Done' || val === 'QC_DONE') return 'QC Done';
     if (val === 'PENDING' || val === 'QC Pending' || val === 'QC_PENDING') return 'QC Pending';
@@ -54,6 +61,38 @@ function formatChoiceLabel(val: string, field?: string): string {
   return val;
 }
 
+function computePopoverPosition(triggerEl: HTMLElement | null): { top: number; left: number; maxHeight: number } {
+  if (!triggerEl) {
+    return { top: 80, left: 20, maxHeight: 400 };
+  }
+  const rect = triggerEl.getBoundingClientRect();
+  const popoverWidth = 300;
+  const padding = 10;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+
+  const left = Math.max(padding, Math.min(rect.left, viewportWidth - popoverWidth - padding));
+  const spaceBelow = viewportHeight - rect.bottom - padding;
+  const spaceAbove = rect.top - padding;
+
+  let top: number;
+  let maxHeight: number;
+
+  if (spaceBelow >= 320 || spaceBelow >= spaceAbove) {
+    top = rect.bottom + 6;
+    maxHeight = Math.min(480, Math.max(200, viewportHeight - top - padding));
+    if (maxHeight < 240 && spaceAbove > spaceBelow + 40) {
+      maxHeight = Math.min(480, Math.max(200, spaceAbove - 6));
+      top = Math.max(padding, rect.top - maxHeight - 6);
+    }
+  } else {
+    maxHeight = Math.min(480, Math.max(200, spaceAbove - 6));
+    top = Math.max(padding, rect.top - maxHeight - 6);
+  }
+
+  return { left, top, maxHeight };
+}
+
 export default function RecordColumnHeader({
   label,
   field,
@@ -84,7 +123,7 @@ export default function RecordColumnHeader({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [position, setPosition] = useState<{ top: number; left: number; maxHeight?: number }>({ top: 0, left: 0 });
   const [choices, setChoices] = useState<Choice[]>([]);
   const [draft, setDraft] = useState<string[]>(values);
   const [all, setAll] = useState(!values.length);
@@ -157,20 +196,31 @@ export default function RecordColumnHeader({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const updatePosition = () => {
+      setPosition(computePopoverPosition(trigger.current));
+    };
+    const handleScroll = (e: Event) => {
+      if (panel.current && panel.current.contains(e.target as Node)) {
+        return;
+      }
+      updatePosition();
+    };
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [open]);
+
   const toggle = () => {
     if (open) {
       setOpen(false);
       return;
     }
-    const rect = trigger.current!.getBoundingClientRect();
-    const popoverWidth = 300;
-    const popoverHeight = 390;
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - popoverWidth - 8));
-    let top = rect.bottom + 6;
-    if (top + popoverHeight > window.innerHeight && rect.top - popoverHeight - 6 > 0) {
-      top = rect.top - popoverHeight - 6;
-    }
-    setPosition({ left, top });
+    setPosition(computePopoverPosition(trigger.current));
     setDraft(values);
     setAll(!values.length);
     setSearch('');
@@ -252,6 +302,7 @@ export default function RecordColumnHeader({
               position: 'fixed',
               top: position.top,
               left: position.left,
+              maxHeight: position.maxHeight ? `${position.maxHeight}px` : undefined,
             }}
           >
             <div className="column-filter-title">

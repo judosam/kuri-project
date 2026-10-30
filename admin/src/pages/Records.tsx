@@ -741,8 +741,8 @@ export default function Records({
   }, [searchParams, isAuditorView]);
 
   const ALLOWED_HEADER_FILTER_COLUMNS = new Set([
-    'unique_id',
     'assigned_at',
+    'source',
     'audit_status',
     'audit_comment',
     'audited_by',
@@ -1474,8 +1474,8 @@ export default function Records({
                   { value: 'created_at:asc', label: 'Oldest first' },
                   { value: 'audit_status:asc', label: 'QC Status (A–Z)' },
                   { value: 'audit_status:desc', label: 'QC Status (Z–A)' },
-                  { value: 'unique_id:asc', label: 'Unique ID (A–Z)' },
-                  { value: 'unique_id:desc', label: 'Unique ID (Z–A)' },
+                  { value: 'source:asc', label: 'Source (A–Z)' },
+                  { value: 'source:desc', label: 'Source (Z–A)' },
                   { value: 'name:asc', label: 'Name A–Z' },
                   { value: 'name:desc', label: 'Name Z–A' },
                   { value: 'status:desc', label: 'Inspection (Completed first)' },
@@ -1975,7 +1975,7 @@ export default function Records({
   ? <th key={item.key} aria-sort={sortBy === item.sort ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}><button type="button" className="record-sort-heading" onClick={() => { setSortOrder(sortBy === item.sort && sortOrder === 'asc' ? 'desc' : 'asc'); setSortBy(item.sort!); setPage(1); }}>{item.label}<Icon name="unfold_more" size={14} /></button></th>
   : <th key={item.key}>{item.label}</th>) : isAuditorView ? (
   <>
-    {sortHeader('Unique ID', 'unique_id', 225, true, 260, 210)}
+    {sortHeader('Unique ID', 'unique_id', 225, false, 260, 210)}
     {sortHeader('Source', 'source', 140, true, 160)}
     {sortHeader('Last Modified Date', 'last_modified_at', 172, true, 185, 165)}
     {sortHeader('QA Done at', 'qc_completed_at', 145, true, 155)}
@@ -1994,7 +1994,7 @@ export default function Records({
   </>
 ) : (
   <>
-    {sortHeader('Unique ID', 'unique_id', 225, true, 260, 210)}
+    {sortHeader('Unique ID', 'unique_id', 225, false, 260, 210)}
     {sortHeader('Source', 'source', 140, true, 160)}
     {sortHeader('Last Modified Date', 'last_modified_at', 172, true, 185, 165)}
     {sortHeader('QC Status', 'qc_status', 125, true, 135, 115)}

@@ -50,7 +50,7 @@ export function getUnifiedQcStatus(record: CaptureRecord): string {
 
 export const RECORD_GROUPS: { key: 'imported' | 'audit' | 'field'; label: string; fields: Field[] }[] = [
   { key: 'imported', label: 'Imported Details', fields: [
-    field('id', 'Record ID', 'id'), field('unique_id', 'Unique ID', 'unique_id'),
+    field('id', 'Record ID', 'id'), field('unique_id', 'Unique ID'),
     { key: 'source', label: 'Source', sort: 'source', value: r => <SourceBadge source={r.source} isManual={r.is_manually_added} uploadedByName={r.uploaded_by_name} /> },
     { key: 'last_modified_at', label: 'Last Modified Date', sort: 'last_modified_at', value: r => { const t = lastModifiedTime(r); return t ? formatDateTime(String(t)) : '—'; } },
     field('name', 'Record Name', 'name'),
