@@ -106,3 +106,39 @@ def test_full_report_crosses_pages_and_respects_filters(client, admin_token, use
     assert {row[name_index].value for row in report.iter_rows(min_row=2)} == {'Site 1', 'Site 2'}
     empty = client.get(url, headers=headers, params={'search':'does-not-exist'})
     assert openpyxl.load_workbook(io.BytesIO(empty.content))['Inspections Report'].max_row == 1
+
+
+def test_export_includes_old_unique_id_and_modern_styling(client, admin_token, test_user, db_session):
+    record = CaptureRecord(
+        user_id=test_user.id,
+        name='Modern Export Site',
+        unique_id='CBE-659578',
+        old_unique_id='CBE-109967-769953',
+        status='COMPLETED',
+    )
+    db_session.add(record)
+    db_session.commit()
+
+    headers = {'Authorization': f'Bearer {admin_token}'}
+    resp = client.get('/api/admin/records/export', headers=headers)
+    assert resp.status_code == 200
+
+    wb = openpyxl.load_workbook(io.BytesIO(resp.content))
+    ws = wb['Inspections Report']
+    headers_row = [cell.value for cell in ws[1]]
+
+    # Ensure Old Unique ID is present and ordered right beside Unique ID
+    assert 'Unique ID' in headers_row
+    assert 'Old Unique ID' in headers_row
+    assert headers_row.index('Old Unique ID') == headers_row.index('Unique ID') + 1
+
+    # Check cell value in row 2
+    row2 = {headers_row[i]: cell.value for i, cell in enumerate(ws[2])}
+    assert row2['Unique ID'] == 'CBE-659578'
+    assert row2['Old Unique ID'] == 'CBE-109967-769953'
+
+    # Check modern styles
+    assert ws.freeze_panes == 'D2'
+    assert ws.sheet_view.showGridLines is True
+    assert ws.cell(1, 1).fill.fgColor.rgb in ('001E293B', '1E293B')
+

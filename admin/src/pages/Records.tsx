@@ -3242,7 +3242,7 @@ export default function Records({
                         1. Site & Task Planning (Imported Data)
                       </div>
                       <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 1, lineHeight: 1.35 }}>
-                        Unique ID, Coordinates, Site Address, Village, Taluk, District, Survey No, Land Use, Owner Name
+                        Unique ID, Old Unique ID, Coordinates, Site Address, Village, Taluk, District, Survey No, Land Use, Owner Name
                       </div>
                     </div>
                   </label>

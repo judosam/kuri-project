@@ -277,11 +277,14 @@ async def create_record(
         else:
             raise HTTPException(status_code=404, detail="Assigned task is unavailable. Refresh your records before retrying.")
     else:
-        # Manually added records get a platform unique ID from the capture
-        # position, matching the Excel-dispatched CBE-110291-770091 scheme.
+        # Manually added records get a standard 6-digit platform unique ID,
+        # storing the coordinate reference in old_unique_id.
         manual_unique_id = None
+        legacy_coord_id = None
         if first_gps is not None:
-            manual_unique_id = record_service.next_unique_id(first_gps.latitude, first_gps.longitude)
+            from app.services.record_service import generate_unique_id
+            legacy_coord_id = generate_unique_id(first_gps.latitude, first_gps.longitude, prefix="CBE")
+            manual_unique_id = record_service.next_six_digit_unique_id(prefix="CBE")
         manual_remarks = (request.remarks.strip() or None) if (request.remarks and isinstance(request.remarks, str)) else None
         if manual_remarks and request.description and manual_remarks == request.description.strip():
             manual_remarks = None
@@ -296,6 +299,7 @@ async def create_record(
             owner_name_en=request.owner_name_en,
             status=request.status or "COMPLETED",
             unique_id=manual_unique_id,
+            old_unique_id=legacy_coord_id,
             source="manual",
             date_of_visit=request.date_of_visit,
             construction_happening=request.construction_happening,

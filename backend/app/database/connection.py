@@ -103,6 +103,7 @@ CREATE TABLE capture_records_new (
     field_location_accuracy FLOAT,
     field_captured_at TIMESTAMP,
     unique_id VARCHAR(100),
+    old_unique_id VARCHAR(100),
     coordinates VARCHAR(100),
     street_address TEXT,
     land_use VARCHAR(100),
@@ -155,6 +156,7 @@ _CAPTURE_RECORDS_AUDIT_INDEX_DDL = [
     "CREATE INDEX IF NOT EXISTS ix_capture_records_status ON capture_records (status)",
     "CREATE INDEX IF NOT EXISTS ix_capture_records_source ON capture_records (source)",
     "CREATE INDEX IF NOT EXISTS ix_capture_records_unique_id ON capture_records (unique_id)",
+    "CREATE INDEX IF NOT EXISTS ix_capture_records_old_unique_id ON capture_records (old_unique_id)",
     "CREATE INDEX IF NOT EXISTS ix_capture_records_audit_status ON capture_records (audit_status)",
     "CREATE INDEX IF NOT EXISTS idx_rec_user_status_created ON capture_records (user_id, status, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_rec_status_created ON capture_records (status, created_at)",
@@ -283,6 +285,7 @@ def _add_assigned_auditor_column(engine) -> None:
                 logger.info("capture_records: added assigned_auditor_id column for auditor routing")
             # Auditor QC assessment columns (VHR imagery / street view review).
             for stmt, name in (
+                ("ALTER TABLE capture_records ADD COLUMN old_unique_id VARCHAR(100)", "old_unique_id"),
                 ("ALTER TABLE capture_records ADD COLUMN qc_vhr_comment VARCHAR(120)", "qc_vhr_comment"),
                 ("ALTER TABLE capture_records ADD COLUMN qc_street_details TEXT", "qc_street_details"),
                 ("ALTER TABLE capture_records ADD COLUMN qc_builder_contact TEXT", "qc_builder_contact"),

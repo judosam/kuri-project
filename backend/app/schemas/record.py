@@ -212,6 +212,7 @@ class RecordDetail(BaseModel):
 
     # 15 Task Dispatch Planning Fields (Admin Google Sheet)
     unique_id: Optional[str] = None
+    old_unique_id: Optional[str] = None
     coordinates: Optional[str] = None
     street_address: Optional[str] = None
     land_use: Optional[str] = None

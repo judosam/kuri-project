@@ -63,11 +63,11 @@ function formatChoiceLabel(val: string, field?: string): string {
 
 function computePopoverPosition(triggerEl: HTMLElement | null): { top: number; left: number; maxHeight: number } {
   if (!triggerEl) {
-    return { top: 80, left: 20, maxHeight: 400 };
+    return { top: 80, left: 20, maxHeight: 380 };
   }
   const rect = triggerEl.getBoundingClientRect();
   const popoverWidth = 300;
-  const padding = 10;
+  const padding = 12;
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
 
@@ -78,16 +78,15 @@ function computePopoverPosition(triggerEl: HTMLElement | null): { top: number; l
   let top: number;
   let maxHeight: number;
 
-  if (spaceBelow >= 320 || spaceBelow >= spaceAbove) {
-    top = rect.bottom + 6;
-    maxHeight = Math.min(480, Math.max(200, viewportHeight - top - padding));
-    if (maxHeight < 240 && spaceAbove > spaceBelow + 40) {
-      maxHeight = Math.min(480, Math.max(200, spaceAbove - 6));
-      top = Math.max(padding, rect.top - maxHeight - 6);
-    }
-  } else {
-    maxHeight = Math.min(480, Math.max(200, spaceAbove - 6));
+  if (spaceBelow < 360 && spaceAbove > spaceBelow) {
+    maxHeight = Math.min(420, Math.max(180, spaceAbove - 6));
     top = Math.max(padding, rect.top - maxHeight - 6);
+  } else {
+    top = rect.bottom + 6;
+    maxHeight = Math.min(420, Math.max(180, viewportHeight - top - padding));
+    if (top + maxHeight > viewportHeight - padding) {
+      top = Math.max(padding, viewportHeight - maxHeight - padding);
+    }
   }
 
   return { left, top, maxHeight };

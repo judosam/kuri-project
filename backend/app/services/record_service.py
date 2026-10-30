@@ -212,6 +212,23 @@ class RecordService:
             candidate = f"{base}-{suffix}"
         return candidate
 
+    def next_six_digit_unique_id(self, prefix: str = DEFAULT_UNIQUE_ID_PREFIX) -> str:
+        """Generate a clean, collision-free standard 6-digit Unique ID (e.g. CBE-518294)."""
+        import random
+        clean_prefix = (prefix or DEFAULT_UNIQUE_ID_PREFIX).strip().upper()
+        if clean_prefix.startswith("QANEW-"):
+            clean_prefix = clean_prefix.replace("QANEW-", "")
+        existing_uids = {
+            r[0] for r in self.db.query(CaptureRecord.unique_id)
+            .filter(CaptureRecord.unique_id.like(f"{clean_prefix}-______"))
+            .all()
+            if r[0]
+        }
+        while True:
+            candidate = f"{clean_prefix}-{random.randint(100000, 999999)}"
+            if candidate not in existing_uids:
+                return candidate
+
     def create_record(
         self,
         user_id: int,
