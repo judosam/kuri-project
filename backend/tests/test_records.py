@@ -20,6 +20,33 @@ class TestRecordCreation:
         assert data["description"] == "A test capture record"
         assert "id" in data
 
+    def test_create_record_auto_resolves_village_taluk_district(self, client, user_token):
+        response = client.post(
+            "/api/records",
+            json={
+                "name": "Manual Field Record",
+                "description": "Captured in Podanur",
+                "photos": [
+                    {
+                        "latitude": 10.965167,
+                        "longitude": 76.981952,
+                        "location_accuracy": 5.0,
+                        "captured_at": "2026-10-30T10:00:00Z",
+                        "file_name": "test.jpg",
+                    }
+                ],
+            },
+            headers=auth_header(user_token),
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["unique_id"].startswith("CBE-")
+        assert data["old_unique_id"] == "CBE-109652-769820"
+        assert data["village"] == "Kurichy"
+        assert data["taluk"] == "Madukkarai"
+        assert data["district"] == "Coimbatore"
+        assert "Podanur" in (data["formatted_address"] or "")
+
     def test_create_record_unauthenticated(self, client):
         response = client.post(
             "/api/records",

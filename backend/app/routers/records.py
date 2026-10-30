@@ -224,6 +224,34 @@ async def create_record(
                 if cur_coords and not (record.coordinates or "").strip() and not is_closed_status:
                     update_data["coordinates"] = cur_coords
 
+            eff_coords = cur_coords or record.coordinates
+            if eff_coords and not (record.village and record.taluk and record.district):
+                from app.services.village_master_service import get_village_master_service
+                try:
+                    vms = get_village_master_service()
+                    loc_match = vms.resolve_record_location(
+                        village=record.village,
+                        taluk=record.taluk,
+                        district=record.district,
+                        coordinates=eff_coords,
+                        site_address=record.site_address or formatted_address,
+                        street_address=record.street_address or formatted_address,
+                    )
+                    if not record.village and loc_match.get("village"):
+                        update_data["village"] = loc_match.get("village")
+                    if not record.taluk and loc_match.get("taluk"):
+                        update_data["taluk"] = loc_match.get("taluk")
+                    if not record.district and loc_match.get("district"):
+                        update_data["district"] = loc_match.get("district")
+                    if not record.area and loc_match.get("village"):
+                        update_data["area"] = loc_match.get("village")
+                    if not record.street_address and loc_match.get("formatted_address"):
+                        update_data["street_address"] = loc_match.get("formatted_address")
+                    if not record.site_address and loc_match.get("formatted_address"):
+                        update_data["site_address"] = loc_match.get("formatted_address")
+                except Exception as e:
+                    logger.warning(f"Failed to auto-resolve village/taluk/district for task record #{record.id}: {e}")
+
             for field in (
                 "date_of_visit", "construction_happening", "remarks",
                 "type_of_construction", "relationship_with_building",
@@ -289,18 +317,52 @@ async def create_record(
         if manual_remarks and request.description and manual_remarks == request.description.strip():
             manual_remarks = None
         f_date = str(request.follow_up_date).strip() if (request.follow_up_date and str(request.follow_up_date).strip()) else None
+
+        # ── Auto-resolve Village, Taluk, District from coordinates ──
+        manual_village = None
+        manual_taluk = None
+        manual_district = None
+        manual_area = None
+        manual_address = formatted_address
+
+        if cur_coords:
+            from app.services.village_master_service import get_village_master_service
+            try:
+                vms = get_village_master_service()
+                loc_match = vms.resolve_record_location(
+                    coordinates=cur_coords,
+                    site_address=formatted_address,
+                    street_address=formatted_address,
+                )
+                manual_village = loc_match.get("village")
+                manual_taluk = loc_match.get("taluk")
+                manual_district = loc_match.get("district")
+                manual_area = manual_village
+                if not manual_address and loc_match.get("formatted_address"):
+                    manual_address = loc_match.get("formatted_address")
+                if not location_name and manual_village:
+                    location_name = manual_village
+            except Exception as e:
+                logger.warning(f"Failed to auto-resolve village/taluk/district for manual record: {e}")
+
         record = record_service.create_record(
             user_id=user.id,
             name=request.name,
             description=request.description,
-            location_name=location_name,
-            formatted_address=formatted_address,
+            location_name=location_name or manual_village,
+            formatted_address=manual_address or formatted_address,
             place_id=place_id,
             owner_name_en=request.owner_name_en,
             status=request.status or "COMPLETED",
             unique_id=manual_unique_id,
             old_unique_id=legacy_coord_id,
             source="manual",
+            village=manual_village,
+            taluk=manual_taluk,
+            district=manual_district,
+            area=manual_area,
+            street_address=manual_address,
+            site_address=manual_address,
             date_of_visit=request.date_of_visit,
             construction_happening=request.construction_happening,
             remarks=manual_remarks,
@@ -526,8 +588,43 @@ async def upload_record_images(
     if record and files:
         if record.status == "NOT_COMPLETED":
             record.status = "COMPLETED"
-            db.commit()
-            db.refresh(record)
+
+        eff_coords = record.coordinates
+        if not eff_coords and lat != 0 and lng != 0:
+            eff_coords = f"{lat:.6f}, {lng:.6f}"
+            record.coordinates = eff_coords
+            record.field_latitude = lat
+            record.field_longitude = lng
+
+        if eff_coords and not (record.village and record.taluk and record.district):
+            from app.services.village_master_service import get_village_master_service
+            try:
+                vms = get_village_master_service()
+                loc_match = vms.resolve_record_location(
+                    village=record.village,
+                    taluk=record.taluk,
+                    district=record.district,
+                    coordinates=eff_coords,
+                    site_address=record.site_address or record.formatted_address,
+                    street_address=record.street_address or record.formatted_address,
+                )
+                if not record.village and loc_match.get("village"):
+                    record.village = loc_match.get("village")
+                if not record.taluk and loc_match.get("taluk"):
+                    record.taluk = loc_match.get("taluk")
+                if not record.district and loc_match.get("district"):
+                    record.district = loc_match.get("district")
+                if not record.area and loc_match.get("village"):
+                    record.area = loc_match.get("village")
+                if not record.street_address and loc_match.get("formatted_address"):
+                    record.street_address = loc_match.get("formatted_address")
+                if not record.site_address and loc_match.get("formatted_address"):
+                    record.site_address = loc_match.get("formatted_address")
+            except Exception as e:
+                logger.warning(f"Failed to auto-resolve village/taluk/district on upload for record #{record.id}: {e}")
+
+        db.commit()
+        db.refresh(record)
         log_activity(
             db=db,
             action_type="photo_upload",
@@ -989,6 +1086,7 @@ def _record_to_detail(record, errors=None) -> RecordDetail:
         status=getattr(record, "status", "NOT_COMPLETED") or "NOT_COMPLETED",
         source=getattr(record, "source", "captured") or "captured",
         unique_id=getattr(record, "unique_id", None),
+        old_unique_id=getattr(record, "old_unique_id", None),
                 coordinates=getattr(record, "coordinates", None),
         street_address=getattr(record, "street_address", None),
         land_use=getattr(record, "land_use", None),

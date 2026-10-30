@@ -263,6 +263,23 @@ class VillageMasterService:
                 'dname': 'Coimbatore',
             }
 
+        # 3b. Perur Taluk areas (Selvapuram, Kuniamuthur, Sundakamuthur, Telungupalayam, Kovaipudur, Veera Keralam, Vadavalli)
+        if any(x in clean_full for x in ['selvapuram', 'telungupalayam', 'kuniamuthur', 'sundakamuthur', 'kovaipudur', 'veerakeralam', 'vadavalli']):
+            if 'selvapuram' in clean_full:
+                return {'vname': 'Selvapuram', 'tname': 'Perur', 'dname': 'Coimbatore'}
+            if 'telungupalayam' in clean_full:
+                return {'vname': 'Telungupalayam', 'tname': 'Perur', 'dname': 'Coimbatore'}
+            if 'kuniamuthur' in clean_full:
+                return {'vname': 'Kuniamuthur', 'tname': 'Perur', 'dname': 'Coimbatore'}
+            if 'sundakamuthur' in clean_full:
+                return {'vname': 'Sundakamuthur', 'tname': 'Perur', 'dname': 'Coimbatore'}
+            if 'kovaipudur' in clean_full:
+                return {'vname': 'Kovaipudur', 'tname': 'Perur', 'dname': 'Coimbatore'}
+            if 'veerakeralam' in clean_full:
+                return {'vname': 'Veera Keralam', 'tname': 'Perur', 'dname': 'Coimbatore'}
+            if 'vadavalli' in clean_full:
+                return {'vname': 'Vadavalli', 'tname': 'Perur', 'dname': 'Coimbatore'}
+
         # 4. Coimbatore Corporation North areas
         if any(x in clean_full for x in CORP_NORTH_AREAS):
             # Check if any specific village name inside Corp North matches
