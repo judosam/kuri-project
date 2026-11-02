@@ -805,70 +805,134 @@ export default function RecordsScreen({
                   <div
                     style={{
                       display: 'flex',
+                      flexDirection: 'column',
                       gap: 6,
-                      marginTop: 5,
-                      paddingTop: 5,
+                      marginTop: 6,
+                      paddingTop: 6,
                       borderTop: '1px solid #f1f5f9',
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
                       type="button"
-                      className="btn btn-primary btn-sm"
-                      style={{ flex: 1.4, padding: '4px 8px', fontSize: '0.74rem', minHeight: 30, height: 30, whiteSpace: 'nowrap' }}
+                      className="btn btn-primary"
+                      style={{
+                        width: '100%',
+                        padding: '6px 12px',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        minHeight: 34,
+                        height: 34,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        borderRadius: 7,
+                      }}
                       onClick={() => onStartInspection(item)}
                     >
-                      <Icon name="photo_camera" size={14} />
+                      <Icon name="photo_camera" size={15} />
                       <span>Start Inspection</span>
                     </button>
 
-                    {(item.coordinates || site) && (
-                      <>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: (item.coordinates || site) ? 'repeat(3, 1fr)' : '1fr',
+                        gap: 6,
+                      }}
+                    >
+                      {(item.coordinates || site) && (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            style={{
+                              padding: '5px 4px',
+                              fontSize: '0.74rem',
+                              fontWeight: 600,
+                              minHeight: 32,
+                              height: 32,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 4,
+                              borderRadius: 6,
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              color: '#334155',
+                              width: '100%',
+                            }}
+                            onClick={() => setSelectedMapRecord(item)}
+                            title="Preview Location Map"
+                          >
+                            <Icon name="map" size={14} color="#FF6467" />
+                            <span>Map</span>
+                          </button>
+                          <a
+                            className="btn btn-secondary btn-sm"
+                            style={{
+                              padding: '5px 4px',
+                              fontSize: '0.74rem',
+                              fontWeight: 600,
+                              minHeight: 32,
+                              height: 32,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 4,
+                              borderRadius: 6,
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              color: '#334155',
+                              textDecoration: 'none',
+                              width: '100%',
+                            }}
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(item.coordinates || item.street_address || item.site_address || '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Icon name="directions" size={14} color="#64748b" />
+                            <span>Directions</span>
+                          </a>
+                        </>
+                      )}
                       <button
                         type="button"
-                        className="btn btn-secondary btn-sm"
-                        style={{ flex: 0.8, padding: '4px 6px', fontSize: '0.74rem', minHeight: 30, height: 30, justifyContent: 'center', whiteSpace: 'nowrap' }}
-                        onClick={() => setSelectedMapRecord(item)}
-                        title="Preview Location Map"
+                        className="btn btn-secondary btn-sm mark-status-touch-btn"
+                        style={{
+                          padding: '5px 4px',
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          minHeight: 32,
+                              height: 32,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 4,
+                          borderRadius: 6,
+                          background: '#f8fafc',
+                          border: '1px solid #cbd5e1',
+                          color: '#334155',
+                          width: '100%',
+                        }}
+                        onClick={() => setMarkStatusRecord(item)}
+                        title="Mark Status (Not Interested / Duplicate / Finished)"
                       >
-                        <Icon name="map" size={14} color="#FF6467" />
-                        <span>Map</span>
+                        <Icon name="label" size={14} color="#475569" />
+                        <span>Status</span>
                       </button>
-                      {(item.coordinates || item.street_address || item.site_address) && (
-                        <a
-                          className="btn btn-secondary btn-sm"
-                          style={{ flex: 0.9, padding: '4px 6px', fontSize: '0.74rem', minHeight: 30, height: 30, textAlign: 'center', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(item.coordinates || item.street_address || item.site_address || '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Icon name="directions" size={14} color="#64748b" />
-                          <span>Directions</span>
-                        </a>
-                      )}
-                      </>
-                    )}
-
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm mark-status-touch-btn"
-                      style={{ padding: '6px 12px', fontSize: '0.82rem', fontWeight: 600, minHeight: 38, height: 38, display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 8, background: '#f8fafc', border: '1.5px solid #cbd5e1', color: '#334155' }}
-                      onClick={() => setMarkStatusRecord(item)}
-                      title="Mark Status (Not Interested / Duplicate / Finished)"
-                    >
-                      <Icon name="label" size={15} color="#475569" />
-                      <span>Status</span>
-                    </button>
+                    </div>
                   </div>
                 ) : (
                   <div
                     style={{
-                      display: 'flex',
+                      display: 'grid',
+                      gridTemplateColumns: (item.coordinates || site) ? 'repeat(3, 1fr)' : '1fr',
                       gap: 6,
-                      flexWrap: 'wrap',
-                      marginTop: 4,
-                      paddingTop: 5,
+                      marginTop: 6,
+                      paddingTop: 6,
                       borderTop: '1px solid #f8fafc',
                     }}
                     onClick={(e) => e.stopPropagation()}
@@ -879,14 +943,45 @@ export default function RecordsScreen({
                           type="button"
                           className="btn btn-secondary btn-sm"
                           onClick={() => setSelectedMapRecord(item)}
-                          style={{ flex: 1, justifyContent: 'center', fontSize: '0.74rem', minHeight: 30, height: 30, padding: '4px 8px' }}
+                          style={{
+                            padding: '5px 4px',
+                            fontSize: '0.74rem',
+                            fontWeight: 600,
+                            minHeight: 32,
+                            height: 32,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 4,
+                            borderRadius: 6,
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1',
+                            color: '#334155',
+                            width: '100%',
+                          }}
                         >
                           <Icon name="map" size={14} color="#FF6467" />
-                          <span>View Site Map</span>
+                          <span>Map</span>
                         </button>
                         <a
                           className="btn btn-secondary btn-sm"
-                          style={{ flex: 1, justifyContent: 'center', fontSize: '0.74rem', minHeight: 30, height: 30, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                          style={{
+                            padding: '5px 4px',
+                            fontSize: '0.74rem',
+                            fontWeight: 600,
+                            minHeight: 32,
+                            height: 32,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 4,
+                            borderRadius: 6,
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1',
+                            color: '#334155',
+                            textDecoration: 'none',
+                            width: '100%',
+                          }}
                           href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(item.coordinates || site || '')}`}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -900,11 +995,26 @@ export default function RecordsScreen({
                       type="button"
                       className="btn btn-secondary btn-sm mark-status-touch-btn"
                       onClick={() => setMarkStatusRecord(item)}
-                      style={{ flex: 1, justifyContent: 'center', fontSize: '0.82rem', fontWeight: 600, minHeight: 38, height: 38, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 8, background: '#f8fafc', border: '1.5px solid #cbd5e1', color: '#334155' }}
+                      style={{
+                        padding: '5px 4px',
+                        fontSize: '0.74rem',
+                        fontWeight: 600,
+                        minHeight: 32,
+                        height: 32,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 4,
+                        borderRadius: 6,
+                        background: '#f8fafc',
+                        border: '1px solid #cbd5e1',
+                        color: '#334155',
+                        width: '100%',
+                      }}
                       title="Mark or Change Status"
                     >
-                      <Icon name="label" size={15} color="#475569" />
-                      <span>Mark Status</span>
+                      <Icon name="label" size={14} color="#475569" />
+                      <span>Status</span>
                     </button>
                   </div>
                 )}

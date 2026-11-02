@@ -244,8 +244,12 @@ export default function FormScreen({
       newErrors.customStage = 'Please specify the stage of construction (at least 3 characters).';
     }
 
-    if (!typeOfConstruction) {
-      newErrors.typeOfConstruction = 'Please select the type of construction.';
+    if (constructionHappening !== 'No') {
+      if (!typeOfConstruction) {
+        newErrors.typeOfConstruction = 'Please select the type of construction.';
+      } else if (typeOfConstruction === 'Other' && (!customTypeOfConstruction || customTypeOfConstruction.trim().length < 3)) {
+        newErrors.customTypeOfConstruction = 'Please specify the type of construction (at least 3 characters).';
+      }
     } else if (typeOfConstruction === 'Other' && (!customTypeOfConstruction || customTypeOfConstruction.trim().length < 3)) {
       newErrors.customTypeOfConstruction = 'Please specify the type of construction (at least 3 characters).';
     }
@@ -931,7 +935,17 @@ export default function FormScreen({
                 <button
                   type="button"
                   className={`btn ${constructionHappening === 'No' ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setConstructionHappening('No')}
+                  onClick={() => {
+                    setConstructionHappening('No');
+                    if (fieldErrors.typeOfConstruction || fieldErrors.customTypeOfConstruction) {
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.typeOfConstruction;
+                        delete next.customTypeOfConstruction;
+                        return next;
+                      });
+                    }
+                  }}
                   style={{ justifyContent: 'center' }}
                 >
                   <Icon name="cancel" size={18} />
@@ -1010,7 +1024,7 @@ export default function FormScreen({
             {/* 4. Type of Construction */}
             <div className="form-group">
               <label className="form-label" htmlFor="type-construction">
-                4. Type of Construction <span style={{ color: '#ef4444' }}>*</span>
+                4. Type of Construction {constructionHappening !== 'No' && <span style={{ color: '#ef4444' }}>*</span>}
               </label>
               <select
                 id="type-construction"
