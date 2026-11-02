@@ -73,6 +73,7 @@ export default function RecordsScreen({
   const [customStartDate, setCustomStartDate] = useState(saved.customStartDate);
   const [customEndDate, setCustomEndDate] = useState(saved.customEndDate);
   const [searchText, setSearchText] = useState(saved.searchText);
+  const [isSearchOpen, setIsSearchOpen] = useState(() => Boolean(saved.searchText));
   const [search, setSearch] = useState(saved.search);
   const [selectedMapRecord, setSelectedMapRecord] = useState<CaptureRecord | null>(null);
   const [markStatusRecord, setMarkStatusRecord] = useState<CaptureRecord | null>(null);
@@ -264,36 +265,148 @@ export default function RecordsScreen({
 
   return (
     <div className="field-record-workspace">
-      <div className="field-record-controls">
-        <div className="field-record-search">
-          <Icon name="search" size={20} />
-          <input type="search" name="record-search" autoComplete="off" value={searchText} aria-label="Search records"
-            onChange={event => setSearchText(event.target.value)}
-            placeholder={viewMode === 'gallery' ? 'Search photos by site or UID…' : 'Search UID, survey no or location…'} />
-          {(selectedVillages.length > 0 || datePreset !== 'ALL' || searchText) && <button type="button" className="field-filter-reset" aria-label="Clear filters" title="Clear filters"
-            onClick={() => { setSelectedVillages([]); setDatePreset('ALL'); setCustomStartDate(''); setCustomEndDate(''); setSearchText(''); setPage(1); }}><Icon name="restart_alt" size={18} /></button>}
+      <div className="field-record-controls" style={{ marginBottom: 8 }}>
+        {/* Compact Expandable Search Input (revealed by search icon or active query) */}
+        {(isSearchOpen || searchText) && (
+          <div className="field-record-search" style={{ minHeight: 36, padding: '0 8px', marginBottom: 6 }}>
+            <Icon name="search" size={18} color="#64748b" />
+            <input
+              type="search"
+              name="record-search"
+              autoComplete="off"
+              value={searchText}
+              autoFocus
+              aria-label="Search records"
+              style={{ minHeight: 34, fontSize: 13 }}
+              onChange={event => { setSearchText(event.target.value); setPage(1); }}
+              placeholder={viewMode === 'gallery' ? 'Search photos by site or UID…' : 'Search UID, survey no or location…'}
+            />
+            <button
+              type="button"
+              className="field-filter-reset"
+              style={{ width: 32, height: 32 }}
+              aria-label="Close search"
+              title="Close search"
+              onClick={() => {
+                setSearchText('');
+                setIsSearchOpen(false);
+                setPage(1);
+              }}
+            >
+              <Icon name="close" size={18} />
+            </button>
+          </div>
+        )}
+
+        <div className="field-record-filters" style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 4 }}>
+          <label style={{ flex: 1, minWidth: 0, margin: 0 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 2, display: 'block' }}>Date</span>
+            <select
+              name="date-range"
+              aria-label="Filter by date"
+              value={datePreset}
+              style={{ width: '100%', height: 34, minHeight: 34, fontSize: 12.5, borderRadius: 8, padding: '0 6px' }}
+              onChange={event => { setDatePreset(event.target.value as DatePreset); setPage(1); }}
+            >
+              <option value="ALL">All time</option>
+              <option value="TODAY">Today</option>
+              <option value="YESTERDAY">Yesterday</option>
+              <option value="THIS_WEEK">This week</option>
+              <option value="THIS_MONTH">This month</option>
+              <option value="CUSTOM">Custom range</option>
+            </select>
+          </label>
+
+          <div style={{ flex: 1.1, minWidth: 0 }}>
+            <VillageMultiSelect
+              selected={selectedVillages}
+              onChange={(villages) => {
+                setSelectedVillages(villages);
+                setPage(1);
+              }}
+              options={villageOptions}
+            />
+          </div>
+
+          {/* Search Toggle Icon Button */}
+          {!isSearchOpen && !searchText && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{
+                width: 34,
+                minWidth: 34,
+                height: 34,
+                minHeight: 34,
+                padding: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 8,
+                background: '#ffffff',
+                border: '1px solid var(--border-line)',
+                flexShrink: 0,
+              }}
+              onClick={() => setIsSearchOpen(true)}
+              aria-label="Open search"
+              title="Search records"
+            >
+              <Icon name="search" size={18} color="#64748b" />
+            </button>
+          )}
+
+          {/* Reset Filters Icon Button */}
+          {(selectedVillages.length > 0 || datePreset !== 'ALL' || searchText) && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{
+                width: 34,
+                minWidth: 34,
+                height: 34,
+                minHeight: 34,
+                padding: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 8,
+                background: '#fff1f2',
+                border: '1px solid #fecdd3',
+                color: '#e11d48',
+                flexShrink: 0,
+              }}
+              aria-label="Clear all filters"
+              title="Clear all filters"
+              onClick={() => {
+                setSelectedVillages([]);
+                setDatePreset('ALL');
+                setCustomStartDate('');
+                setCustomEndDate('');
+                setSearchText('');
+                setIsSearchOpen(false);
+                setPage(1);
+              }}
+            >
+              <Icon name="restart_alt" size={18} color="#e11d48" />
+            </button>
+          )}
         </div>
-        <div className="field-record-filters">
-          <label>Date<select name="date-range" aria-label="Filter by date" value={datePreset} onChange={event => { setDatePreset(event.target.value as DatePreset); setPage(1); }}>
-            <option value="ALL">All time</option><option value="TODAY">Today</option><option value="YESTERDAY">Yesterday</option><option value="THIS_WEEK">This week</option><option value="THIS_MONTH">This month</option><option value="CUSTOM">Custom range</option>
-          </select></label>
-          <VillageMultiSelect
-            selected={selectedVillages}
-            onChange={(villages) => {
-              setSelectedVillages(villages);
-              setPage(1);
-            }}
-            options={villageOptions}
-          />
+
+        {datePreset === 'CUSTOM' && (
+          <div className="field-custom-dates" style={{ marginTop: 4, marginBottom: 4 }}>
+            <label>From<input type="date" name="date-from" aria-label="From date" value={customStartDate} max={customEndDate || undefined}
+              onChange={event => { setCustomStartDate(event.target.value); setPage(1); }} /></label>
+            <label>To<input type="date" name="date-to" aria-label="To date" value={customEndDate} min={customStartDate || undefined}
+              onChange={event => { setCustomEndDate(event.target.value); setPage(1); }} /></label>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '2px 0 4px 0' }}>
+          <span style={{ fontSize: 11, color: '#94a3b8' }}>
+            Dates: {statusFilter === 'NOT_COMPLETED' ? 'Assigned' : (statusFilter === 'CLOSED' ? 'Created/Assigned' : 'Capture')} · IST
+          </span>
         </div>
-        {datePreset === 'CUSTOM' && <div className="field-custom-dates">
-          <label>From<input type="date" name="date-from" aria-label="From date" value={customStartDate} max={customEndDate || undefined}
-            onChange={event => { setCustomStartDate(event.target.value); setPage(1); }} /></label>
-          <label>To<input type="date" name="date-to" aria-label="To date" value={customEndDate} min={customStartDate || undefined}
-            onChange={event => { setCustomEndDate(event.target.value); setPage(1); }} /></label>
-        </div>}
-        <p className="field-date-hint">Dates: {statusFilter === 'NOT_COMPLETED' ? 'Assigned' : (statusFilter === 'CLOSED' ? 'Created/Assigned' : 'Capture')} · India time</p>
-        {locationError && <p role="alert" className="field-filter-error">{locationError}</p>}
+        {locationError && <p role="alert" className="field-filter-error" style={{ margin: '4px 0 0', fontSize: 11 }}>{locationError}</p>}
       </div>
 
       {/* ─── Segmented Filter Tabs (Coral #FF6467) — records only, photos have no status ─── */}
