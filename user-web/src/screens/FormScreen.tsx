@@ -885,36 +885,32 @@ export default function FormScreen({
           </div>
 
           <form id="inspection-answers" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* 1. Date of Visit */}
+            {/* 1. Date of Visit (Non-editable, auto-locked to visit date) */}
             <div className="form-group">
-              <label className="form-label" htmlFor="date-visit">
-                1. Date of Visit <span style={{ color: 'var(--color-danger)' }}>*</span>
+              <label className="form-label" htmlFor="date-visit" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>1. Date of Visit <span style={{ color: 'var(--color-danger)' }}>*</span></span>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <Icon name="lock" size={13} color="#94a3b8" />
+                  <span>Auto-locked to visit date</span>
+                </span>
               </label>
               <input
                 id="date-visit"
                 type="date"
-                className={`form-input ${fieldErrors.dateOfVisit ? 'input-error' : ''}`}
-                style={fieldErrors.dateOfVisit ? { borderColor: '#ef4444' } : undefined}
-                value={dateOfVisit}
-                onChange={(e) => {
-                  setDateOfVisit(e.target.value);
-                  if (fieldErrors.dateOfVisit) {
-                    setFieldErrors((prev) => {
-                      const next = { ...prev };
-                      delete next.dateOfVisit;
-                      return next;
-                    });
-                  }
+                readOnly
+                className="form-input"
+                style={{
+                  backgroundColor: '#f8fafc',
+                  color: '#334155',
+                  cursor: 'not-allowed',
+                  borderColor: '#cbd5e1',
+                  fontWeight: 600,
+                  pointerEvents: 'none',
                 }}
-                aria-invalid={!!fieldErrors.dateOfVisit}
-                required
+                value={dateOfVisit}
+                tabIndex={-1}
+                aria-readonly="true"
               />
-              {fieldErrors.dateOfVisit && (
-                <span style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: 4 }} role="alert">
-                  <Icon name="error" size={13} color="#ef4444" />
-                  <span>{fieldErrors.dateOfVisit}</span>
-                </span>
-              )}
             </div>
 
             {/* 2. Construction Happening */}
