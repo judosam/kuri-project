@@ -2960,7 +2960,7 @@ async def admin_resolve_coords(
         )
     lat, lng = parsed
     record_service = RecordService(db)
-    site_id = record_service.next_unique_id(lat, lng, prefix="QANEW-CBE")
+    site_id = record_service.next_six_digit_unique_id(prefix="CBE")
 
     # 1. Google Reverse Geocoding for address and area
     area = None
@@ -3039,18 +3039,26 @@ async def admin_qa_create_record(
     lat, lng = parsed
     record_service = RecordService(db)
 
-    # Generate or reuse unique_id
-    unique_id = (payload.unique_id or "").strip()
-    if not unique_id:
-        unique_id = record_service.next_unique_id(lat, lng, prefix="QANEW-CBE")
+    # Generate standard 6-digit platform unique_id (CBE-XXXXXX)
+    import re
+    from app.services.record_service import generate_unique_id
+    legacy_coord_id = generate_unique_id(lat, lng, prefix="QANEW-CBE")
+    user_unique_id = (payload.unique_id or "").strip()
+    is_valid_six_digit = bool(re.match(r"^CBE-\d{6}$", user_unique_id, re.IGNORECASE))
 
-    # Check if duplicate unique_id
-    existing = db.query(CaptureRecord).filter(CaptureRecord.unique_id == unique_id).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Record with Unique ID '{unique_id}' already exists (ID #{existing.id})."
-        )
+    if user_unique_id and is_valid_six_digit:
+        existing = db.query(CaptureRecord).filter(CaptureRecord.unique_id == user_unique_id.upper()).first()
+        if existing:
+            unique_id = record_service.next_six_digit_unique_id(prefix="CBE")
+        else:
+            unique_id = user_unique_id.upper()
+        old_unique_id = legacy_coord_id
+    elif user_unique_id and (user_unique_id.upper().startswith("QANEW-") or "-" in user_unique_id):
+        old_unique_id = user_unique_id.upper()
+        unique_id = record_service.next_six_digit_unique_id(prefix="CBE")
+    else:
+        unique_id = record_service.next_six_digit_unique_id(prefix="CBE")
+        old_unique_id = legacy_coord_id
 
     # Resolve location if fields are empty
     area = (payload.area or "").strip() or None
@@ -3089,7 +3097,7 @@ async def admin_qa_create_record(
         status="NOT_COMPLETED",
         source="qa_portal",
         unique_id=unique_id,
-        old_unique_id=unique_id if unique_id.startswith("QANEW-") else None,
+        old_unique_id=old_unique_id,
         coordinates=formatted_coords,
         street_address=address,
         site_address=address,

@@ -389,9 +389,11 @@ class PreviousRecordsImportService:
                 if not row.values.get("unique_id"):
                     parsed_c = parse_coordinates(coords)
                     if parsed_c:
-                        from app.services.record_service import generate_unique_id
+                        from app.services.record_service import RecordService, generate_unique_id
                         try:
-                            row.values["unique_id"] = generate_unique_id(parsed_c[0], parsed_c[1], prefix="CBE")
+                            rs = RecordService(self.db)
+                            row.values["unique_id"] = rs.next_six_digit_unique_id(prefix="CBE")
+                            row.values["old_unique_id"] = generate_unique_id(parsed_c[0], parsed_c[1], prefix="CBE")
                         except Exception:
                             pass
 
@@ -532,6 +534,7 @@ class PreviousRecordsImportService:
                 status="COMPLETED",
                 source="imported",
                 unique_id=values["unique_id"] or None,
+                old_unique_id=values.get("old_unique_id") or None,
                                 coordinates=values["coordinates"] or None,
                 street_address=values["street_address"] or None,
                 land_use=values["land_use"] or None,

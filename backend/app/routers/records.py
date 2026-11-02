@@ -307,12 +307,14 @@ async def create_record(
     else:
         # Manually added records get a standard 6-digit platform unique ID,
         # storing the coordinate reference in old_unique_id.
-        manual_unique_id = None
+        manual_unique_id = record_service.next_six_digit_unique_id(prefix="CBE")
         legacy_coord_id = None
         if first_gps is not None:
             from app.services.record_service import generate_unique_id
             legacy_coord_id = generate_unique_id(first_gps.latitude, first_gps.longitude, prefix="CBE")
-            manual_unique_id = record_service.next_six_digit_unique_id(prefix="CBE")
+        elif cur_lat is not None and cur_lon is not None and (cur_lat != 0 or cur_lon != 0):
+            from app.services.record_service import generate_unique_id
+            legacy_coord_id = generate_unique_id(cur_lat, cur_lon, prefix="CBE")
         manual_remarks = (request.remarks.strip() or None) if (request.remarks and isinstance(request.remarks, str)) else None
         if manual_remarks and request.description and manual_remarks == request.description.strip():
             manual_remarks = None
