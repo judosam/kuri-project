@@ -30,6 +30,7 @@ export type IconName =
   | 'pending_actions'
   | 'near_me'
   | 'my_location'
+  | 'add_location_alt'
   | 'location_on'
   | 'layers'
   | 'map'

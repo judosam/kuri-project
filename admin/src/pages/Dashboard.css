@@ -188,6 +188,13 @@
   color: #0f172a;
 }
 
+/* 10-Card Responsive KPI Grid (Balanced 5x2) */
+.cc-kpi-grid-10 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
 /* 8-Card Responsive KPI Grid (Balanced 4x2) */
 .cc-kpi-grid-8 {
   display: grid;
@@ -999,6 +1006,13 @@
   }
 }
 
+@media (max-width: 1200px) {
+  .cc-kpi-grid-10 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
 @media (max-width: 1024px) {
   .cc-middle-grid {
     grid-template-columns: 1fr;
@@ -1006,7 +1020,9 @@
 }
 
 @media (max-width: 860px) {
-  .cc-kpi-grid {
+  .cc-kpi-grid,
+  .cc-kpi-grid-10,
+  .cc-kpi-grid-8 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .cc-preset-pills {
@@ -1016,7 +1032,9 @@
 }
 
 @media (max-width: 540px) {
-  .cc-kpi-grid {
+  .cc-kpi-grid,
+  .cc-kpi-grid-10,
+  .cc-kpi-grid-8 {
     grid-template-columns: 1fr;
   }
 }
