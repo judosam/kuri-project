@@ -189,6 +189,18 @@
 }
 
 /* 10-Card Responsive KPI Grid (Balanced 5x2) */
+.cc-kpi-grid-9 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+@media (min-width: 1300px) {
+  .cc-kpi-grid-9 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
 .cc-kpi-grid-10 {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1021,6 +1033,7 @@
 
 @media (max-width: 860px) {
   .cc-kpi-grid,
+  .cc-kpi-grid-9,
   .cc-kpi-grid-10,
   .cc-kpi-grid-8 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1033,6 +1046,7 @@
 
 @media (max-width: 540px) {
   .cc-kpi-grid,
+  .cc-kpi-grid-9,
   .cc-kpi-grid-10,
   .cc-kpi-grid-8 {
     grid-template-columns: 1fr;

@@ -3959,6 +3959,26 @@ def _record_to_detail(record, errors: Optional[List[str]] = None) -> RecordDetai
         last_modified = getattr(record, "reassigned_at", None) or getattr(record, "assigned_at", None) or record.created_at
     updated_at = getattr(record, "updated_at", None) or last_modified
 
+    # Resolve field coordinates & GPS fix with photo fallback
+    f_lat = getattr(record, "field_latitude", None)
+    f_lon = getattr(record, "field_longitude", None)
+    if f_lat is None or f_lon is None or (f_lat == 0 and f_lon == 0):
+        for img in getattr(record, "images", []) or []:
+            i_lat = getattr(img, "latitude", None)
+            i_lon = getattr(img, "longitude", None)
+            if i_lat is not None and i_lon is not None and (i_lat != 0 or i_lon != 0):
+                f_lat = i_lat
+                f_lon = i_lon
+                break
+    if f_lat is None or f_lon is None or (f_lat == 0 and f_lon == 0):
+        cand = getattr(record, "updated_coordinates", None) or (getattr(record, "coordinates", None) if getattr(record, "source", None) in ("manual", "qa_portal") or getattr(record, "status", None) == "COMPLETED" else None)
+        if cand:
+            from app.services.record_service import _parse_coordinates
+            p = _parse_coordinates(cand)
+            if p:
+                f_lat, f_lon = p
+    f_coords = f"{f_lat:.6f}, {f_lon:.6f}" if (f_lat is not None and f_lon is not None and (f_lat != 0 or f_lon != 0)) else None
+
     return RecordDetail(
         id=record.id,
         is_manually_added=record.is_manually_added,
@@ -3980,8 +4000,9 @@ def _record_to_detail(record, errors: Optional[List[str]] = None) -> RecordDetai
         last_modified_at=last_modified,
         assigned_at=assigned_at,
         assigned_date=assigned_date,
-        field_latitude=getattr(record, "field_latitude", None),
-        field_longitude=getattr(record, "field_longitude", None),
+        field_latitude=f_lat,
+        field_longitude=f_lon,
+        field_coordinates=f_coords,
         field_location_accuracy=getattr(record, "field_location_accuracy", None),
         field_captured_at=getattr(record, "field_captured_at", None),
         errors=errors,

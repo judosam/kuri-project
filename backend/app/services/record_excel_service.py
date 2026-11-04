@@ -110,6 +110,7 @@ COLUMN_WIDTH_MAP = {
     "date_of_visit": 18,
     "field_captured_at": 22,
     "formatted_address": 38,
+    "field_coordinates": 24,
     "field_latitude": 16,
     "field_longitude": 16,
     "field_location_accuracy": 15,
@@ -430,7 +431,7 @@ SECTION_FIELD_MAP = {
     "field": [
         "user_name", "operator_email", "status", "assigned_at",
         "date_of_visit", "field_captured_at", "formatted_address",
-        "field_latitude", "field_longitude", "field_location_accuracy",
+        "field_coordinates", "field_latitude", "field_longitude", "field_location_accuracy",
         "deviation_meters",
         "construction_happening", "type_of_construction", "stage_of_construction",
         "no_of_floors", "built_up_area", "expected_completion",
@@ -502,6 +503,7 @@ REPORT_LABELS = {
     "date_of_visit": "Date of Visit",
     "field_captured_at": "Inspection Completed Date",
     "formatted_address": "Field Inspection Address",
+    "field_coordinates": "Field Coordinates",
     "field_latitude": "Field Latitude",
     "field_longitude": "Field Longitude",
     "field_location_accuracy": "Accuracy (m)",
@@ -620,6 +622,35 @@ def build_records_report(
         detail["operator_email"] = record.user.email if record.user else None
         detail["photo_count"] = len(images)
         detail["captured_at"] = images[0]["captured_at"] if images else None
+
+        # Robustly resolve Field Coordinates & GPS Fix from direct fields, photos, or manual entries
+        f_lat = detail.get("field_latitude") or getattr(record, "field_latitude", None)
+        f_lon = detail.get("field_longitude") or getattr(record, "field_longitude", None)
+
+        if f_lat is None or f_lon is None or (f_lat == 0 and f_lon == 0):
+            # Fallback 1: Genuine GPS fix from captured inspection photos
+            for img in getattr(record, "images", []) or []:
+                i_lat = getattr(img, "latitude", None)
+                i_lon = getattr(img, "longitude", None)
+                if i_lat is not None and i_lon is not None and (i_lat != 0 or i_lon != 0):
+                    f_lat = i_lat
+                    f_lon = i_lon
+                    break
+
+        if f_lat is None or f_lon is None or (f_lat == 0 and f_lon == 0):
+            # Fallback 2: Updated coordinates or on-site manual creation coordinates
+            cand = getattr(record, "updated_coordinates", None)
+            if not cand and (getattr(record, "source", None) in ("manual", "qa_portal") or getattr(record, "status", None) == "COMPLETED"):
+                cand = getattr(record, "coordinates", None)
+            if cand:
+                from app.services.record_service import _parse_coordinates
+                p = _parse_coordinates(cand)
+                if p:
+                    f_lat, f_lon = p
+
+        detail["field_latitude"] = f_lat
+        detail["field_longitude"] = f_lon
+        detail["field_coordinates"] = f"{f_lat:.6f}, {f_lon:.6f}" if (f_lat is not None and f_lon is not None and (f_lat != 0 or f_lon != 0)) else None
 
         # Resolve Old Unique ID: from DB column, then reference map fallback
         old_uid = (

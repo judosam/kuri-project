@@ -62,12 +62,12 @@ export default function Dashboard() {
     left: (
       <div className="topbar-page-left">
         <h1 className="topbar-page-title">Dashboard</h1>
-        <span className="count-pill">Overview</span>
+        <span className="count-pill">Coimbatore</span>
       </div>
     ),
     right: (
       <span className="topbar-badge-pill">
-        <Icon name="verified" size={15} /> Live Operations • IST
+        <Icon name="verified" size={15} /> Coimbatore Operations • IST
       </span>
     ),
   }, []);
@@ -177,13 +177,11 @@ export default function Dashboard() {
   }, [qaUsers]);
 
   const totalQaCreated = useMemo(() => {
-    return qaUsers.reduce((acc, u) => acc + u.qa_created, 0);
-  }, [qaUsers]);
+    const fromUsers = qaUsers.reduce((acc, u) => acc + (u.qa_created || 0), 0);
+    return fromUsers || overview?.qa_new_records || data?.qa_new_records || 61;
+  }, [qaUsers, overview?.qa_new_records, data?.qa_new_records]);
 
-  const qaUsersCount = useMemo(() => {
-    const auditors = qaUsers.filter((u) => u.role === 'AUDITOR');
-    return auditors.length || 4;
-  }, [qaUsers]);
+
 
   const overallApprovalRate = totalQcReviewed > 0 ? Math.round((totalApproved / totalQcReviewed) * 100) : 0;
 
@@ -341,8 +339,8 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* ── Executive KPI Grid (10 Balanced, Compact Cards in 5x2 Grid) ──────── */}
-          <section className="cc-kpi-grid cc-kpi-grid-10" aria-label="Executive KPI Metrics">
+          {/* ── Executive KPI Grid (9 Balanced, Compact Cards) ──────── */}
+          <section className="cc-kpi-grid cc-kpi-grid-9" aria-label="Executive KPI Metrics">
             {/* Card 1: Total Properties */}
             <div
               className="cc-kpi-card clickable-stat"
@@ -529,8 +527,8 @@ export default function Dashboard() {
                     'Properties discovered directly on-site by field verifiers during live survey operations, with captured GPS coordinates, building details, and on-ground photo evidence.',
                   breakdown: [
                     { label: 'Total Manually Added', value: manuallyAdded.toLocaleString() },
-                    { label: 'Elavarasan (Field Verifier)', value: '30 sites' },
-                    { label: 'Prabhu (Field Verifier)', value: '9 sites' },
+                    { label: 'Elavarasan (Field Verifier)', value: '33 sites (Coimbatore)' },
+                    { label: 'Prabhu (Field Verifier)', value: '10 sites (9 CBE • 1 CHE)' },
                     { label: 'Verification Status', value: '100% Completed on Ground' },
                     { label: 'Source Provenance', value: 'source = manual (Mobile App)' },
                   ],
@@ -550,7 +548,7 @@ export default function Dashboard() {
                 <span className="cc-kpi-label">Field Verifier Added</span>
               </div>
               <p className="cc-kpi-sub">
-                <strong>30</strong> by Elavarasan • <strong>9</strong> by Prabhu on-site
+                <strong>33</strong> by Elavarasan • <strong>10</strong> by Prabhu on-site
               </p>
             </div>
 
@@ -702,91 +700,45 @@ export default function Dashboard() {
               </p>
             </div>
 
-            {/* Card 8: QA Auditor Approvals */}
+            {/* Card 9: Manually Added by QA Users (Auditors) */}
             <div
               className="cc-kpi-card clickable-stat"
               role="button"
               tabIndex={0}
               onClick={() =>
                 setModalStat({
-                  title: 'QA Review Velocity & Approvals',
-                  category: 'Satellite Quality Desk',
-                  value: `${overallApprovalRate}% Rate`,
-                  badgeText: `${totalApproved} Approved`,
-                  badgeTone: 'purple',
-                  icon: 'verified',
-                  description:
-                    'High-resolution satellite imagery inspection throughput and approval rate across auditor desks.',
-                  breakdown: [
-                    { label: 'Total Audits Completed', value: totalQcReviewed.toLocaleString() },
-                    { label: 'Approved Sites', value: totalApproved.toLocaleString() },
-                    { label: 'Disapproved False Positives', value: totalDisapproved.toLocaleString() },
-                    { label: 'Corporate Commercials Flagged', value: totalCommercial.toLocaleString() },
-                    { label: 'Created by QA Auditors', value: totalQaCreated.toLocaleString() },
-                  ],
-                  recordLinkOptions: { auditStatus: 'APPROVAL' },
-                })
-              }
-              title="Click to view QA audit details"
-            >
-              <div className="cc-kpi-top">
-                <div className="cc-kpi-icon-wrap tone-purple">
-                  <Icon name="verified" size={16} />
-                </div>
-                <span className="cc-kpi-badge badge-purple">{overallApprovalRate}% Approved</span>
-              </div>
-              <div className="cc-kpi-main">
-                <span className="cc-kpi-value" style={{ color: '#7c3aed' }}>{totalApproved.toLocaleString()}</span>
-                <span className="cc-kpi-label">QA Verified &amp; Approved</span>
-              </div>
-              <p className="cc-kpi-sub">
-                <strong>{totalQcReviewed.toLocaleString()}</strong> VHR audits done • <strong>{totalDisapproved}</strong> false positives
-              </p>
-            </div>
-
-            {/* Card 10: QA Users & Desk Performance */}
-            <div
-              className="cc-kpi-card clickable-stat"
-              role="button"
-              tabIndex={0}
-              onClick={() =>
-                setModalStat({
-                  title: 'QA Reviewers & Satellite Quality Desk',
-                  category: 'Quality Assurance Team',
-                  value: `${qaUsersCount} QA Users`,
-                  badgeText: `${totalQcReviewed.toLocaleString()} Audits`,
+                  title: 'Manually Added by QA Users',
+                  category: 'Satellite & QA Portal Discovery',
+                  value: `${totalQaCreated.toLocaleString()} Sites`,
+                  badgeText: `${totalQaCreated} QA Portal`,
                   badgeTone: 'sky',
-                  icon: 'fact_check',
+                  icon: 'add_location_alt',
                   description:
-                    'Dedicated Quality Assurance & Auditor team reviewing high-resolution satellite imagery, cadastral survey boundaries, street view imagery, and corporate builder tagging.',
+                    'Properties identified and manually catalogued directly from the QA map portal by quality auditors using high-resolution satellite imagery, coordinate resolution, and cadastral survey boundaries.',
                   breakdown: [
-                    { label: 'Total QA Auditors', value: `${qaUsersCount} Users` },
-                    { label: 'Total Audits Reviewed', value: totalQcReviewed.toLocaleString() },
-                    { label: 'Approved Sites', value: totalApproved.toLocaleString() },
-                    { label: 'Disapproved False Positives', value: totalDisapproved.toLocaleString() },
-                    { label: 'Corporate Commercials Flagged', value: totalCommercial.toLocaleString() },
-                    { label: 'Liyana (Auditor)', value: '442 reviews (199 approved)' },
-                    { label: 'Sreepriya (Auditor)', value: '327 reviews (227 approved)' },
-                    { label: 'Sundar (Auditor)', value: '222 reviews (194 approved)' },
-                    { label: 'System Admin', value: '42 reviews (4 approved)' },
+                    { label: 'Total QA Manually Added', value: `${totalQaCreated.toLocaleString()} sites` },
+                    { label: 'Sreepriya (Auditor)', value: '61 sites (56 CBE • 5 Tiruppur)' },
+                    { label: 'Creation Method', value: 'Satellite Map & Resolve Coords' },
+                    { label: 'Source Provenance', value: 'source = qa_portal' },
+                    { label: 'Operational Status', value: 'Ready for Field Inspection & Telecalling' },
                   ],
-                  recordLinkOptions: { auditStatus: 'APPROVAL' },
+                  recordLinkOptions: {},
                 })
               }
-              title="Click to view QA Users details"
+              title="Click to view QA User manually added details"
             >
               <div className="cc-kpi-top">
                 <div className="cc-kpi-icon-wrap tone-sky">
-                  <Icon name="fact_check" size={16} />
+                  <Icon name="add_location_alt" size={16} />
                 </div>
-                <span className="cc-kpi-badge badge-sky">{totalQcReviewed.toLocaleString()} Audits</span>
+                <span className="cc-kpi-badge badge-sky">{totalQaCreated} QA Portal</span>
               </div>
               <div className="cc-kpi-main">
-                <span className="cc-kpi-value" style={{ color: '#0284c7' }}>{qaUsersCount}</span>
-                <span className="cc-kpi-label">QA Users</span>
+                <span className="cc-kpi-value" style={{ color: '#0284c7' }}>{totalQaCreated.toLocaleString()}</span>
+                <span className="cc-kpi-label">QA User Added</span>
               </div>
               <p className="cc-kpi-sub">
-                <strong>{totalQcReviewed.toLocaleString()}</strong> reviews done • <strong>{qaUsersCount}</strong> active auditors
+                <strong>61</strong> by Sreepriya (Auditor) via QA Portal
               </p>
             </div>
           </section>
@@ -1543,8 +1495,9 @@ export default function Dashboard() {
                 </div>
                 <div className="cc-dist-bars">
                   {(distribution?.by_district || [
-                    { label: 'Chennai', count: 2179, completed: 23 },
-                    { label: 'Coimbatore', count: 694, completed: 630 },
+                    { label: 'Coimbatore', count: 1911, completed: 694 },
+                    { label: 'Tiruppur', count: 5, completed: 0 },
+                    { label: 'Chennai', count: 4, completed: 3 },
                   ]).map((dist) => {
                     const distTotal = dist.count || 1;
                     const pct = totalRecords ? ((distTotal / totalRecords) * 100).toFixed(1) : '0';

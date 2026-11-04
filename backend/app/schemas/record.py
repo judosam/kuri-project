@@ -198,6 +198,7 @@ class RecordDetail(BaseModel):
     # their GPS on the CapturedImage rows instead).
     field_latitude: Optional[float] = None
     field_longitude: Optional[float] = None
+    field_coordinates: Optional[str] = None
     field_location_accuracy: Optional[float] = None
     field_captured_at: Optional[datetime] = None
     images: List[ImageDetail] = []

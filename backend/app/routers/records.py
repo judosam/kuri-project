@@ -203,11 +203,14 @@ async def create_record(
             }
             is_closed_status = bool(request.status and request.status in closed_map)
 
-            if not request.photos and cur_lat is not None and cur_lon is not None and (cur_lat != 0 or cur_lon != 0) and not is_closed_status:
+            if cur_lat is not None and cur_lon is not None and (cur_lat != 0 or cur_lon != 0) and not is_closed_status:
                 update_data["field_latitude"] = cur_lat
                 update_data["field_longitude"] = cur_lon
                 if cur_acc is not None:
                     update_data["field_location_accuracy"] = cur_acc
+            elif first_gps is not None and not is_closed_status:
+                update_data["field_latitude"] = first_gps.latitude
+                update_data["field_longitude"] = first_gps.longitude
 
             if is_revisit:
                 update_data["revisit_status"] = "Updated Revisited"
