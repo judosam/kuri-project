@@ -330,7 +330,7 @@ class TestRolePermissions:
             assert client.get("/api/records", headers=_login_headers(token)).status_code == 200
 
     def test_sheet_import_endpoints_reject_non_admins(
-        self, client, manager_token, auditor_token, test_user
+        self, client, user_token, manager_token, auditor_token, test_user
     ):
         """Importing and exporting sheets stayed admin-only; retiring the
         importer role did not hand those powers to managers or auditors."""
@@ -338,8 +338,9 @@ class TestRolePermissions:
         for token in (manager_token, auditor_token):
             headers = _login_headers(token)
             assert client.get("/api/admin/records/template", headers=headers).status_code == 403
-            assert client.get("/api/admin/records/export", headers=headers).status_code == 403
             assert upload_tasks(client, token, rows).status_code == 403
+        # Operators / field verifiers are strictly forbidden from exporting records
+        assert client.get("/api/admin/records/export", headers=_login_headers(user_token)).status_code == 403
 
     def test_auditor_cannot_reassign_records(self, client, auditor_token, test_user):
         denied = client.post(

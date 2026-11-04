@@ -1,3 +1,4 @@
+from app.services.notification_service import create_notification
 import io
 import logging
 from datetime import datetime, timezone
@@ -57,6 +58,8 @@ async def column_options(field: str, choice_search: str = Query("", max_length=2
     filters["column_filters"] = {k: v for k, v in filters["column_filters"].items() if k != field}
     column = func.coalesce(cast(filter_column(field), String), "")
     query = filtered_query(db, **filters)
+    if user.role == UserRole.AUDITOR:
+        query = query.filter(CaptureRecord.qc_status != "Not Applicable", CaptureRecord.source != "manual")
     if choice_search:
         query = query.filter(column.ilike(f"%{choice_search}%"))
     rows = query.with_entities(column, func.count(CaptureRecord.id)).group_by(column).order_by(column).limit(501).all()
@@ -157,6 +160,8 @@ async def qa_dashboard(filters: dict = Depends(record_filters), user: User = Dep
         filters["assigned_auditor_id"] = user.id
         filters["unassigned_auditor"] = False
     query = filtered_query(db, **filters)
+    # Exclude field-captured records where QC is Not Applicable from the QA dashboard
+    query = query.filter(CaptureRecord.qc_status != "Not Applicable", CaptureRecord.source != "manual")
     total, done = query.with_entities(func.count(CaptureRecord.id), func.sum(case((has_qc_expression(), 1), else_=0))).one()
     categories = query.with_entities(CaptureRecord.qc_vhr_comment, func.count(CaptureRecord.id)).filter(
         has_qc_expression()).group_by(CaptureRecord.qc_vhr_comment).order_by(func.count(CaptureRecord.id).desc()).limit(6).all()
@@ -198,7 +203,30 @@ async def save_qc(record_id: int, request: QcRequest, user: User = Depends(requi
         record.assigned_auditor_id = new_auditor_id if new_auditor_id > 0 else None
     elif user.role == UserRole.AUDITOR and record.assigned_auditor_id is None:
         record.assigned_auditor_id = user.id
+    from app.services.record_service import record_qc_history
+    record_qc_history(
+        record,
+        user=user,
+        qc_vhr_comment=record.qc_vhr_comment,
+        qc_street_details=record.qc_street_details,
+        qc_builder_contact=record.qc_builder_contact,
+        qc_sqfeet=record.qc_sqfeet,
+        audit_status=record.audit_status,
+        audit_comment=record.audit_comment,
+        coordinates=record.coordinates,
+    )
     db.commit()
+    create_notification(
+        db=db,
+        type="qa_done",
+        title=f"QA Assessment Saved: {record.unique_id or record.name}",
+        message=f"QA reviewer {user.full_name} completed desk review for {record.unique_id or record.name}.",
+        recipient_role="ADMIN",
+        record_id=record.id,
+        unique_id=record.unique_id,
+        with_sound=False,
+    )
+
     log_activity(db=db, action_type="record_qc", type="record", title="QC assessment saved", user_id=user.id,
                  user_name=user.full_name, record_id=record.id, record_name=record.name, status="success")
     from app.routers.admin import _record_to_detail

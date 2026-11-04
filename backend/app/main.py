@@ -7,7 +7,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 from app.core.config import get_settings
 from app.database.connection import create_tables
-from app.routers import admin, auth, location, records, quality, telecaller
+from app.routers import admin, auth, location, records, quality, telecaller, notifications
 
 settings = get_settings()
 
@@ -88,6 +88,7 @@ app.include_router(records.router, prefix=settings.API_V1_PREFIX)
 app.include_router(location.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(telecaller.router, prefix=settings.API_V1_PREFIX)
+app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health")

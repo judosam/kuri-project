@@ -146,6 +146,8 @@ async def list_telecaller_records(
     )
 
     detail_list = [_record_to_detail(r) for r in records]
+    from app.services.duplicate_detection_service import get_duplicate_detection_service
+    get_duplicate_detection_service().enrich_record_details(db, detail_list)
     return RecordListResponse(
         records=detail_list,
         total=total,
@@ -167,7 +169,10 @@ async def get_telecaller_record(
     if current_user.role.value == "TELECALLER":
         if record.assigned_telecaller_id is not None and record.assigned_telecaller_id != current_user.id:
             raise HTTPException(status_code=403, detail="Record is assigned to another telecaller")
-    return _record_to_detail(record)
+    detail = _record_to_detail(record)
+    from app.services.duplicate_detection_service import get_duplicate_detection_service
+    get_duplicate_detection_service().enrich_single_record(db, detail)
+    return detail
 
 
 @router.post("/records/{record_id}/feedback", response_model=RecordDetail)
@@ -240,6 +245,19 @@ async def save_telecaller_feedback(
     # If unassigned and current user is telecaller, claim it
     if record.assigned_telecaller_id is None and current_user.role.value == "TELECALLER":
         record.assigned_telecaller_id = current_user.id
+
+    from app.services.record_service import record_telecaller_history
+    record_telecaller_history(
+        record,
+        user=current_user,
+        telecaller_status=record.telecaller_status,
+        telecaller_comment=record.telecaller_comment,
+        telecaller_no_of_floors=record.telecaller_no_of_floors,
+        telecaller_expected_completion=record.telecaller_expected_completion,
+        telecaller_built_up_area=record.telecaller_built_up_area,
+        telecaller_stage_of_construction=record.telecaller_stage_of_construction,
+        follow_up_date=record.follow_up_date,
+    )
 
     db.commit()
     db.refresh(record)

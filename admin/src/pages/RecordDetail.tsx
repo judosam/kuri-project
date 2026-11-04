@@ -283,6 +283,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
   }, []);
   const [showEditHistoryModal, setShowEditHistoryModal] = useState(false);
   const [showQcHistoryModal, setShowQcHistoryModal] = useState(false);
+  const [showTelecallerHistoryModal, setShowTelecallerHistoryModal] = useState(false);
   const [recordActivityLogs, setRecordActivityLogs] = useState<ActivityEntry[]>([]);
   const [loadingActivityLogs, setLoadingActivityLogs] = useState(false);
 
@@ -893,17 +894,80 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
         <div className="record-screen-grid">
           {/* LEFT COLUMN — ordered record details */}
           <div className="record-audit-card">
+            {/* DUPLICATE WARNING BANNER (40m / 50m spatial deduplication warning) */}
+            {record.is_duplicate && (
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: '12px 16px',
+                  borderRadius: 10,
+                  background: '#fef2f2',
+                  border: '1.5px solid #f87171',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 20 }}>⚠️</span>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: '#991b1b' }}>
+                        {record.duplicate_warning || 'Site may be already visited'}
+                      </span>
+                      <span
+                        style={{
+                          background: '#dc2626',
+                          color: '#ffffff',
+                          fontSize: 10,
+                          fontWeight: 800,
+                          padding: '2px 7px',
+                          borderRadius: 4,
+                          letterSpacing: '0.04em',
+                        }}
+                      >
+                        DUPLICATE
+                      </span>
+                    </div>
+                    <p style={{ margin: '3px 0 0', fontSize: 12, color: '#b91c1c' }}>
+                      Identified by 40m/50m spatial deduplication engine before verifiers travel.
+                      {record.duplicate_site_id && (
+                        <span>
+                          {' '}Matched site: <strong>{record.duplicate_site_id}</strong>
+                          {record.duplicate_distance_m != null && ` (${record.duplicate_distance_m}m away)`}.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                {record.duplicate_record_id && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/records/${record.duplicate_record_id}`)}
+                    style={{
+                      background: '#ffffff',
+                      color: '#991b1b',
+                      border: '1px solid #fca5a5',
+                      borderRadius: 6,
+                      padding: '6px 12px',
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    View Matched Site
+                  </button>
+                )}
+              </div>
+            )}
             {/* 1. Operator */}
             <Section
               icon="person"
               title="Field Operator"
               action={
-                record.property_type === 'Commercial Property' || record.audit_status === 'COMMERCIAL_PROPERTY' ? (
-                  <span className="rd-chip" style={{ background: '#fef3c7', color: '#b45309', borderColor: '#fde68a' }}>
-                    <span className="rd-dot" style={{ background: '#d97706' }} />
-                    Commercial Property (QC Only)
-                  </span>
-                ) : (
+                record.user_id != null ? (
                   <span className={`rd-chip ${(record.is_manually_added || record.source === 'manual') ? 'rd-chip-neutral' : (isCompleted ? 'rd-chip-ok' : ((record.reassigned_to_id != null || record.revisit_status === 'REASSIGNED' || record.revisit_status === 'PENDING_REVISIT') ? 'rd-chip-info' : 'rd-chip-warn'))}`}>
                     <span className="rd-dot" />
                     {(record.is_manually_added || record.source === 'manual')
@@ -911,6 +975,16 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                       : (isCompleted
                         ? 'Completed'
                         : ((record.reassigned_to_id != null || record.revisit_status === 'REASSIGNED' || record.revisit_status === 'PENDING_REVISIT') ? 'Reassigned' : 'Pending Inspection'))}
+                  </span>
+                ) : (record.property_type === 'Commercial Property' || record.audit_status === 'COMMERCIAL_PROPERTY') ? (
+                  <span className="rd-chip" style={{ background: '#fef3c7', color: '#b45309', borderColor: '#fde68a' }}>
+                    <span className="rd-dot" style={{ background: '#d97706' }} />
+                    Commercial Property (Unassigned)
+                  </span>
+                ) : (
+                  <span className="rd-chip rd-chip-warn">
+                    <span className="rd-dot" />
+                    Pending Assignment
                   </span>
                 )
               }
@@ -1027,7 +1101,29 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                       Edited
                     </span>
                   )}
-                  <AuditStatusChip status={record.audit_status} />
+                  {(record.qc_status === 'Not Applicable' || record.audit_status === 'NOT_APPLICABLE' || (record.is_manually_added && record.source === 'manual')) ? (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        background: '#f1f5f9',
+                        color: '#64748b',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: 9999,
+                        letterSpacing: '0.02em',
+                      }}
+                      title="Direct field discovery by field verifier (Desk QC not applicable)"
+                    >
+                      <Icon name="block" size={12} />
+                      QC Not Applicable (Field Added)
+                    </span>
+                  ) : (
+                    <AuditStatusChip status={record.audit_status} />
+                  )}
                 </div>
               }
               action={
@@ -2072,6 +2168,15 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                   <div className="fancy-action-btn-group">
                     <button
                       type="button"
+                      className="fancy-btn-history"
+                      onClick={() => setShowTelecallerHistoryModal(true)}
+                      title="View Telecaller Verification modification history (last 5 revisions)"
+                    >
+                      <Icon name="history" size={13} />
+                      <span>History {record.telecaller_history && record.telecaller_history.length > 0 ? `(${record.telecaller_history.length})` : ''}</span>
+                    </button>
+                    <button
+                      type="button"
                       className={`fancy-btn-edit${isEditingTelecaller ? ' active' : ''}`}
                       onClick={() => {
                         setTelecallerDraft({
@@ -2979,6 +3084,130 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
             </div>
 
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* 5 Modified Field Verification Revisions History */}
+              {record.field_history && record.field_history.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <Icon name="history" size={16} style={{ color: '#2563eb' }} />
+                      Field Verification Modification History (Last {record.field_history.length} Revisions)
+                    </span>
+                    <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Capped at 5 Revisions</span>
+                  </div>
+                  {record.field_history.map((rev, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        border: idx === 0 ? '1px solid #93c5fd' : '1px solid #e2e8f0',
+                        borderRadius: 12,
+                        background: idx === 0 ? '#f0f9ff' : '#ffffff',
+                        padding: 14,
+                        boxShadow: idx === 0 ? '0 1px 3px rgba(37, 99, 235, 0.08)' : 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{
+                            background: idx === 0 ? '#2563eb' : '#64748b',
+                            color: '#ffffff',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                          }}>
+                            Revision #{record.field_history!.length - idx} {idx === 0 ? '★ Latest' : ''}
+                          </span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>
+                            {rev.user_name || 'Field Verifier'} {rev.user_role ? `(${rev.user_role})` : ''}
+                          </span>
+                          <span style={{ fontSize: 11, color: '#64748b' }}>
+                            {formatDateTime(rev.timestamp)}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {rev.revisit_status && (
+                            <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 9999, fontSize: 10, fontWeight: 700 }}>
+                              {rev.revisit_status}
+                            </span>
+                          )}
+                          <span style={{
+                            background: rev.status === 'COMPLETED' ? '#dcfce7' : '#f1f5f9',
+                            color: rev.status === 'COMPLETED' ? '#15803d' : '#475569',
+                            padding: '2px 8px',
+                            borderRadius: 9999,
+                            fontSize: 11,
+                            fontWeight: 700,
+                          }}>
+                            {rev.status || 'NOT_COMPLETED'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px 12px', fontSize: 12 }}>
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Date of Visit:</span>
+                          <strong style={{ color: '#0f172a' }}>{rev.date_of_visit || '—'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Construction:</span>
+                          <strong style={{ color: rev.construction_happening === 'Yes' ? '#16a34a' : '#dc2626' }}>
+                            {rev.construction_happening || '—'}
+                          </strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Stage of Construction:</span>
+                          <strong style={{ color: '#0f172a' }}>{rev.stage_of_construction || '—'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Type of Construction:</span>
+                          <span style={{ color: '#334155' }}>{rev.type_of_construction || '—'}</span>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>No of Floors:</span>
+                          <span style={{ color: '#0f172a' }}>{rev.no_of_floors || '—'}</span>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Built-up Area:</span>
+                          <span style={{ color: '#0f172a' }}>{rev.built_up_area || '—'}</span>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Contact / Owner:</span>
+                          <strong style={{ color: '#0f172a' }}>{rev.building_user_name || rev.contact_number || '—'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Contractor / Architect:</span>
+                          <span style={{ color: '#0f172a' }}>{rev.site_contractor_architect_name || rev.site_contractor_architect_number || '—'}</span>
+                        </div>
+                        {rev.updated_coordinates && (
+                          <div>
+                            <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Coordinates:</span>
+                            <span style={{ fontFamily: 'monospace', color: '#2563eb', fontWeight: 600 }}>{rev.updated_coordinates}</span>
+                          </div>
+                        )}
+                        {rev.follow_up_date && (
+                          <div>
+                            <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Follow-up Date:</span>
+                            <strong style={{ color: '#0284c7' }}>{rev.follow_up_date}</strong>
+                          </div>
+                        )}
+                        {rev.remarks && (
+                          <div style={{ gridColumn: '1 / -1', background: '#f8fafc', padding: '6px 10px', borderRadius: 6, border: '1px solid #f1f5f9' }}>
+                            <span style={{ color: '#64748b', fontWeight: 600, fontSize: 11 }}>Remarks: </span>
+                            <span style={{ color: '#334155' }}>{rev.remarks}</span>
+                          </div>
+                        )}
+                        {rev.updated_information && (
+                          <div style={{ gridColumn: '1 / -1', background: '#eff6ff', padding: '6px 10px', borderRadius: 6, border: '1px solid #dbeafe' }}>
+                            <span style={{ color: '#1e40af', fontWeight: 600, fontSize: 11 }}>Updated Info: </span>
+                            <span style={{ color: '#1e3a8a' }}>{rev.updated_information}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Revision Card: Latest / Revisit Inspection */}
               <div style={{ border: '1px solid #bfdbfe', borderRadius: 10, background: '#f8fafc', padding: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -3142,6 +3371,84 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
 
             {/* Modal Content */}
             <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* 5 Modified QC Revisions History */}
+              {record.qc_history && record.qc_history.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0369a1', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <Icon name="history" size={16} style={{ color: '#0284c7' }} />
+                      QC Modification History (Last {record.qc_history.length} Revisions)
+                    </span>
+                    <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Capped at 5 Revisions</span>
+                  </div>
+                  {record.qc_history.map((rev, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        border: idx === 0 ? '1px solid #7dd3fc' : '1px solid #e2e8f0',
+                        borderRadius: 12,
+                        background: idx === 0 ? '#f0f9ff' : '#ffffff',
+                        padding: 14,
+                        boxShadow: idx === 0 ? '0 1px 3px rgba(2, 132, 199, 0.08)' : 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{
+                            background: idx === 0 ? '#0284c7' : '#64748b',
+                            color: '#ffffff',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                          }}>
+                            Revision #{record.qc_history!.length - idx} {idx === 0 ? '★ Latest' : ''}
+                          </span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>
+                            {rev.user_name || 'Auditor'} {rev.user_role ? `(${rev.user_role})` : ''}
+                          </span>
+                          <span style={{ fontSize: 11, color: '#64748b' }}>
+                            {formatDateTime(rev.timestamp)}
+                          </span>
+                        </div>
+                        <AuditStatusChip status={(rev.audit_status as AuditStatus) || 'PENDING'} />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px 12px', fontSize: 12 }}>
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>VHR Imagery:</span>
+                          <strong style={{ color: '#0f172a' }}>{rev.qc_vhr_comment || '—'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Street View:</span>
+                          <span style={{ color: '#334155' }}>{rev.qc_street_details || '—'}</span>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Builder / Contact:</span>
+                          <strong style={{ color: '#0f172a' }}>{rev.qc_builder_contact || '—'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Sq.ft:</span>
+                          <strong style={{ color: '#0f172a' }}>{rev.qc_sqfeet || '—'}</strong>
+                        </div>
+                        {rev.coordinates && (
+                          <div>
+                            <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Coordinates:</span>
+                            <span style={{ fontFamily: 'monospace', color: '#0284c7', fontWeight: 600 }}>{rev.coordinates}</span>
+                          </div>
+                        )}
+                        {rev.audit_comment && (
+                          <div style={{ gridColumn: '1 / -1', background: '#f8fafc', padding: '6px 10px', borderRadius: 6, border: '1px solid #f1f5f9' }}>
+                            <span style={{ color: '#64748b', fontWeight: 600, fontSize: 11 }}>Remarks / Comment: </span>
+                            <span style={{ color: '#334155' }}>{rev.audit_comment}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Latest / Current QC Assessment */}
               <div style={{ border: '1px solid #bae6fd', borderRadius: 12, background: '#f0f9ff', padding: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -3305,6 +3612,167 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                 type="button"
                 className="btn btn-secondary btn-sm"
                 onClick={() => setShowQcHistoryModal(false)}
+                style={{ padding: '6px 16px', fontWeight: 600 }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Telecaller Verification History Modal */}
+      {showTelecallerHistoryModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            backdropFilter: 'blur(4px)',
+            padding: 16,
+          }}
+          onClick={() => setShowTelecallerHistoryModal(false)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 16,
+              width: '100%',
+              maxWidth: 780,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 22px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '16px 16px 0 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="phone_in_talk" size={24} style={{ color: '#16a34a' }} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: '#0f172a' }}>Telecaller Verification History</h3>
+                    <span style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: 9999, fontSize: 11, fontWeight: 700 }}>
+                      Last 5 Revisions
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>
+                    Record #{record.id} — <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{record.unique_id || record.name}</span>
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setShowTelecallerHistoryModal(false)}
+                style={{ padding: '6px 10px', fontSize: 18, lineHeight: 1, borderRadius: 8 }}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {record.telecaller_history && record.telecaller_history.length > 0 ? (
+                record.telecaller_history.map((rev, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      border: idx === 0 ? '1px solid #86efac' : '1px solid #e2e8f0',
+                      borderRadius: 12,
+                      background: idx === 0 ? '#f0fdf4' : '#ffffff',
+                      padding: 14,
+                      boxShadow: idx === 0 ? '0 1px 3px rgba(22, 163, 74, 0.08)' : 'none',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{
+                          background: idx === 0 ? '#16a34a' : '#64748b',
+                          color: '#ffffff',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                        }}>
+                          Revision #{record.telecaller_history!.length - idx} {idx === 0 ? '★ Latest' : ''}
+                        </span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>
+                          {rev.user_name || 'Telecaller'} {rev.user_role ? `(${rev.user_role})` : ''}
+                        </span>
+                        <span style={{ fontSize: 11, color: '#64748b' }}>
+                          {formatDateTime(rev.timestamp)}
+                        </span>
+                      </div>
+                      <span style={{
+                        background: rev.telecaller_status === 'CONSTRUCTION_CONFIRMED' ? '#dcfce7' : '#f1f5f9',
+                        color: rev.telecaller_status === 'CONSTRUCTION_CONFIRMED' ? '#15803d' : '#334155',
+                        border: '1px solid #cbd5e1',
+                        padding: '2px 8px',
+                        borderRadius: 9999,
+                        fontSize: 11,
+                        fontWeight: 700,
+                      }}>
+                        {(rev.telecaller_status || 'PENDING').replace(/_/g, ' ')}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px 12px', fontSize: 12 }}>
+                      <div>
+                        <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Stage of Construction:</span>
+                        <strong style={{ color: '#0f172a' }}>{rev.telecaller_stage_of_construction || '—'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>No of Floors:</span>
+                        <span style={{ color: '#0f172a' }}>{rev.telecaller_no_of_floors || '—'}</span>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Built-up Area:</span>
+                        <span style={{ color: '#0f172a' }}>{rev.telecaller_built_up_area || '—'}</span>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Expected Completion:</span>
+                        <span style={{ color: '#0f172a' }}>{rev.telecaller_expected_completion || '—'}</span>
+                      </div>
+                      {rev.follow_up_date && (
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Follow-up Date:</span>
+                          <strong style={{ color: '#16a34a' }}>{rev.follow_up_date}</strong>
+                        </div>
+                      )}
+                      {rev.telecaller_comment && (
+                        <div style={{ gridColumn: '1 / -1', background: '#f8fafc', padding: '8px 12px', borderRadius: 6, border: '1px solid #e2e8f0', marginTop: 4 }}>
+                          <span style={{ color: '#475569', fontWeight: 600, fontSize: 11, display: 'block', marginBottom: 4 }}>Conversation Notes / Call Log:</span>
+                          <div style={{ color: '#1e293b', fontSize: 12, whiteSpace: 'pre-wrap' }}>
+                            {rev.telecaller_comment}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div style={{ padding: 24, textAlign: 'center', color: '#64748b', fontSize: 13, background: '#f8fafc', borderRadius: 10, border: '1px dashed #cbd5e1' }}>
+                  No previous telecaller verification revisions saved yet.
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '14px 22px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '0 0 16px 16px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setShowTelecallerHistoryModal(false)}
                 style={{ padding: '6px 16px', fontWeight: 600 }}
               >
                 Close

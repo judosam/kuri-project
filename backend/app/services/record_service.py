@@ -460,7 +460,7 @@ class RecordService:
         if user.role.value == "TELECALLER":
             return record.assigned_telecaller_id == user.id or record.assigned_telecaller_id is None
         # Field workers (USER operators and FIELD_VERIFIERs) see their own records.
-        return (record.user_id == user.id or record.reassigned_to_id == user.id) and record.audit_status not in ("DISAPPROVAL", "COMMERCIAL_PROPERTY")
+        return (record.user_id == user.id or record.reassigned_to_id == user.id) and record.audit_status != "DISAPPROVAL"
 
     def audit_record(
         self,
@@ -539,9 +539,21 @@ class RecordService:
                 record.qc_edited_at = None
                 record.qc_by_id = None
 
-        if record.status not in ("COMPLETED", "Updated Revisited", "UPDATED_REVISITED") and audit_status not in ("APPROVAL", "RE_AUDITED"):
-            # Blocked outcomes: never assigned to a field operator.
+        if record.status not in ("COMPLETED", "Updated Revisited", "UPDATED_REVISITED") and audit_status in ("DISAPPROVAL", "COMMERCIAL_PROPERTY"):
+            # Blocked / unassigned outcomes: clear user assignment.
             record.user_id = None
+
+        record_qc_history(
+            record,
+            user=auditor,
+            audit_status=audit_status,
+            audit_comment=record.audit_comment,
+            qc_vhr_comment=record.qc_vhr_comment,
+            qc_street_details=record.qc_street_details,
+            qc_builder_contact=record.qc_builder_contact,
+            qc_sqfeet=record.qc_sqfeet,
+            coordinates=record.coordinates,
+        )
 
         self.db.commit()
         self.db.refresh(record)
@@ -582,20 +594,35 @@ class RecordService:
         assigner: User,
     ) -> CaptureRecord:
         """Assign or reassign a record to a field verifier."""
-        if record.audit_status in ("DISAPPROVAL", "COMMERCIAL_PROPERTY") or getattr(record, "property_type", None) in ("Commercial Property", "COMMERCIAL_PROPERTY"):
-            raise ValueError("Disapproved or commercial records cannot be assigned to a field verifier")
+        if record.audit_status == "DISAPPROVAL":
+            raise ValueError("Disapproved records cannot be assigned to a field verifier")
+
+        has_prior_history = bool(
+            record.status in ("COMPLETED", "Updated Revisited", "UPDATED_REVISITED")
+            or record.revisit_status
+            or record.images
+            or getattr(record, "field_captured_at", None)
+            or getattr(record, "updated_information", None)
+        )
+        was_previously_assigned = bool(record.user_id and record.user_id != verifier_id)
+        is_reassignment = was_previously_assigned or has_prior_history
 
         now_utc = datetime.now(timezone.utc)
         record.user_id = verifier_id
         record.staged_operator_id = verifier_id
-        record.reassigned_to_id = verifier_id
-        record.reassigned_at = now_utc
         record.assigned_at = now_utc
         record.updated_at = now_utc
-
-        # Verification Status is marked NOT_COMPLETED and REASSIGNED
         record.status = "NOT_COMPLETED"
-        record.revisit_status = "REASSIGNED"
+
+        if is_reassignment:
+            record.reassigned_to_id = verifier_id
+            record.reassigned_at = now_utc
+            record.revisit_status = "REASSIGNED"
+        else:
+            # First time assignment: explicitly Pending, not Reassigned
+            record.reassigned_to_id = None
+            record.reassigned_at = None
+            record.revisit_status = None
 
         # DO NOT wipe any QC details, comments, or audit decisions!
         self.db.commit()
@@ -1216,3 +1243,163 @@ class RecordService:
             location_search=location_search,
             user_id=user_id,
         )
+
+
+def record_qc_history(record: CaptureRecord, user: Optional[Any] = None, **kwargs) -> list:
+    """Prepend a QC modification snapshot to qc_history, capped at the last 5 revisions."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "timestamp": now_iso,
+        "user_id": getattr(user, "id", None) or record.qc_by_id or record.audited_by_id,
+        "user_name": (getattr(user, "full_name", None) or getattr(user, "username", None)) if user else None,
+        "user_role": (user.role.value if hasattr(getattr(user, "role", None), "value") else str(getattr(user, "role", ""))) if user else None,
+        "audit_status": kwargs.get("audit_status", record.audit_status),
+        "audit_comment": kwargs.get("audit_comment", record.audit_comment),
+        "qc_vhr_comment": kwargs.get("qc_vhr_comment", record.qc_vhr_comment),
+        "qc_street_details": kwargs.get("qc_street_details", record.qc_street_details),
+        "qc_builder_contact": kwargs.get("qc_builder_contact", record.qc_builder_contact),
+        "qc_sqfeet": kwargs.get("qc_sqfeet", record.qc_sqfeet),
+        "coordinates": kwargs.get("coordinates", record.coordinates),
+        "qc_reference_image_key": kwargs.get("qc_reference_image_key", record.qc_reference_image_key),
+    }
+
+    existing = list(record.qc_history) if record.qc_history else []
+    if not existing and (record.qc_completed_at or record.audited_at or (record.qc_vhr_comment and str(record.qc_vhr_comment).strip())):
+        baseline_time = record.qc_edited_at or record.qc_completed_at or record.audited_at or record.created_at
+        baseline_entry = {
+            "timestamp": baseline_time.isoformat() if hasattr(baseline_time, "isoformat") else str(baseline_time),
+            "user_id": record.qc_by_id or record.audited_by_id,
+            "user_name": (record.qc_by.full_name if getattr(record, "qc_by", None) else (record.audited_by.full_name if getattr(record, "audited_by", None) else None)),
+            "user_role": "AUDITOR" if record.audited_by_id else None,
+            "audit_status": record.audit_status,
+            "audit_comment": record.audit_comment,
+            "qc_vhr_comment": record.qc_vhr_comment,
+            "qc_street_details": record.qc_street_details,
+            "qc_builder_contact": record.qc_builder_contact,
+            "qc_sqfeet": record.qc_sqfeet,
+            "coordinates": record.coordinates,
+            "qc_reference_image_key": record.qc_reference_image_key,
+        }
+        if (
+            baseline_entry.get("qc_vhr_comment") != entry.get("qc_vhr_comment")
+            or baseline_entry.get("audit_status") != entry.get("audit_status")
+            or baseline_entry.get("coordinates") != entry.get("coordinates")
+        ):
+            existing.append(baseline_entry)
+
+    updated = [entry, *existing][:5]
+    record.qc_history = updated
+    return updated
+
+
+def record_field_history(record: CaptureRecord, user: Optional[Any] = None, **kwargs) -> list:
+    """Prepend a Field Verification modification snapshot to field_history, capped at the last 5 revisions."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "timestamp": now_iso,
+        "user_id": getattr(user, "id", None) or record.updated_by_id or record.user_id,
+        "user_name": (getattr(user, "full_name", None) or getattr(user, "username", None)) if user else record.updated_by_name,
+        "user_role": (user.role.value if hasattr(getattr(user, "role", None), "value") else str(getattr(user, "role", ""))) if user else record.updated_by_role,
+        "status": kwargs.get("status", record.status),
+        "revisit_status": kwargs.get("revisit_status", record.revisit_status),
+        "date_of_visit": kwargs.get("date_of_visit", record.date_of_visit),
+        "construction_happening": kwargs.get("construction_happening", record.construction_happening),
+        "stage_of_construction": kwargs.get("stage_of_construction", record.stage_of_construction),
+        "type_of_construction": kwargs.get("type_of_construction", record.type_of_construction),
+        "no_of_floors": kwargs.get("no_of_floors", record.no_of_floors),
+        "built_up_area": kwargs.get("built_up_area", record.built_up_area),
+        "expected_completion": kwargs.get("expected_completion", record.expected_completion),
+        "building_user_name": kwargs.get("building_user_name", record.building_user_name),
+        "relationship_with_building": kwargs.get("relationship_with_building", record.relationship_with_building),
+        "spoken_with": kwargs.get("spoken_with", record.spoken_with),
+        "contact_number": kwargs.get("contact_number", record.contact_number),
+        "site_contractor_architect_name": kwargs.get("site_contractor_architect_name", record.site_contractor_architect_name),
+        "site_contractor_architect_number": kwargs.get("site_contractor_architect_number", record.site_contractor_architect_number),
+        "remarks": kwargs.get("remarks", record.remarks),
+        "updated_coordinates": kwargs.get("updated_coordinates", record.updated_coordinates),
+        "updated_information": kwargs.get("updated_information", record.updated_information),
+        "follow_up_date": kwargs.get("follow_up_date", record.follow_up_date),
+    }
+
+    existing = list(record.field_history) if record.field_history else []
+    if not existing and (record.field_captured_at or record.date_of_visit or record.status in ("COMPLETED", "Updated Revisited", "UPDATED_REVISITED")):
+        baseline_time = record.field_captured_at or record.updated_at or record.created_at
+        baseline_entry = {
+            "timestamp": baseline_time.isoformat() if hasattr(baseline_time, "isoformat") else str(baseline_time),
+            "user_id": record.user_id,
+            "user_name": record.user.full_name if getattr(record, "user", None) else record.updated_by_name,
+            "user_role": "FIELD_VERIFIER" if record.user_id else None,
+            "status": record.status,
+            "revisit_status": record.revisit_status,
+            "date_of_visit": record.date_of_visit,
+            "construction_happening": record.construction_happening,
+            "stage_of_construction": record.stage_of_construction,
+            "type_of_construction": record.type_of_construction,
+            "no_of_floors": record.no_of_floors,
+            "built_up_area": record.built_up_area,
+            "expected_completion": record.expected_completion,
+            "building_user_name": record.building_user_name,
+            "relationship_with_building": record.relationship_with_building,
+            "spoken_with": record.spoken_with,
+            "contact_number": record.contact_number,
+            "site_contractor_architect_name": record.site_contractor_architect_name,
+            "site_contractor_architect_number": record.site_contractor_architect_number,
+            "remarks": record.remarks,
+            "updated_coordinates": record.updated_coordinates,
+            "updated_information": record.updated_information,
+            "follow_up_date": record.follow_up_date,
+        }
+        if (
+            baseline_entry.get("status") != entry.get("status")
+            or baseline_entry.get("stage_of_construction") != entry.get("stage_of_construction")
+            or baseline_entry.get("remarks") != entry.get("remarks")
+        ):
+            existing.append(baseline_entry)
+
+    updated = [entry, *existing][:5]
+    record.field_history = updated
+    return updated
+
+
+def record_telecaller_history(record: CaptureRecord, user: Optional[Any] = None, **kwargs) -> list:
+    """Prepend a Telecaller modification snapshot to telecaller_history, capped at the last 5 revisions."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "timestamp": now_iso,
+        "user_id": getattr(user, "id", None) or record.telecaller_by_id or record.updated_by_id,
+        "user_name": (getattr(user, "full_name", None) or getattr(user, "username", None)) if user else record.updated_by_name,
+        "user_role": (user.role.value if hasattr(getattr(user, "role", None), "value") else str(getattr(user, "role", ""))) if user else record.updated_by_role,
+        "telecaller_status": kwargs.get("telecaller_status", record.telecaller_status),
+        "telecaller_comment": kwargs.get("telecaller_comment", record.telecaller_comment),
+        "telecaller_no_of_floors": kwargs.get("telecaller_no_of_floors", record.telecaller_no_of_floors),
+        "telecaller_expected_completion": kwargs.get("telecaller_expected_completion", record.telecaller_expected_completion),
+        "telecaller_built_up_area": kwargs.get("telecaller_built_up_area", record.telecaller_built_up_area),
+        "telecaller_stage_of_construction": kwargs.get("telecaller_stage_of_construction", record.telecaller_stage_of_construction),
+        "follow_up_date": kwargs.get("follow_up_date", record.follow_up_date),
+    }
+
+    existing = list(record.telecaller_history) if record.telecaller_history else []
+    if not existing and (record.telecaller_called_at or record.telecaller_status):
+        baseline_time = record.telecaller_called_at or record.updated_at or record.created_at
+        baseline_entry = {
+            "timestamp": baseline_time.isoformat() if hasattr(baseline_time, "isoformat") else str(baseline_time),
+            "user_id": record.telecaller_by_id,
+            "user_name": record.telecaller_by.full_name if getattr(record, "telecaller_by", None) else None,
+            "user_role": "TELECALLER",
+            "telecaller_status": record.telecaller_status,
+            "telecaller_comment": record.telecaller_comment,
+            "telecaller_no_of_floors": record.telecaller_no_of_floors,
+            "telecaller_expected_completion": record.telecaller_expected_completion,
+            "telecaller_built_up_area": record.telecaller_built_up_area,
+            "telecaller_stage_of_construction": record.telecaller_stage_of_construction,
+            "follow_up_date": record.follow_up_date,
+        }
+        if (
+            baseline_entry.get("telecaller_status") != entry.get("telecaller_status")
+            or baseline_entry.get("telecaller_comment") != entry.get("telecaller_comment")
+        ):
+            existing.append(baseline_entry)
+
+    updated = [entry, *existing][:5]
+    record.telecaller_history = updated
+    return updated

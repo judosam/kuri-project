@@ -22,6 +22,9 @@ import TelecallerDashboard from './pages/TelecallerDashboard';
 import TelecallerRecords from './pages/TelecallerRecords';
 import { AdminMobileNav } from './components/AdminMobileNav';
 import ErrorBoundary from './components/ErrorBoundary';
+import { NotificationProvider } from './context/NotificationContext';
+import { NotificationBell } from './components/NotificationBell';
+import { NotificationToastContainer } from './components/NotificationToastContainer';
 
 export interface NavItem {
   to: string;
@@ -184,7 +187,8 @@ function AppShell() {
   }
 
   return (
-    <div className={`fos-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${isRecordDetail ? 'fos-shell-fixed' : ''}`}>
+    <NotificationProvider>
+      <div className={`fos-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${isRecordDetail ? 'fos-shell-fixed' : ''}`}>
       <Sidebar
         user={user}
         isCollapsed={sidebarCollapsed}
@@ -243,7 +247,7 @@ function AppShell() {
             <Route path="/settings" element={<Navigate to="/admin/users" replace />} />
             <Route path="/settings/users" element={user.role === 'ADMIN' ? <Users /> : <Navigate to="/" replace />} />
             <Route path="/records" element={user.role === 'ADMIN' ? <Navigate to="/admin/records" replace /> : user.role === 'AUDITOR' ? <Navigate to="/auditor/records" replace /> : user.role === 'TELECALLER' ? <Navigate to="/telecaller/records" replace /> : <Navigate to="/verifier" replace />} />
-            <Route path="/records/import" element={user.role === 'ADMIN' ? <ImportRecords canImportHistory={user.role === 'ADMIN'} /> : <Navigate to="/" replace />} />
+            <Route path="/records/import" element={user.role === 'ADMIN' ? <ImportRecords /> : <Navigate to="/" replace />} />
             <Route path="/records/import-previous" element={user.role === 'ADMIN' ? <ImportPreviousRecords /> : <Navigate to="/" replace />} />
             <Route path="/records/imported/:id" element={user.role === 'ADMIN' ? <ImportedRecordDetail /> : user.role === 'AUDITOR' ? <RecordDetail canAdmin={false} canAudit={true} /> : <RecordDetail canAdmin={false} canAudit={false} />} />
             <Route path="/records/:id" element={user.role === 'AUDITOR' ? <RecordDetail canAdmin={false} canAudit={true} /> : user.role === 'TELECALLER' ? <Navigate to="/telecaller/records" replace /> : <RecordDetail canAdmin={user.role === 'ADMIN'} canAudit={user.role === 'ADMIN'} />} />
@@ -255,6 +259,8 @@ function AppShell() {
       </div>
       <AdminMobileNav role={user.role} />
     </div>
+      <NotificationToastContainer />
+    </NotificationProvider>
   );
 }
 
@@ -302,6 +308,7 @@ function TopBar({ user }: { user: User; isCollapsed?: boolean; onToggleCollapse?
             <span className="btn-label">Import Task Sheet</span>
           </button>
         )}
+        <NotificationBell />
         {header.right || (
           <div className="system-status-pill">
             <span className="pulse-dot" />

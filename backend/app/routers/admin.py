@@ -1,3 +1,4 @@
+from app.services.notification_service import create_notification
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -190,6 +191,25 @@ async def reassign_records(
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
+    if reassigned > 0:
+        create_notification(
+            db=db,
+            type="verifier_assigned",
+            title=f"Field Tasks Reassigned: {reassigned} Record(s)",
+            message=f"{admin.full_name} reassigned {reassigned} pending site inspection(s) to you.",
+            recipient_id=target_user.id,
+            recipient_role="FIELD_VERIFIER",
+            with_sound=True,
+        )
+        create_notification(
+            db=db,
+            type="verifier_assigned",
+            title=f"Field Tasks Reassigned: {reassigned} Record(s) to {target_user.full_name}",
+            message=f"{admin.full_name} reassigned {reassigned} pending site inspection(s) to {target_user.full_name}.",
+            recipient_role="ADMIN",
+            with_sound=True,
+        )
+
     log_activity(
         db=db,
         action_type="record_reassign",
@@ -245,6 +265,10 @@ async def assign_auditor_endpoint(
         if not record:
             skipped += 1
             continue
+        if record.qc_status == "Not Applicable" or (record.is_manually_added and record.source == "manual"):
+            # Desk QC review not applicable for field-verified captures
+            skipped += 1
+            continue
         if auditor.role == UserRole.AUDITOR and record.assigned_auditor_id not in (None, auditor.id):
             skipped += 1
             continue
@@ -253,6 +277,17 @@ async def assign_auditor_endpoint(
             routed += 1
         except ValueError:
             skipped += 1
+
+    if routed > 0:
+        create_notification(
+            db=db,
+            type="qa_assigned",
+            title=f"New QA Task: {routed} Record(s) Assigned",
+            message=f"{current_user.full_name} assigned {routed} record(s) to you for QA verification.",
+            recipient_id=auditor.id,
+            recipient_role="AUDITOR",
+            with_sound=True,
+        )
 
     log_activity(
         db=db,
@@ -319,6 +354,25 @@ async def assign_verifier_endpoint(
         except ValueError:
             skipped += 1
             skipped_reasons += 1
+
+    if assigned > 0:
+        create_notification(
+            db=db,
+            type="verifier_assigned",
+            title=f"New Field Tasks: {assigned} Record(s) Assigned",
+            message=f"{current_user.full_name} assigned {assigned} site inspection(s) to you.",
+            recipient_id=verifier.id,
+            recipient_role="FIELD_VERIFIER",
+            with_sound=True,
+        )
+        create_notification(
+            db=db,
+            type="verifier_assigned",
+            title=f"Field Tasks Assigned: {assigned} Record(s) to {verifier.full_name}",
+            message=f"{current_user.full_name} assigned {assigned} site inspection(s) to {verifier.full_name}.",
+            recipient_role="ADMIN",
+            with_sound=True,
+        )
 
     log_activity(
         db=db,
@@ -480,6 +534,17 @@ async def assign_telecaller_endpoint(
     )
     db.commit()
 
+    if assigned > 0:
+        create_notification(
+            db=db,
+            type="telecaller_assigned",
+            title=f"New Calling Queue: {assigned} Record(s) Assigned",
+            message=f"{current_user.full_name} assigned {assigned} lead record(s) to you for telecalling.",
+            recipient_id=telecaller.id,
+            recipient_role="TELECALLER",
+            with_sound=True,
+        )
+
     log_activity(
         db=db,
         action_type="record_assign_telecaller",
@@ -545,6 +610,10 @@ def _build_activity_entries(db: Session) -> List[ActivityEntry]:
         .order_by(ActivityLog.created_at.desc(), ActivityLog.id.desc())
         .all()
     )
+    # Fast in-memory map for unique_id and user_role
+    record_map = {r.id: r.unique_id for r in db.query(CaptureRecord.id, CaptureRecord.unique_id).all()}
+    user_map = {u.id: (u.role.value if hasattr(u.role, 'value') else str(u.role)) for u in db.query(User.id, User.role).all()}
+
     entries: List[ActivityEntry] = []
     for l in logs:
         entries.append(
@@ -552,12 +621,15 @@ def _build_activity_entries(db: Session) -> List[ActivityEntry]:
                 id=f"log-{l.id}",
                 ts=l.created_at,
                 type=l.type,
+                action_type=l.action_type,
                 title=l.title,
                 detail=l.detail,
                 user_id=l.user_id,
                 user_name=l.user_name,
+                user_role=user_map.get(l.user_id),
                 record_id=l.record_id,
                 record_name=l.record_name,
+                unique_id=record_map.get(l.record_id) if l.record_id else None,
             )
         )
     return entries
@@ -832,12 +904,13 @@ async def admin_list_records(
     unassigned_auditor: bool = False,
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
-    audit_status: Optional[str] = Query(None, pattern="^(PENDING|APPROVAL|DISAPPROVAL|COMMERCIAL_PROPERTY|RE_AUDITED)$"),
-    qc_status: Optional[str] = Query(None, pattern="^(DONE|PENDING)$"),
+    audit_status: Optional[str] = Query(None, pattern="^(PENDING|APPROVAL|DISAPPROVAL|COMMERCIAL_PROPERTY|RE_AUDITED|NOT_APPLICABLE)$"),
+    qc_status: Optional[str] = Query(None, pattern="^(DONE|PENDING|NOT_APPLICABLE|Not Applicable)$"),
     sort_by: str = Query("assigned_at", pattern=SORT_PATTERN),
     column_filters: Optional[str] = Query(None, max_length=16000),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     date_field: str = Query("created_at", pattern="^(created_at|assigned_at|captured_at|completed_at|qc_completed_at)$"),
+    for_qa: bool = Query(False, description="Restrict to desk QA reviewable leads, excluding Not Applicable"),
     admin: User = Depends(require_record_manager),
     db: Session = Depends(get_db),
 ):
@@ -846,6 +919,7 @@ async def admin_list_records(
     if admin.role == UserRole.AUDITOR:
         assigned_auditor_id = admin.id
         unassigned_auditor = False
+        for_qa = True
     record_service = RecordService(db)
     records, total = record_service.get_all_records(
         page=page, page_size=page_size, status=status, search=search, user_id=user_id,
@@ -856,9 +930,13 @@ async def admin_list_records(
         qc_status=qc_status,
         column_filters=parse_column_filters(column_filters),
         assigned_auditor_id=assigned_auditor_id, unassigned_user=unassigned_user, unassigned_auditor=unassigned_auditor,
+        for_qa=for_qa,
     )
+    detail_records = [_record_to_detail(r) for r in records]
+    from app.services.duplicate_detection_service import get_duplicate_detection_service
+    get_duplicate_detection_service().enrich_record_details(db, detail_records)
     return RecordListResponse(
-        records=[_record_to_detail(r) for r in records],
+        records=detail_records,
         total=total, page=page, page_size=page_size,
     )
 
@@ -1224,11 +1302,12 @@ async def export_records(
     date_to: Optional[datetime] = Query(None),
     search: Optional[str] = Query(None),
     date_field: str = Query("created_at", pattern="^(created_at|assigned_at|captured_at|completed_at|qc_completed_at)$"),
-    audit_status: Optional[str] = Query(None, pattern="^(PENDING|APPROVAL|DISAPPROVAL|COMMERCIAL_PROPERTY|RE_AUDITED)$"),
-    qc_status: Optional[str] = Query(None, pattern="^(DONE|PENDING)$"),
+    audit_status: Optional[str] = Query(None, pattern="^(PENDING|APPROVAL|DISAPPROVAL|COMMERCIAL_PROPERTY|RE_AUDITED|NOT_APPLICABLE)$"),
+    qc_status: Optional[str] = Query(None, pattern="^(DONE|PENDING|NOT_APPLICABLE|Not Applicable)$"),
     column_filters: Optional[str] = Query(None, max_length=16000),
     include_images: bool = Query(True),
     sections: Optional[str] = Query(None),
+    for_qa: bool = Query(False, description="Restrict to desk QA reviewable leads, excluding Not Applicable"),
     admin: User = Depends(require_record_manager),
     db: Session = Depends(get_db),
 ):
@@ -1239,10 +1318,11 @@ async def export_records(
     if admin.role == UserRole.AUDITOR:
         assigned_auditor_id = admin.id
         unassigned_auditor = False
+        for_qa = True
     parsed_sections = [s.strip().lower() for s in sections.split(",") if s.strip()] if sections else None
     records = iter_report_records(RecordService(db), status=status, user_id=user_id,
                                   date_from=date_from, date_to=date_to, search=search, date_field=date_field, audit_status=audit_status, qc_status=qc_status, column_filters=parse_column_filters(column_filters),
-                                  assigned_auditor_id=assigned_auditor_id, unassigned_user=unassigned_user, unassigned_auditor=unassigned_auditor)
+                                  assigned_auditor_id=assigned_auditor_id, unassigned_user=unassigned_user, unassigned_auditor=unassigned_auditor, for_qa=for_qa)
     content = build_records_report(records, _record_to_detail, include_images=include_images, sections=parsed_sections)
     log_activity(db=db, action_type="record_download", type="record", title="Full records report exported",
                  detail=f"Excel report exported (photos={'included' if include_images else 'excluded'}, sections={sections or 'all'})", user_id=admin.id,
@@ -1332,8 +1412,11 @@ async def upload_tasks_sheet(
     expected_key_columns = {
         "operator_email", "email", "assigned_email", "operator", "user_email", "verifier_email", "field_verifier_email",
         "audit_user", "auditor_email", "auditor",
-        "coordinates", "coordinate", "coords", "gps", "site_address", "address", "unique_id", "uid", "street_address",
+        "coordinates", "coordinate", "coords", "gps", "lat", "latitude", "lon", "lng", "longitude",
+        "site_address", "address", "unique_id", "uid", "street_address",
         "survey_no", "survey_number", "village", "taluk", "district",
+        "detection_type", "area_sqm", "priority_tier", "construction_stage",
+        "model_confidence_score", "meets_strict_construction_definition", "contradicts_planetscope_still_vegetated",
     }
     if not any(h in expected_key_columns for h in headers):
         raise HTTPException(
@@ -1510,13 +1593,20 @@ async def upload_tasks_sheet(
                 })
                 continue
 
-        # ── Auto-generate unique_id from coordinates if omitted ──
+        # ── Auto-generate standard 6-digit unique_id (CBE-XXXXXX) if omitted or legacy ──
+        old_unique_id = None
+        from app.services.record_service import generate_unique_id
         if not unique_id and lat_val is not None and lng_val is not None:
-            from app.services.record_service import generate_unique_id
             try:
-                unique_id = generate_unique_id(lat_val, lng_val, prefix="CBE")
+                unique_id = record_service.next_six_digit_unique_id(prefix="CBE")
+                old_unique_id = generate_unique_id(lat_val, lng_val, prefix="CBE")
             except Exception:
                 pass
+        elif unique_id:
+            import re as _re
+            if not _re.match(r"^CBE-\d{6}$", str(unique_id).strip(), _re.IGNORECASE):
+                old_unique_id = str(unique_id).strip().upper()
+                unique_id = record_service.next_six_digit_unique_id(prefix="CBE")
 
         # ── Duplicate Prevention & Warning ──
         # Compare against intra-sheet records and existing database records.
@@ -1563,25 +1653,50 @@ async def upload_tasks_sheet(
         if coords_str:
             seen_coordinates[coords_str] = idx
 
-        # ── Auto-resolve Village, Taluk, District if empty ──
-        if not (taluk.strip() and village.strip() and district.strip()):
-            from app.services.village_master_service import get_village_master_service
-            res = get_village_master_service().resolve_record_location(
-                village=village,
-                taluk=taluk,
-                district=district,
-                coordinates=coords_str,
-                site_address=site_address,
-                street_address=street_address,
-            )
-            taluk = res["taluk"]
-            village = res["village"]
-            district = res["district"]
-            if res.get("formatted_address"):
-                if not street_address:
-                    street_address = res["formatted_address"]
-                if not site_address:
-                    site_address = res["formatted_address"]
+        # ── Auto-resolve Village, Taluk, District, Survey No, Subdivision No via WFS if empty ──
+        if not (taluk.strip() and village.strip() and district.strip()) or not (survey_no and subdivision_no):
+            if lat_val is not None and lng_val is not None:
+                try:
+                    from app.services.tngis_wfs_service import get_tngis_wfs_service
+                    wfs_data = get_tngis_wfs_service().resolve_coordinates(lat_val, lng_val)
+                    if not survey_no and wfs_data.get("survey_no"):
+                        survey_no = wfs_data["survey_no"]
+                        survey_number = survey_no
+                    if not subdivision_no and wfs_data.get("subdivision_no"):
+                        subdivision_no = wfs_data["subdivision_no"]
+                        sub_division = subdivision_no
+                    if not village and wfs_data.get("village"):
+                        village = wfs_data["village"]
+                    if not taluk and wfs_data.get("taluk"):
+                        taluk = wfs_data["taluk"]
+                    if not district and wfs_data.get("district"):
+                        district = wfs_data["district"]
+                    if not site_address and wfs_data.get("formatted_address"):
+                        site_address = wfs_data["formatted_address"]
+                    if not street_address and wfs_data.get("formatted_address"):
+                        street_address = wfs_data["formatted_address"]
+                except Exception as e:
+                    logger.debug("TNGIS WFS resolve during xlsx import error: %s", e)
+
+            # Fallback to Village Master if still missing revenue hierarchy
+            if not (taluk.strip() and village.strip() and district.strip()):
+                from app.services.village_master_service import get_village_master_service
+                res = get_village_master_service().resolve_record_location(
+                    village=village,
+                    taluk=taluk,
+                    district=district,
+                    coordinates=coords_str,
+                    site_address=site_address,
+                    street_address=street_address,
+                )
+                taluk = res["taluk"]
+                village = res["village"]
+                district = res["district"]
+                if res.get("formatted_address"):
+                    if not street_address:
+                        street_address = res["formatted_address"]
+                    if not site_address:
+                        site_address = res["formatted_address"]
 
         record_name = unique_id or (f"Site Visit - {site_address[:30]}" if site_address else f"Visit #{visit_order or idx}")
         record_desc = f"Assigned inspection for {owner_name_en or 'owner'} at {site_address or street_address or 'site'}"
@@ -1620,23 +1735,50 @@ async def upload_tasks_sheet(
                 if val:
                     extra[col] = val
 
+        # GIS Upload Signals & Cadastral Auto-resolution
+        priority_tier = (row_dict.get("priority_tier") or row_dict.get("tier") or "").strip() or None
+        area_sqm_raw = row_dict.get("area_sqm") or ""
+        if area_sqm_raw:
+            try:
+                val_sqm = float(str(area_sqm_raw).strip())
+                if not extra.get("qc_sqfeet") and val_sqm > 0:
+                    extra["qc_sqfeet"] = str(round(val_sqm * 10.7639, 1))
+            except Exception:
+                pass
+        const_stage = (row_dict.get("construction_stage") or row_dict.get("detected_stage") or "").strip()
+        if const_stage and not extra.get("stage_of_construction"):
+            extra["stage_of_construction"] = const_stage
+
+        if lat_val is not None and lng_val is not None and (not (survey_no and subdivision_no) or not (village and taluk)):
+            from app.services.tngis_wfs_service import get_tngis_wfs_service
+            try:
+                wfs_res = get_tngis_wfs_service().resolve_coordinates(lat_val, lng_val)
+                if not survey_no and wfs_res.get("survey_no"):
+                    survey_no = wfs_res["survey_no"]
+                    survey_number = survey_no
+                if not subdivision_no and wfs_res.get("subdivision_no"):
+                    subdivision_no = wfs_res["subdivision_no"]
+                    sub_division = subdivision_no
+                if not village and wfs_res.get("village"):
+                    village = wfs_res["village"]
+                if not taluk and wfs_res.get("taluk"):
+                    taluk = wfs_res["taluk"]
+                if not district and wfs_res.get("district"):
+                    district = wfs_res["district"]
+            except Exception:
+                pass
+
         rec = record_service.create_record(
             user_id=assigned_user_id,
             name=record_name,
-            # Dispatch tasks are staged unassigned (PENDING via extra); history
-            # rows are assigned immediately and default to APPROVAL in the repo.
             staged_operator_id=staged_operator_id,
             uploaded_by_id=current_user.id,
             description=record_desc,
-            # No formatted_address: that field means "address of the place the
-            # operator actually stood", which cannot exist before the visit.
-            # The admin's text stays in site_address/street_address.
             status=record_status,
-            # Backfilled rows are admin-uploaded history, not app captures, so
-            # the Records table labels them "Uploaded / Imported".
             source="imported" if mode == "history" else "captured",
             unique_id=unique_id,
-            
+            old_unique_id=old_unique_id,
+            priority_tier=priority_tier,
             coordinates=coords_str,
             street_address=street_address,
             land_use=land_use,
@@ -1790,6 +1932,11 @@ async def upload_tasks_sheet_stream(
         "auditor_email",
         "coordinates",
         "coordinate",
+        "lat",
+        "latitude",
+        "lon",
+        "lng",
+        "longitude",
         "site_address",
         "address",
         "unique_id",
@@ -1801,6 +1948,13 @@ async def upload_tasks_sheet_stream(
         "village",
         "taluk",
         "district",
+        "detection_type",
+        "area_sqm",
+        "priority_tier",
+        "construction_stage",
+        "model_confidence_score",
+        "meets_strict_construction_definition",
+        "contradicts_planetscope_still_vegetated",
     }
     if not any(h in expected_key_columns for h in headers):
         raise HTTPException(
@@ -2067,13 +2221,20 @@ async def upload_tasks_sheet_stream(
                     }) + "\n"
                     continue
 
-            # ── Auto-generate unique_id from coordinates if omitted ──
+            # ── Auto-generate standard 6-digit unique_id (CBE-XXXXXX) if omitted or legacy ──
+            old_unique_id = None
+            from app.services.record_service import generate_unique_id
             if not unique_id and lat_val is not None and lng_val is not None:
-                from app.services.record_service import generate_unique_id
                 try:
-                    unique_id = generate_unique_id(lat_val, lng_val, prefix="CBE")
+                    unique_id = record_service.next_six_digit_unique_id(prefix="CBE")
+                    old_unique_id = generate_unique_id(lat_val, lng_val, prefix="CBE")
                 except Exception:
                     pass
+            elif unique_id:
+                import re as _re
+                if not _re.match(r"^CBE-\d{6}$", str(unique_id).strip(), _re.IGNORECASE):
+                    old_unique_id = str(unique_id).strip().upper()
+                    unique_id = record_service.next_six_digit_unique_id(prefix="CBE")
 
             # ── Duplicate Prevention & Warning ──
             if unique_id and unique_id in seen_unique_ids:
@@ -2216,6 +2377,39 @@ async def upload_tasks_sheet_stream(
                     if val:
                         extra[col] = val
 
+            # GIS Upload Signals & Cadastral Auto-resolution
+            priority_tier = (row_dict.get("priority_tier") or row_dict.get("tier") or "").strip() or None
+            area_sqm_raw = row_dict.get("area_sqm") or ""
+            if area_sqm_raw:
+                try:
+                    val_sqm = float(str(area_sqm_raw).strip())
+                    if not extra.get("qc_sqfeet") and val_sqm > 0:
+                        extra["qc_sqfeet"] = str(round(val_sqm * 10.7639, 1))
+                except Exception:
+                    pass
+            const_stage = (row_dict.get("construction_stage") or row_dict.get("detected_stage") or "").strip()
+            if const_stage and not extra.get("stage_of_construction"):
+                extra["stage_of_construction"] = const_stage
+
+            if lat_val is not None and lng_val is not None and (not (survey_no and subdivision_no) or not (village and taluk)):
+                from app.services.tngis_wfs_service import get_tngis_wfs_service
+                try:
+                    wfs_res = get_tngis_wfs_service().resolve_coordinates(lat_val, lng_val)
+                    if not survey_no and wfs_res.get("survey_no"):
+                        survey_no = wfs_res["survey_no"]
+                        survey_number = survey_no
+                    if not subdivision_no and wfs_res.get("subdivision_no"):
+                        subdivision_no = wfs_res["subdivision_no"]
+                        sub_division = subdivision_no
+                    if not village and wfs_res.get("village"):
+                        village = wfs_res["village"]
+                    if not taluk and wfs_res.get("taluk"):
+                        taluk = wfs_res["taluk"]
+                    if not district and wfs_res.get("district"):
+                        district = wfs_res["district"]
+                except Exception:
+                    pass
+
             rec = record_service.create_record(
                 user_id=assigned_user_id,
                 name=record_name,
@@ -2224,8 +2418,9 @@ async def upload_tasks_sheet_stream(
                 description=record_desc,
                 status=record_status,
                 source="imported" if mode == "history" else "captured",
-                    unique_id=unique_id,
-                
+                unique_id=unique_id,
+                old_unique_id=old_unique_id,
+                priority_tier=priority_tier,
                 coordinates=coords_str,
                 street_address=street_address,
                 land_use=land_use,
@@ -2508,6 +2703,51 @@ async def import_previous_records_sheet(
     return report
 
 
+@router.post("/records/import")
+async def import_gis_records(
+    file: UploadFile = File(...),
+    dry_run: bool = Query(False),
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Authoritative Kuri GIS Upload Specification & Cadastral Auto-Enrichment Import Endpoint.
+    
+    Supports dry-run inspection (?dry_run=true) and atomic transaction commit (?dry_run=false).
+    Accepts .xlsx and .csv files conforming to the 12-column GIS specification.
+    """
+    from app.services.upload_specification_service import UploadSpecificationService
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    service = UploadSpecificationService(db)
+    validation_result = service.validate_batch(content, file.filename or "upload.xlsx")
+
+    if dry_run or not validation_result.get("valid"):
+        return validation_result
+
+    # Commit import transaction
+    try:
+        report = service.commit_batch(validation_result, admin)
+        return {
+            "valid": True,
+            "committed": True,
+            "created_count": report["created_count"],
+            "merged_count": report["merged_count"],
+            "total_processed": report["total_processed"],
+            "committed_records": report["committed_records"],
+            "updated_records": report["updated_records"],
+            "warnings": validation_result.get("warnings", []),
+        }
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Failed to commit GIS upload batch: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Failed to commit batch: {str(exc)}")
+
+
+
 @router.post("/records/{record_id}/photos", response_model=RecordDetail)
 async def admin_upload_record_photos(
     record_id: int,
@@ -2656,7 +2896,10 @@ async def admin_get_record(record_id: int, admin: User = Depends(require_record_
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
     if admin.role == UserRole.AUDITOR and record.assigned_auditor_id not in (None, admin.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: Record is assigned to another QA reviewer")
-    return _record_to_detail(record)
+    detail = _record_to_detail(record)
+    from app.services.duplicate_detection_service import get_duplicate_detection_service
+    get_duplicate_detection_service().enrich_single_record(db, detail)
+    return detail
 
 
 # ─── Audit workflow (auditor decisions on staged task sheets) ─────────
@@ -2950,7 +3193,7 @@ async def admin_resolve_coords(
     auditor: User = Depends(require_auditor),
     db: Session = Depends(get_db),
 ):
-    """Resolve coordinates into lat, lng, site_id, area, village, taluk, district, address."""
+    """Resolve coordinates into cadastral & revenue details (WFS default, or GMaps)."""
     coords_str = payload.coordinates.strip()
     parsed = _parse_coordinates(coords_str)
     if not parsed:
@@ -2961,52 +3204,92 @@ async def admin_resolve_coords(
     lat, lng = parsed
     record_service = RecordService(db)
     site_id = record_service.next_six_digit_unique_id(prefix="CBE")
+    source = (payload.source or "wfs").strip().lower()
 
-    # 1. Google Reverse Geocoding for address and area
-    area = None
+    survey_no = None
+    subdivision_no = None
+    village = None
+    taluk = None
+    district = None
+    ulpin = None
     address = None
-    settings = get_settings()
-    api_key = settings.GOOGLE_GEOCODING_API_KEY
-    if api_key:
+    area = None
+
+    if source == "wfs":
+        # 1. Authoritative TNGIS WFS Cadastral & Revenue resolution (Default)
+        from app.services.tngis_wfs_service import get_tngis_wfs_service
         try:
-            url = f"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&key={api_key}"
-            resp = requests.get(url, timeout=10).json()
-            results = resp.get("results", [])
-            if results:
-                address = results[0].get("formatted_address")
-                # Look for sublocality_level_1 first
-                for res in results:
-                    for comp in res.get("address_components", []):
-                        types = comp.get("types", [])
-                        if "sublocality_level_1" in types:
-                            area = comp.get("long_name")
-                            break
-                    if area:
-                        break
-                # Fallback to sublocality / neighborhood / sublocality_level_2 / locality
-                if not area:
+            wfs_service = get_tngis_wfs_service()
+            wfs_res = wfs_service.resolve_coordinates(lat, lng)
+            survey_no = wfs_res.get("survey_no") or None
+            subdivision_no = wfs_res.get("subdivision_no") or None
+            village = wfs_res.get("village") or None
+            taluk = wfs_res.get("taluk") or None
+            district = wfs_res.get("district") or None
+            ulpin = wfs_res.get("ulpin") or None
+            address = wfs_res.get("formatted_address") or None
+            if village:
+                area = village
+        except Exception as e:
+            logger.warning("TNGIS WFS error during resolve_coords: %s", e)
+
+        # Fallback to Village Master if WFS returned incomplete revenue fields
+        if not (village and taluk and district):
+            vms = get_village_master_service()
+            loc_match = vms.resolve_record_location(coordinates=f"{lat}, {lng}")
+            village = village or loc_match.get("village")
+            taluk = taluk or loc_match.get("taluk")
+            district = district or loc_match.get("district")
+            if not address and loc_match.get("formatted_address"):
+                address = loc_match.get("formatted_address")
+            if not area and village:
+                area = village
+
+    else:
+        # 2. Google Reverse Geocoding & Village Master resolution (GMaps)
+        settings = get_settings()
+        api_key = settings.GOOGLE_GEOCODING_API_KEY
+        if api_key:
+            try:
+                url = f"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&key={api_key}"
+                resp = requests.get(url, timeout=10).json()
+                results = resp.get("results", [])
+                if results:
+                    address = results[0].get("formatted_address")
+                    # Look for sublocality_level_1 first
                     for res in results:
                         for comp in res.get("address_components", []):
                             types = comp.get("types", [])
-                            if any(t in types for t in ["sublocality", "neighborhood", "sublocality_level_2", "locality"]):
+                            if "sublocality_level_1" in types:
                                 area = comp.get("long_name")
                                 break
                         if area:
                             break
-        except Exception as e:
-            logger.warning("Google geocoding error during resolve_coords: %s", e)
+                    # Fallback to sublocality / neighborhood / sublocality_level_2 / locality
+                    if not area:
+                        for res in results:
+                            for comp in res.get("address_components", []):
+                                types = comp.get("types", [])
+                                if any(t in types for t in ["sublocality", "neighborhood", "sublocality_level_2", "locality"]):
+                                    area = comp.get("long_name")
+                                    break
+                            if area:
+                                break
+            except Exception as e:
+                logger.warning("Google geocoding error during resolve_coords: %s", e)
 
-    # 2. Village Master resolution for village, taluk, district
-    vms = get_village_master_service()
-    loc_match = vms.resolve_record_location(coordinates=f"{lat}, {lng}")
-    village = loc_match.get("village")
-    taluk = loc_match.get("taluk")
-    district = loc_match.get("district")
-    if not address and loc_match.get("formatted_address"):
-        address = loc_match.get("formatted_address")
+        vms = get_village_master_service()
+        loc_match = vms.resolve_record_location(coordinates=f"{lat}, {lng}")
+        village = loc_match.get("village")
+        taluk = loc_match.get("taluk")
+        district = loc_match.get("district")
+        if not address and loc_match.get("formatted_address"):
+            address = loc_match.get("formatted_address")
+        if not area and village:
+            area = village
 
-    if not area and village:
-        area = village
+    from app.services.duplicate_detection_service import get_duplicate_detection_service
+    dup_info = get_duplicate_detection_service().check_duplicate_proximity(db, lat=lat, lng=lng)
 
     return ResolveCoordsResponse(
         coordinates=f"{lat:.6f}, {lng:.6f}",
@@ -3018,7 +3301,17 @@ async def admin_resolve_coords(
         taluk=taluk,
         district=district,
         address=address,
+        survey_no=survey_no,
+        subdivision_no=subdivision_no,
+        ulpin=ulpin,
+        source=source,
         success=True,
+        is_duplicate=dup_info["is_duplicate"],
+        duplicate_warning=dup_info["duplicate_warning"],
+        duplicate_site_id=dup_info["duplicate_site_id"],
+        duplicate_record_id=dup_info["duplicate_record_id"],
+        duplicate_distance_m=dup_info["duplicate_distance_m"],
+        duplicate_is_visited=dup_info["duplicate_is_visited"],
     )
 
 
@@ -3060,12 +3353,35 @@ async def admin_qa_create_record(
         unique_id = record_service.next_six_digit_unique_id(prefix="CBE")
         old_unique_id = legacy_coord_id
 
-    # Resolve location if fields are empty
+    # Resolve location and cadastral details if fields are empty
     area = (payload.area or "").strip() or None
     village = (payload.village or "").strip() or None
     taluk = (payload.taluk or "").strip() or None
     district = (payload.district or "").strip() or None
     address = (payload.street_address or payload.site_address or "").strip() or None
+    survey_no = (payload.survey_no or "").strip() or None
+    subdivision_no = (payload.subdivision_no or "").strip() or None
+
+    if not (survey_no and subdivision_no) or not (village and taluk and district):
+        from app.services.tngis_wfs_service import get_tngis_wfs_service
+        try:
+            wfs_data = get_tngis_wfs_service().resolve_coordinates(lat, lng)
+            if not survey_no and wfs_data.get("survey_no"):
+                survey_no = wfs_data["survey_no"]
+            if not subdivision_no and wfs_data.get("subdivision_no"):
+                subdivision_no = wfs_data["subdivision_no"]
+            if not village and wfs_data.get("village"):
+                village = wfs_data["village"]
+            if not taluk and wfs_data.get("taluk"):
+                taluk = wfs_data["taluk"]
+            if not district and wfs_data.get("district"):
+                district = wfs_data["district"]
+            if not address and wfs_data.get("formatted_address"):
+                address = wfs_data["formatted_address"]
+            if not area and village:
+                area = village
+        except Exception as e:
+            logger.warning("WFS resolve in qa-create error: %s", e)
 
     if not (village and taluk and district) or not area or not address:
         vms = get_village_master_service()
@@ -3125,6 +3441,17 @@ async def admin_qa_create_record(
         qc_completed_at=now_utc if is_decided else None,
         audited_by_id=auditor.id if is_decided else None,
         audited_at=now_utc if is_decided else None,
+    )
+
+    create_notification(
+        db=db,
+        type="qa_done",
+        title=f"New Record Created in QA: {rec.unique_id}",
+        message=f"QA reviewer {auditor.full_name} created new record {rec.unique_id} ({rec.village or rec.area or 'Coimbatore'}).",
+        recipient_role="ADMIN",
+        record_id=rec.id,
+        unique_id=rec.unique_id,
+        with_sound=False,
     )
 
     log_activity(
@@ -3525,6 +3852,15 @@ async def admin_update_record(
             "site_contractor_architect_number", "remarks", "follow_up_date",
         ]
     )
+
+    from app.services.record_service import record_qc_history, record_field_history, record_telecaller_history
+    if has_qc_update or ("audit_status" in update_kwargs):
+        record_qc_history(record, user=admin)
+    if has_field_update:
+        record_field_history(record, user=admin)
+    if any(k.startswith("telecaller_") for k in update_kwargs):
+        record_telecaller_history(record, user=admin)
+    db.commit()
     if has_field_update:
         action_type = "field_verification_update"
         action_title = "Field verification updated"
@@ -3657,6 +3993,21 @@ def _record_to_detail(record, errors: Optional[List[str]] = None) -> RecordDetai
         unique_id=getattr(record, "unique_id", None),
         old_unique_id=getattr(record, "old_unique_id", None),
         coordinates=getattr(record, "coordinates", None),
+        latitude=getattr(record, "latitude", None),
+        longitude=getattr(record, "longitude", None),
+        detection_type=getattr(record, "detection_type", None),
+        detected_stage=getattr(record, "detected_stage", None),
+        area_sqm=getattr(record, "area_sqm", None),
+        area_sqft=getattr(record, "area_sqft", None),
+        is_eligible=getattr(record, "is_eligible", None),
+        model_confidence_score=getattr(record, "model_confidence_score", None),
+        meets_strict_construction_definition=getattr(record, "meets_strict_construction_definition", None),
+        contradicts_planetscope_vegetated=getattr(record, "contradicts_planetscope_vegetated", None),
+        dtcp_building_type=getattr(record, "dtcp_building_type", None),
+        sub_division_number=getattr(record, "sub_division_number", None) or getattr(record, "subdivision_no", None),
+        ulpin=getattr(record, "ulpin", None),
+        gmaps_link=getattr(record, "gmaps_link", None),
+        cadastral_lookup_status=getattr(record, "cadastral_lookup_status", None),
         street_address=getattr(record, "street_address", None),
         land_use=getattr(record, "land_use", None),
         survey_no=getattr(record, "survey_no", None),
@@ -3710,13 +4061,16 @@ def _record_to_detail(record, errors: Optional[List[str]] = None) -> RecordDetai
         qc_street_details=getattr(record, "qc_street_details", None),
         qc_builder_contact=getattr(record, "qc_builder_contact", None),
         qc_sqfeet=getattr(record, "qc_sqfeet", None),
-        qc_status="DONE" if (
+        qc_status="Not Applicable" if (
+            getattr(record, "qc_status", None) in ("Not Applicable", "NOT_APPLICABLE")
+            or (getattr(record, "is_manually_added", False) and getattr(record, "source", None) == "manual" and not getattr(record, "qc_completed_at", None))
+        ) else ("DONE" if (
             getattr(record, "qc_completed_at", None) is not None
             or bool(getattr(record, "qc_vhr_comment", None) and str(record.qc_vhr_comment).strip())
             or bool(getattr(record, "qc_street_details", None) and str(record.qc_street_details).strip())
             or bool(getattr(record, "qc_builder_contact", None) and str(record.qc_builder_contact).strip())
             or bool(getattr(record, "qc_sqfeet", None) and str(record.qc_sqfeet).strip())
-        ) else "PENDING",
+        ) else "PENDING"),
         qc_completed_at=getattr(record, "qc_completed_at", None),
         qc_edited_at=getattr(record, "qc_edited_at", None),
         assigned_telecaller_id=getattr(record, "assigned_telecaller_id", None),
@@ -3741,6 +4095,9 @@ def _record_to_detail(record, errors: Optional[List[str]] = None) -> RecordDetai
         gmap_captured_at=getattr(record, "gmap_captured_at", None),
         qc_reference_image_key=getattr(record, "qc_reference_image_key", None),
         qc_reference_image_url=f"/api/admin/records/{record.id}/qc-reference-image" if getattr(record, "qc_reference_image_key", None) else None,
+        qc_history=getattr(record, "qc_history", None) or [],
+        field_history=getattr(record, "field_history", None) or [],
+        telecaller_history=getattr(record, "telecaller_history", None) or [],
         images=[
             ImageDetail(
                 id=img.id,

@@ -11,6 +11,8 @@ import type {
   ActivityLog,
   ResolveCoordsResponse,
   QaCreateRecordPayload,
+  NotificationListResponse,
+  NotificationPollResponse,
 } from '../types';
 
 const ENV_API_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '');
@@ -172,8 +174,9 @@ export const recordsApi = {
     sort_order?: string;
     date_field?: string;
     audit_status?: string;
-    qc_status?: 'DONE' | 'PENDING';
+    qc_status?: 'DONE' | 'PENDING' | 'NOT_APPLICABLE' | string;
     column_filters?: string;
+    for_qa?: boolean;
   }): Promise<PaginatedResponse<CaptureRecord>> => {
     const res = await api.get('/admin/records', { params });
     return res.data;
@@ -321,8 +324,8 @@ export const recordsApi = {
     return res.data;
   },
   /** Resolve coordinates to address, site_id, area, village, taluk, district (POST /admin/records/resolve-coords). */
-  resolveCoords: async (coordinates: string): Promise<ResolveCoordsResponse> => {
-    const res = await api.post('/admin/records/resolve-coords', { coordinates });
+  resolveCoords: async (coordinates: string, source: 'wfs' | 'gmap' = 'wfs'): Promise<ResolveCoordsResponse> => {
+    const res = await api.post('/admin/records/resolve-coords', { coordinates, source });
     return res.data;
   },
   /** Create a new record from QA portal with auto-resolved details (POST /admin/records/qa-create). */
@@ -433,6 +436,16 @@ export const recordsApi = {
     // Note: Do NOT set 'Content-Type': 'multipart/form-data' manually.
     // Axios will automatically attach the correct boundary string.
     const res = await api.post('/admin/records/upload-sheet', formData, {
+      timeout: 180000,
+    });
+    return res.data;
+  },
+  /** Authoritative Kuri GIS Upload Specification (supports ?dry_run=true inspection and commit). */
+  importGisRecords: async (file: File, dryRun = false): Promise<any> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await api.post('/admin/records/import', formData, {
+      params: { dry_run: dryRun },
       timeout: 180000,
     });
     return res.data;
@@ -601,6 +614,7 @@ export const recordsApi = {
     column_filters?: string;
     include_images?: boolean;
     sections?: string;
+    for_qa?: boolean;
   }): Promise<void> => {
     const token = localStorage.getItem('token');
     const sp = new URLSearchParams();
@@ -618,6 +632,7 @@ export const recordsApi = {
     if (params?.column_filters) sp.set('column_filters', params.column_filters);
     if (params?.include_images !== undefined) sp.set('include_images', String(params.include_images));
     if (params?.sections) sp.set('sections', params.sections);
+    if (params?.for_qa) sp.set('for_qa', 'true');
     const url = `${SERVER_BASE}/api/admin/records/export${sp.toString() ? `?${sp.toString()}` : ''}`;
     const resp = await fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -807,6 +822,26 @@ export const telecallerApi = {
   },
   getDashboard: async (): Promise<TelecallerDashboardData> => {
     const res = await api.get('/telecaller/dashboard');
+    return res.data;
+  },
+};
+
+
+export const notificationsApi = {
+  list: async (page = 1, pageSize = 20): Promise<NotificationListResponse> => {
+    const res = await api.get('/notifications', { params: { page, page_size: pageSize } });
+    return res.data;
+  },
+  poll: async (lastId = 0): Promise<NotificationPollResponse> => {
+    const res = await api.get('/notifications/poll', { params: { last_id: lastId } });
+    return res.data;
+  },
+  markAsRead: async (id: number): Promise<{ success: boolean; message: string }> => {
+    const res = await api.post(`/notifications/${id}/read`);
+    return res.data;
+  },
+  markAllAsRead: async (): Promise<{ success: boolean; count: number; message: string }> => {
+    const res = await api.post('/notifications/read-all');
     return res.data;
   },
 };

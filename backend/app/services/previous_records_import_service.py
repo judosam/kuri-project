@@ -510,7 +510,32 @@ class PreviousRecordsImportService:
                 f"at {values['site_address'] or values['street_address'] or 'site'}"
             )
 
-            # Auto-resolve village, taluk, district if missing
+            # Auto-resolve survey_no, subdivision_no, village, taluk, district via WFS if missing
+            coords_val = values.get("coordinates")
+            if coords_val and (not (values.get("taluk") and values.get("village") and values.get("district")) or not (values.get("survey_no") and values.get("subdivision_no"))):
+                parsed_coords = parse_coordinates(coords_val)
+                if parsed_coords:
+                    try:
+                        from app.services.tngis_wfs_service import get_tngis_wfs_service
+                        wfs_data = get_tngis_wfs_service().resolve_coordinates(parsed_coords[0], parsed_coords[1])
+                        if not values.get("survey_no") and wfs_data.get("survey_no"):
+                            values["survey_no"] = wfs_data["survey_no"]
+                            values["survey_number"] = wfs_data["survey_no"]
+                        if not values.get("subdivision_no") and wfs_data.get("subdivision_no"):
+                            values["subdivision_no"] = wfs_data["subdivision_no"]
+                            values["sub_division"] = wfs_data["subdivision_no"]
+                        if not values.get("village") and wfs_data.get("village"):
+                            values["village"] = wfs_data["village"]
+                        if not values.get("taluk") and wfs_data.get("taluk"):
+                            values["taluk"] = wfs_data["taluk"]
+                        if not values.get("district") and wfs_data.get("district"):
+                            values["district"] = wfs_data["district"]
+                        if not values.get("street_address") and wfs_data.get("formatted_address"):
+                            values["street_address"] = wfs_data["formatted_address"]
+                    except Exception as e:
+                        logger.debug("WFS auto-resolve error in previous_records_import: %s", e)
+
+            # Fallback to local Village Master
             if not (values.get("taluk") and values.get("village") and values.get("district")):
                 from app.services.village_master_service import get_village_master_service
                 res = get_village_master_service().resolve_record_location(

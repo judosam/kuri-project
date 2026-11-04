@@ -108,7 +108,11 @@ def filter_column(field: str):
             else_="NOT_COMPLETED",
         )
     if field == "qc_status":
-        return case((has_qc_expression(), "DONE"), else_="PENDING")
+        return case(
+            (CaptureRecord.qc_status.in_(["Not Applicable", "NOT_APPLICABLE"]), "Not Applicable"),
+            (has_qc_expression(), "DONE"),
+            else_="PENDING",
+        )
     if field == "qa_user":
         foreign_key = func.coalesce(CaptureRecord.qc_by_id, CaptureRecord.assigned_auditor_id)
         return select(User.full_name).where(User.id == foreign_key).correlate(CaptureRecord).scalar_subquery()

@@ -1,3 +1,4 @@
+from app.services.notification_service import create_notification
 import logging
 from datetime import datetime, timezone, datetime as dt, timezone as dt_timezone
 from typing import List, Optional
@@ -18,6 +19,8 @@ from app.schemas.record import (
     RecordCreateRequest,
     RecordDetail,
     RecordListResponse,
+    ResolveCoordsRequest,
+    ResolveCoordsResponse,
     UserDashboardResponse,
 )
 from app.services.activity_log_service import log_activity
@@ -225,32 +228,58 @@ async def create_record(
                     update_data["coordinates"] = cur_coords
 
             eff_coords = cur_coords or record.coordinates
-            if eff_coords and not (record.village and record.taluk and record.district):
-                from app.services.village_master_service import get_village_master_service
-                try:
-                    vms = get_village_master_service()
-                    loc_match = vms.resolve_record_location(
-                        village=record.village,
-                        taluk=record.taluk,
-                        district=record.district,
-                        coordinates=eff_coords,
-                        site_address=record.site_address or formatted_address,
-                        street_address=record.street_address or formatted_address,
-                    )
-                    if not record.village and loc_match.get("village"):
-                        update_data["village"] = loc_match.get("village")
-                    if not record.taluk and loc_match.get("taluk"):
-                        update_data["taluk"] = loc_match.get("taluk")
-                    if not record.district and loc_match.get("district"):
-                        update_data["district"] = loc_match.get("district")
-                    if not record.area and loc_match.get("village"):
-                        update_data["area"] = loc_match.get("village")
-                    if not record.street_address and loc_match.get("formatted_address"):
-                        update_data["street_address"] = loc_match.get("formatted_address")
-                    if not record.site_address and loc_match.get("formatted_address"):
-                        update_data["site_address"] = loc_match.get("formatted_address")
-                except Exception as e:
-                    logger.warning(f"Failed to auto-resolve village/taluk/district for task record #{record.id}: {e}")
+            if eff_coords and (not (record.village and record.taluk and record.district) or not (record.survey_no and record.subdivision_no)):
+                from app.services.record_service import _parse_coordinates
+                p_coords = _parse_coordinates(eff_coords)
+                if p_coords:
+                    from app.services.tngis_wfs_service import get_tngis_wfs_service
+                    try:
+                        wfs_data = get_tngis_wfs_service().resolve_coordinates(p_coords[0], p_coords[1])
+                        if not record.survey_no and wfs_data.get("survey_no"):
+                            update_data["survey_no"] = wfs_data["survey_no"]
+                        if not record.subdivision_no and wfs_data.get("subdivision_no"):
+                            update_data["subdivision_no"] = wfs_data["subdivision_no"]
+                        if not record.village and wfs_data.get("village"):
+                            update_data["village"] = wfs_data["village"]
+                        if not record.taluk and wfs_data.get("taluk"):
+                            update_data["taluk"] = wfs_data["taluk"]
+                        if not record.district and wfs_data.get("district"):
+                            update_data["district"] = wfs_data["district"]
+                        if not record.area and wfs_data.get("village"):
+                            update_data["area"] = wfs_data["village"]
+                        if not record.street_address and wfs_data.get("formatted_address"):
+                            update_data["street_address"] = wfs_data["formatted_address"]
+                        if not record.site_address and wfs_data.get("formatted_address"):
+                            update_data["site_address"] = wfs_data["formatted_address"]
+                    except Exception as e:
+                        logger.warning(f"Failed to WFS auto-resolve for task record #{record.id}: {e}")
+
+                if not (record.village and record.taluk and record.district) and not update_data.get("village"):
+                    from app.services.village_master_service import get_village_master_service
+                    try:
+                        vms = get_village_master_service()
+                        loc_match = vms.resolve_record_location(
+                            village=record.village,
+                            taluk=record.taluk,
+                            district=record.district,
+                            coordinates=eff_coords,
+                            site_address=record.site_address or formatted_address,
+                            street_address=record.street_address or formatted_address,
+                        )
+                        if not record.village and loc_match.get("village"):
+                            update_data["village"] = loc_match.get("village")
+                        if not record.taluk and loc_match.get("taluk"):
+                            update_data["taluk"] = loc_match.get("taluk")
+                        if not record.district and loc_match.get("district"):
+                            update_data["district"] = loc_match.get("district")
+                        if not record.area and loc_match.get("village"):
+                            update_data["area"] = loc_match.get("village")
+                        if not record.street_address and loc_match.get("formatted_address"):
+                            update_data["street_address"] = loc_match.get("formatted_address")
+                        if not record.site_address and loc_match.get("formatted_address"):
+                            update_data["site_address"] = loc_match.get("formatted_address")
+                    except Exception as e:
+                        logger.warning(f"Failed to auto-resolve village/taluk/district for task record #{record.id}: {e}")
 
             for field in (
                 "date_of_visit", "construction_happening", "remarks",
@@ -302,6 +331,9 @@ async def create_record(
             update_data["updated_by_role"] = user.role.value if hasattr(user.role, 'value') else str(user.role)
             update_data["updated_at"] = datetime.now(timezone.utc)
             record = record_service.record_repo.update(record, **update_data)
+            from app.services.record_service import record_field_history
+            record_field_history(record, user=user)
+            db.commit()
         else:
             raise HTTPException(status_code=404, detail="Assigned task is unavailable. Refresh your records before retrying.")
     else:
@@ -320,45 +352,81 @@ async def create_record(
             manual_remarks = None
         f_date = str(request.follow_up_date).strip() if (request.follow_up_date and str(request.follow_up_date).strip()) else None
 
-        # ── Auto-resolve Village, Taluk, District from coordinates ──
-        manual_village = None
-        manual_taluk = None
-        manual_district = None
-        manual_area = None
+        # ── Auto-resolve Survey No, Subdivision No, Village, Taluk, District from coordinates ──
+        manual_survey_no = getattr(request, "survey_no", None)
+        manual_subdivision_no = getattr(request, "subdivision_no", None)
+        manual_village = getattr(request, "village", None)
+        manual_taluk = getattr(request, "taluk", None)
+        manual_district = getattr(request, "district", None)
+        manual_area = getattr(request, "area", None)
         manual_address = formatted_address
 
         if cur_coords:
-            from app.services.village_master_service import get_village_master_service
-            try:
-                vms = get_village_master_service()
-                loc_match = vms.resolve_record_location(
-                    coordinates=cur_coords,
-                    site_address=formatted_address,
-                    street_address=formatted_address,
-                )
-                manual_village = loc_match.get("village")
-                manual_taluk = loc_match.get("taluk")
-                manual_district = loc_match.get("district")
-                manual_area = manual_village
-                if not manual_address and loc_match.get("formatted_address"):
-                    manual_address = loc_match.get("formatted_address")
-                if not location_name and manual_village:
-                    location_name = manual_village
-            except Exception as e:
-                logger.warning(f"Failed to auto-resolve village/taluk/district for manual record: {e}")
+            if not (manual_survey_no and manual_subdivision_no) or not (manual_village and manual_taluk and manual_district):
+                from app.services.record_service import _parse_coordinates
+                p_coords = _parse_coordinates(cur_coords)
+                if p_coords:
+                    from app.services.tngis_wfs_service import get_tngis_wfs_service
+                    try:
+                        wfs_data = get_tngis_wfs_service().resolve_coordinates(p_coords[0], p_coords[1])
+                        if not manual_survey_no and wfs_data.get("survey_no"):
+                            manual_survey_no = wfs_data["survey_no"]
+                        if not manual_subdivision_no and wfs_data.get("subdivision_no"):
+                            manual_subdivision_no = wfs_data["subdivision_no"]
+                        if not manual_village and wfs_data.get("village"):
+                            manual_village = wfs_data["village"]
+                        if not manual_taluk and wfs_data.get("taluk"):
+                            manual_taluk = wfs_data["taluk"]
+                        if not manual_district and wfs_data.get("district"):
+                            manual_district = wfs_data["district"]
+                        if not manual_area and manual_village:
+                            manual_area = manual_village
+                        if not manual_address and wfs_data.get("formatted_address"):
+                            manual_address = wfs_data["formatted_address"]
+                    except Exception as e:
+                        logger.warning(f"Failed to WFS auto-resolve for manual record: {e}")
+
+            if not (manual_village and manual_taluk and manual_district):
+                from app.services.village_master_service import get_village_master_service
+                try:
+                    vms = get_village_master_service()
+                    loc_match = vms.resolve_record_location(
+                        coordinates=cur_coords,
+                        site_address=formatted_address,
+                        street_address=formatted_address,
+                    )
+                    manual_village = manual_village or loc_match.get("village")
+                    manual_taluk = manual_taluk or loc_match.get("taluk")
+                    manual_district = manual_district or loc_match.get("district")
+                    manual_area = manual_area or manual_village
+                    if not manual_address and loc_match.get("formatted_address"):
+                        manual_address = loc_match.get("formatted_address")
+                    if not location_name and manual_village:
+                        location_name = manual_village
+                except Exception as e:
+                    logger.warning(f"Failed to auto-resolve village/taluk/district for manual record: {e}")
+
+        user_role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
+        is_field_verifier = user_role_str in ("FIELD_VERIFIER", "USER") or getattr(user, "role", None) in (UserRole.FIELD_VERIFIER, UserRole.USER)
+        manual_qc_status = "Not Applicable" if is_field_verifier else "QC Pending"
 
         record = record_service.create_record(
             user_id=user.id,
             name=request.name,
             description=request.description,
             location_name=location_name or manual_village,
-            formatted_address=manual_address or formatted_address,
+            formatted_address=formatted_address or manual_address,
             place_id=place_id,
             owner_name_en=request.owner_name_en,
             status=request.status or "COMPLETED",
             unique_id=manual_unique_id,
             old_unique_id=legacy_coord_id,
             source="manual",
+            qc_status=manual_qc_status,
+            audit_status="NOT_APPLICABLE" if is_field_verifier else "PENDING",
+            assigned_auditor_id=None,
+            survey_no=manual_survey_no,
+            subdivision_no=manual_subdivision_no,
             village=manual_village,
             taluk=manual_taluk,
             district=manual_district,
@@ -392,6 +460,10 @@ async def create_record(
             field_location_accuracy=cur_acc,
             coordinates=cur_coords,
         )
+        if is_field_verifier:
+            from app.services.record_service import record_field_history
+            record_field_history(record, user=user)
+            db.commit()
 
     # Auto-route to telecaller if phone contact exists
     if not record.assigned_telecaller_id:
@@ -431,6 +503,17 @@ async def create_record(
 
     record = record_service.get_record(record.id)
     place = record.location_name or ""
+    create_notification(
+        db=db,
+        type="verifier_activity",
+        title=f"Field Inspection Submitted: {record.unique_id or record.name}",
+        message=f"Field verifier {user.full_name} submitted inspection data for {record.unique_id or record.name}.",
+        recipient_role="ADMIN",
+        record_id=record.id,
+        unique_id=record.unique_id,
+        with_sound=False,
+    )
+
     log_activity(
         db=db,
         action_type="record_create" if not request.task_id else "inspection_complete",
@@ -627,6 +710,17 @@ async def upload_record_images(
 
         db.commit()
         db.refresh(record)
+        create_notification(
+            db=db,
+            type="verifier_activity",
+            title=f"Site Photos Uploaded: {record.unique_id or record.name}",
+            message=f"Field verifier {user.full_name} uploaded {len(files)} photo(s) for {record.unique_id or record.name}.",
+            recipient_role="ADMIN",
+            record_id=record.id,
+            unique_id=record.unique_id,
+            with_sound=False,
+        )
+
         log_activity(
             db=db,
             action_type="photo_upload",
@@ -684,8 +778,11 @@ async def list_records(
         date_field=date_field,
         audit_status=operator_audit_filter,
     )
+    detail_records = [_record_to_detail(r) for r in records]
+    from app.services.duplicate_detection_service import get_duplicate_detection_service
+    get_duplicate_detection_service().enrich_record_details(db, detail_records)
     return RecordListResponse(
-        records=[_record_to_detail(r) for r in records],
+        records=detail_records,
         total=total,
         page=page,
         page_size=page_size,
@@ -736,7 +833,10 @@ async def get_record(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
     if not record_service.can_access(user, record):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
-    return _record_to_detail(record)
+    detail = _record_to_detail(record)
+    from app.services.duplicate_detection_service import get_duplicate_detection_service
+    get_duplicate_detection_service().enrich_single_record(db, detail)
+    return detail
 
 
 @router.get("/{record_id}/download")
@@ -838,8 +938,22 @@ async def mark_record_status(
     record.updated_by_role = user.role.value if hasattr(user.role, 'value') else str(user.role)
     record.updated_at = datetime.now(timezone.utc)
 
+    from app.services.record_service import record_field_history
+    record_field_history(record, user=user)
+
     db.commit()
     db.refresh(record)
+
+    create_notification(
+        db=db,
+        type="verifier_activity",
+        title=f"Field Status Updated: {record.unique_id or record.name}",
+        message=f"Field verifier {user.full_name} marked status as '{canonical_status}' for {record.unique_id or record.name}.",
+        recipient_role="ADMIN",
+        record_id=record.id,
+        unique_id=record.unique_id,
+        with_sound=False,
+    )
 
     log_activity(
         db=db,
@@ -1090,6 +1204,21 @@ def _record_to_detail(record, errors=None) -> RecordDetail:
         unique_id=getattr(record, "unique_id", None),
         old_unique_id=getattr(record, "old_unique_id", None),
                 coordinates=getattr(record, "coordinates", None),
+        latitude=getattr(record, "latitude", None),
+        longitude=getattr(record, "longitude", None),
+        detection_type=getattr(record, "detection_type", None),
+        detected_stage=getattr(record, "detected_stage", None),
+        area_sqm=getattr(record, "area_sqm", None),
+        area_sqft=getattr(record, "area_sqft", None),
+        is_eligible=getattr(record, "is_eligible", None),
+        model_confidence_score=getattr(record, "model_confidence_score", None),
+        meets_strict_construction_definition=getattr(record, "meets_strict_construction_definition", None),
+        contradicts_planetscope_vegetated=getattr(record, "contradicts_planetscope_vegetated", None),
+        dtcp_building_type=getattr(record, "dtcp_building_type", None),
+        sub_division_number=getattr(record, "sub_division_number", None) or getattr(record, "subdivision_no", None),
+        ulpin=getattr(record, "ulpin", None),
+        gmaps_link=getattr(record, "gmaps_link", None),
+        cadastral_lookup_status=getattr(record, "cadastral_lookup_status", None),
         street_address=getattr(record, "street_address", None),
         land_use=getattr(record, "land_use", None),
         survey_no=getattr(record, "survey_no", None),
@@ -1143,13 +1272,16 @@ def _record_to_detail(record, errors=None) -> RecordDetail:
         qc_street_details=getattr(record, "qc_street_details", None),
         qc_builder_contact=getattr(record, "qc_builder_contact", None),
         qc_sqfeet=getattr(record, "qc_sqfeet", None),
-        qc_status="DONE" if (
+        qc_status="Not Applicable" if (
+            getattr(record, "qc_status", None) in ("Not Applicable", "NOT_APPLICABLE")
+            or (getattr(record, "is_manually_added", False) and getattr(record, "source", None) == "manual" and not getattr(record, "qc_completed_at", None))
+        ) else ("DONE" if (
             getattr(record, "qc_completed_at", None) is not None
             or bool(getattr(record, "qc_vhr_comment", None) and str(record.qc_vhr_comment).strip())
             or bool(getattr(record, "qc_street_details", None) and str(record.qc_street_details).strip())
             or bool(getattr(record, "qc_builder_contact", None) and str(record.qc_builder_contact).strip())
             or bool(getattr(record, "qc_sqfeet", None) and str(record.qc_sqfeet).strip())
-        ) else "PENDING",
+        ) else "PENDING"),
         qc_completed_at=getattr(record, "qc_completed_at", None),
         qc_edited_at=getattr(record, "qc_edited_at", None),
         assigned_telecaller_id=getattr(record, "assigned_telecaller_id", None),
@@ -1194,4 +1326,131 @@ def _record_to_detail(record, errors=None) -> RecordDetail:
             for img in (record.images or [])
         ],
         errors=errors,
+    )
+
+
+
+@router.post("/resolve-coords", response_model=ResolveCoordsResponse)
+async def verifier_resolve_coords(
+    payload: ResolveCoordsRequest,
+    user: User = Depends(require_record_writer),
+    db: Session = Depends(get_db),
+):
+    """Resolve coordinates for field verifiers into cadastral & revenue details (WFS default, or GMaps)."""
+    coords_str = payload.coordinates.strip()
+    from app.services.record_service import _parse_coordinates
+    parsed = _parse_coordinates(coords_str)
+    if not parsed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid coordinates format. Expected 'latitude, longitude' (e.g. 11.0825, 76.9950)."
+        )
+    lat, lng = parsed
+    record_service = RecordService(db)
+    site_id = record_service.next_six_digit_unique_id(prefix="CBE")
+    source = (payload.source or "wfs").strip().lower()
+
+    survey_no = None
+    subdivision_no = None
+    village = None
+    taluk = None
+    district = None
+    ulpin = None
+    address = None
+    area = None
+
+    if source == "wfs":
+        from app.services.tngis_wfs_service import get_tngis_wfs_service
+        try:
+            wfs_service = get_tngis_wfs_service()
+            wfs_res = wfs_service.resolve_coordinates(lat, lng)
+            survey_no = wfs_res.get("survey_no") or None
+            subdivision_no = wfs_res.get("subdivision_no") or None
+            village = wfs_res.get("village") or None
+            taluk = wfs_res.get("taluk") or None
+            district = wfs_res.get("district") or None
+            ulpin = wfs_res.get("ulpin") or None
+            address = wfs_res.get("formatted_address") or None
+            if village:
+                area = village
+        except Exception as e:
+            logger.warning("TNGIS WFS error during verifier resolve_coords: %s", e)
+
+        if not (village and taluk and district):
+            from app.services.village_master_service import get_village_master_service
+            vms = get_village_master_service()
+            loc_match = vms.resolve_record_location(coordinates=f"{lat}, {lng}")
+            village = village or loc_match.get("village")
+            taluk = taluk or loc_match.get("taluk")
+            district = district or loc_match.get("district")
+            if not address and loc_match.get("formatted_address"):
+                address = loc_match.get("formatted_address")
+            if not area and village:
+                area = village
+    else:
+        import requests
+        settings = get_settings()
+        api_key = settings.GOOGLE_GEOCODING_API_KEY
+        if api_key:
+            try:
+                url = f"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&key={api_key}"
+                resp = requests.get(url, timeout=10).json()
+                results = resp.get("results", [])
+                if results:
+                    address = results[0].get("formatted_address")
+                    for res in results:
+                        for comp in res.get("address_components", []):
+                            types = comp.get("types", [])
+                            if "sublocality_level_1" in types:
+                                area = comp.get("long_name")
+                                break
+                        if area:
+                            break
+                    if not area:
+                        for res in results:
+                            for comp in res.get("address_components", []):
+                                types = comp.get("types", [])
+                                if any(t in types for t in ["sublocality", "neighborhood", "sublocality_level_2", "locality"]):
+                                    area = comp.get("long_name")
+                                    break
+                            if area:
+                                break
+            except Exception as e:
+                logger.warning("Google geocoding error during verifier resolve_coords: %s", e)
+
+        from app.services.village_master_service import get_village_master_service
+        vms = get_village_master_service()
+        loc_match = vms.resolve_record_location(coordinates=f"{lat}, {lng}")
+        village = loc_match.get("village")
+        taluk = loc_match.get("taluk")
+        district = loc_match.get("district")
+        if not address and loc_match.get("formatted_address"):
+            address = loc_match.get("formatted_address")
+        if not area and village:
+            area = village
+
+    from app.services.duplicate_detection_service import get_duplicate_detection_service
+    dup_info = get_duplicate_detection_service().check_duplicate_proximity(db, lat=lat, lng=lng)
+
+    return ResolveCoordsResponse(
+        coordinates=f"{lat:.6f}, {lng:.6f}",
+        latitude=lat,
+        longitude=lng,
+        site_id=site_id,
+        area=area,
+        village=village,
+        taluk=taluk,
+        district=district,
+        address=address,
+        survey_no=survey_no,
+        subdivision_no=subdivision_no,
+        ulpin=ulpin,
+        source=source,
+        success=True,
+        is_duplicate=dup_info["is_duplicate"],
+        duplicate_warning=dup_info["duplicate_warning"],
+        duplicate_site_id=dup_info["duplicate_site_id"],
+        duplicate_record_id=dup_info["duplicate_record_id"],
+        duplicate_distance_m=dup_info["duplicate_distance_m"],
+        duplicate_is_visited=dup_info["duplicate_is_visited"],
     )

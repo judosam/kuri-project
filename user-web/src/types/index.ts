@@ -77,6 +77,16 @@ export interface CaptureRecord {
   spoken_with?: string | null;
   remarks?: string;
 
+  // GIS & Deduplication Proximity fields
+  latitude?: number | null;
+  longitude?: number | null;
+  is_duplicate?: boolean;
+  duplicate_warning?: string | null;
+  duplicate_site_id?: string | null;
+  duplicate_record_id?: number | null;
+  duplicate_distance_m?: number | null;
+  duplicate_is_visited?: boolean;
+
   // Deviation metrics
   deviation_meters?: number | null;
   deviation_formatted?: string | null;
@@ -116,6 +126,9 @@ export interface CaptureRecord {
   updated_coordinates?: string | null;
   updated_information?: string | null;
   follow_up_date?: string | null;
+  qc_history?: any[];
+  field_history?: any[];
+  telecaller_history?: any[];
 }
 
 export interface InspectionFormData {
@@ -135,6 +148,35 @@ export interface InspectionFormData {
   site_contractor_architect_number: string;
   remarks: string;
   follow_up_date?: string;
+  survey_no?: string;
+  subdivision_no?: string;
+  village?: string;
+  taluk?: string;
+  district?: string;
+}
+
+export interface ResolveCoordsResponse {
+  coordinates: string;
+  latitude: number;
+  longitude: number;
+  site_id: string;
+  area?: string | null;
+  village?: string | null;
+  taluk?: string | null;
+  district?: string | null;
+  address?: string | null;
+  survey_no?: string | null;
+  subdivision_no?: string | null;
+  ulpin?: string | null;
+  source?: string | null;
+  success: boolean;
+  message?: string | null;
+  is_duplicate?: boolean;
+  duplicate_warning?: string | null;
+  duplicate_site_id?: string | null;
+  duplicate_record_id?: number | null;
+  duplicate_distance_m?: number | null;
+  duplicate_is_visited?: boolean;
 }
 
 export interface CapturedPhoto {
@@ -173,3 +215,32 @@ export type ScreenName =
   | 'camera'
   | 'preview'
   | 'form';
+
+
+export interface NotificationItem {
+  id: number;
+  recipient_id?: number | null;
+  recipient_role?: string | null;
+  type: string;
+  title: string;
+  message: string;
+  record_id?: number | null;
+  unique_id?: string | null;
+  with_sound: boolean;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface NotificationListResponse {
+  notifications: NotificationItem[];
+  total: number;
+  unread_count: number;
+  page: number;
+  page_size: number;
+}
+
+export interface NotificationPollResponse {
+  notifications: NotificationItem[];
+  unread_count: number;
+  has_sound: boolean;
+}

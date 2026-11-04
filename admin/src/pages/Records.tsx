@@ -3,7 +3,7 @@ import { TelecallingInfoModal, FieldVerifierInfoModal, QaInfoModal } from '../co
 import BulkEditModal from '../components/BulkEditModal';
 import QaCreateRecordModal from '../components/QaCreateRecordModal';
 import { getLatestCommentSummary } from '../utils/telecallerHistory';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { recordsApi, usersApi, SERVER_BASE } from '../services/api';
 import type { AuditStatus, CaptureRecord, User } from '../types';
@@ -14,7 +14,6 @@ import {
   Avatar,
   EmptyPanel,
   LoadingPanel,
-  Pager,
   PageShell,
   AuthThumbnail,
   CustomSelect,
@@ -37,6 +36,7 @@ import {
   QcDoneAtCell,
   QcStatusCell,
   AuditStatusCell,
+  UniqueIdCell,
   capturedTime,
   type RecordView,
 } from '../components/RecordWorkflowFields';
@@ -122,6 +122,7 @@ const AUDIT_CHIP_META: Record<AuditStatus, { label: string; icon: IconName; cls:
   DISAPPROVAL: { label: 'Disapproval', icon: 'block', cls: 'audit-chip-disapproval', fullTitle: 'Disapproval' },
   COMMERCIAL_PROPERTY: { label: 'Commercial', icon: 'storefront', cls: 'audit-chip-commercial_property', fullTitle: 'Commercial Property' },
   RE_AUDITED: { label: 'Reaudited', icon: 'history', cls: 'audit-chip-re_audited', fullTitle: 'Reaudited' },
+  NOT_APPLICABLE: { label: 'Not Applicable', icon: 'block', cls: 'audit-chip-pending', fullTitle: 'Not Applicable for QC' },
 };
 
 /** Compact audit badge used in read-only contexts. */
@@ -303,6 +304,7 @@ export default function Records({
   // Every record manager shares one table: auditors get the QC-desk columns,
   // admins and managers get the field-verification columns.
   const isAuditorView = auditOnly && !canRoute;
+
   const [searchParams] = useSearchParams();
   const [saved] = useState(() => readRecordState(storageKey, {
     page: 1, statusFilter: 'ALL' as 'ALL' | 'NOT_COMPLETED' | 'COMPLETED' | 'MANUALLY_ADDED',
@@ -314,10 +316,87 @@ export default function Records({
   const columnFilterKey = JSON.stringify(columnFilters);
 
   const [records, setRecords] = useState<CaptureRecord[]>([]);
+  const [proximityMode, setProximityMode] = useState<'none' | 'village'>('none');
+  const [filtersExpanded, setFiltersExpanded] = useState<boolean>(() => localStorage.getItem('kuri_admin_filters_expanded') !== 'false');
+
+  const spatialVillage = useMemo(() => {
+    const groups: { [key: string]: CaptureRecord[] } = {};
+    records.forEach((r) => {
+      const vName = (r.village || r.taluk || 'Coimbatore Region').trim();
+      if (!groups[vName]) groups[vName] = [];
+      groups[vName].push(r);
+    });
+    const sortedVillages = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
+    return sortedVillages.map((vName, idx) => ({
+      id: `village-${idx + 1}`,
+      label: `Cluster #${idx + 1} • ${vName} Area (${groups[vName].length} sites)`,
+      village: vName,
+      records: groups[vName],
+      count: groups[vName].length,
+    }));
+  }, [records]);
+
+  const [collapsedClusters, setCollapsedClusters] = useState<Record<string, boolean>>({});
+
+  const toggleClusterCollapse = (clusterId: string) => {
+    setCollapsedClusters((prev) => ({
+      ...prev,
+      [clusterId]: !prev[clusterId],
+    }));
+  };
+
+  const collapseAllClusters = () => {
+    const allCollapsed: Record<string, boolean> = {};
+    if (proximityMode === 'village') {
+      spatialVillage.forEach((v) => { allCollapsed[v.id] = true; });
+    }
+    setCollapsedClusters(allCollapsed);
+  };
+
+  const expandAllClusters = () => {
+    setCollapsedClusters({});
+  };
+
+  type RenderableRow =
+    | { type: 'header'; id: string; label: string; village?: string; count: number; mode: 'village'; isCollapsed: boolean }
+    | { type: 'record'; record: CaptureRecord; isClustered: boolean };
+
+  const displayRows = useMemo<RenderableRow[]>(() => {
+    if (proximityMode === 'none') {
+      return records.map((r) => ({ type: 'record', record: r, isClustered: false }));
+    }
+
+    if (proximityMode === 'village') {
+      const rows: RenderableRow[] = [];
+      spatialVillage.forEach((vCluster) => {
+        const isCollapsed = Boolean(collapsedClusters[vCluster.id]);
+        rows.push({
+          type: 'header',
+          id: vCluster.id,
+          label: vCluster.label,
+          village: vCluster.village,
+          count: vCluster.count,
+          mode: 'village',
+          isCollapsed,
+        });
+        if (!isCollapsed) {
+          vCluster.records.forEach((r) => {
+            rows.push({ type: 'record', record: r, isClustered: true });
+          });
+        }
+      });
+      return rows;
+    }
+
+    return records.map((r) => ({ type: 'record', record: r, isClustered: false }));
+  }, [records, proximityMode, spatialVillage, collapsedClusters]);
+
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(saved.page);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'NOT_COMPLETED' | 'COMPLETED' | 'MANUALLY_ADDED' | 'NOT_INTERESTED' | 'DUPLICATE' | 'CONSTRUCTION_FINISHED' | 'CLOSED'>(saved.statusFilter as any);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const isFetchingNextPageRef = useRef(false);
   const lastInteractedHeaderRef = useRef<string | null>(null);
   const savedScrollLeftRef = useRef<number>(0);
   // Unified QC Status filter: All, Approval, Disapproval, Commercial, Reaudited, QC Done, QC Pending.
@@ -335,6 +414,7 @@ export default function Records({
   const [users, setUsers] = useState<User[]>([]);
   const [hasFetchedUsers, setHasFetchedUsers] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const defaultSortKey = defaultSortKeyFor(isAuditorView);
   const [sortBy, setSortBy] = useState(saved.sortBy);
@@ -1022,20 +1102,60 @@ export default function Records({
 
   const loadRecords = async (opts?: { silent?: boolean }) => {
     const seq = ++requestSeq.current;
-    if (!opts?.silent) setLoading(true);
+    if (!opts?.silent) {
+      if (page === 1) setLoading(true);
+      else setLoadingMore(true);
+    }
     try {
       const res = await recordsApi.list(listParams(page, activePageSize));
       if (seq !== requestSeq.current) return;
-      setRecords(res.records || []);
+      const resultRecords = res.records || [];
+      const isEnd = resultRecords.length === 0 || resultRecords.length < activePageSize || (page * activePageSize >= res.total);
+      setHasMore(!isEnd);
+
+      // If page > 1 returned 0 records unexpectedly (e.g. from an out-of-bounds page), reset to 1
+      if (page > 1 && resultRecords.length === 0 && (records.length === 0 || res.total > 0)) {
+        setPage(1);
+        return;
+      }
+
+      setRecords((prev) => {
+        if (page === 1) return resultRecords;
+        const seen = new Set(prev.map((r) => r.id));
+        const fresh = resultRecords.filter((r) => !seen.has(r.id));
+        return [...prev, ...fresh];
+      });
       setTotal(res.total);
-      if (page > Math.max(1, Math.ceil(res.total / activePageSize))) setPage(Math.max(1, Math.ceil(res.total / activePageSize)));
       setLoadError(null);
     } catch (err: any) {
       if (seq === requestSeq.current) setLoadError(err.response?.data?.detail || 'Could not load records. Please retry.');
     } finally {
-      if (seq === requestSeq.current) setLoading(false);
+      if (seq === requestSeq.current) {
+        setLoading(false);
+        setLoadingMore(false);
+        isFetchingNextPageRef.current = false;
+      }
     }
   };
+
+  // Infinite scroll on table-scroll container with concurrency lock to prevent hanging
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+
+    const handleTableScroll = () => {
+      if (!hasMore || isFetchingNextPageRef.current || loading || loadingMore) return;
+      if (records.length >= total) return;
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      if (scrollHeight - (scrollTop + clientHeight) < 320) {
+        isFetchingNextPageRef.current = true;
+        setPage((prev) => prev + 1);
+      }
+    };
+
+    el.addEventListener('scroll', handleTableScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleTableScroll);
+  }, [hasMore, loading, loadingMore, records.length, total]);
 
   // Live sync: while the assigner's merged audit queue is open, silently
   // refetch every 15s so auditor decisions (status + comment) reach the
@@ -1082,12 +1202,14 @@ export default function Records({
   // A selection only ever refers to the rows the current filters produce, so it
   // is dropped whenever the filters, search or sort change (paging keeps it).
   useEffect(() => {
+    setPage(1);
+    setHasMore(true);
     setSelectedIds(new Set());
   }, [statusFilter, qcStatusFilter, search, dateFrom, dateTo, userId, auditorId, sortBy, sortOrder, dateField, columnFilterKey]);
 
   useEffect(() => {
     saveRecordState(storageKey, {
-      page,
+      page: 1, // Always restart at page 1 for infinite scroll on refresh
       statusFilter,
       qcFilter: (qcStatusFilter === 'DONE' || qcStatusFilter === 'PENDING') ? qcStatusFilter : 'ALL',
       auditFilter: ['APPROVAL', 'DISAPPROVAL', 'COMMERCIAL_PROPERTY', 'RE_AUDITED'].includes(qcStatusFilter) ? (qcStatusFilter as AuditStatus) : '',
@@ -1145,6 +1267,17 @@ export default function Records({
     } finally {
       setSelectingAll(false);
     }
+  };
+
+  const pastedTokens = useMemo(() => {
+    if (!searchInput) return [];
+    const tokens = searchInput.split(/[\s,;\n\r\t]+/).map(t => t.trim()).filter(Boolean);
+    return Array.from(new Set(tokens));
+  }, [searchInput]);
+
+  const handleSelectPastedIds = async () => {
+    await selectAllMatching();
+    setDeleteNotice({ tone: 'ok', text: `Selected all matching records for the pasted search IDs` });
   };
 
   const clearSelection = () => {
@@ -1323,9 +1456,6 @@ export default function Records({
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / activePageSize));
-  const shownFrom = total === 0 ? 0 : (page - 1) * activePageSize + 1;
-  const shownTo = Math.min(page * activePageSize, total);
   const isFiltered =
     !!search ||
     !!userId || (!isAuditorView && !!auditorId) ||
@@ -1372,7 +1502,7 @@ export default function Records({
           title="Create a new lead by picking a point on the map or pasting coordinates"
         >
           <Icon name="add" size={14} />
-          <span className="btn-label">+ Create Record</span>
+          <span className="btn-label">Create Record</span>
         </button>
         <button
           type="button"
@@ -1399,17 +1529,7 @@ export default function Records({
           title="Create a new lead by picking a point on the map or pasting coordinates"
         >
           <Icon name="add" size={14} />
-          <span className="btn-label">+ Create Record</span>
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          onClick={() => navigate('/records/import-previous')}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, height: 30, borderRadius: 6 }}
-          title="Upload an Excel sheet of field records collected before the app was deployed"
-        >
-          <Icon name="upload_file" size={14} />
-          <span className="btn-label">Import Previous</span>
+          <span className="btn-label">Create Record</span>
         </button>
         <button
           type="button"
@@ -1448,11 +1568,57 @@ export default function Records({
         <div className="toolbar-row toolbar-row-main">
           <div className="search-wrap records-search-wrap">
             <Icon name="search" />
-            <input type="search" name="record-search" autoComplete="off" className="fld fld-soft"
-              placeholder="Search UID, address, survey no or owner…" value={searchInput}
-              onChange={event => { setSearchInput(event.target.value); setPage(1); }} aria-label="Search records" />
+            <input
+              type="search"
+              name="record-search"
+              autoComplete="off"
+              className="fld fld-soft"
+              placeholder="Search UID, address, or paste multiple IDs (e.g. CBE-1001, CBE-1002)…"
+              value={searchInput}
+              onChange={event => { setSearchInput(event.target.value); setPage(1); }}
+              onPaste={(e) => {
+                const text = e.clipboardData.getData('text');
+                if (text && /[\n\r,;\t]/.test(text)) {
+                  e.preventDefault();
+                  const tokens = text.split(/[\s,;\n\r\t]+/).map(t => t.trim()).filter(Boolean);
+                  if (tokens.length > 0) {
+                    setSearchInput(tokens.join(', '));
+                    setPage(1);
+                  }
+                }
+              }}
+              aria-label="Search records"
+            />
             {searchInput && <button type="button" className="search-clear-btn" onClick={() => setSearchInput('')} aria-label="Clear search"><Icon name="close" size={14} /></button>}
           </div>
+          {pastedTokens.length > 1 && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={handleSelectPastedIds}
+              disabled={selectingAll}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                height: 32,
+                fontSize: 11.5,
+                padding: '2px 10px',
+                borderRadius: 7,
+                fontWeight: 700,
+                background: '#4f46e5',
+                borderColor: '#4f46e5',
+                color: '#ffffff',
+                boxShadow: '0 1px 3px rgba(79, 70, 229, 0.25)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+              title={`Select all records matching the ${pastedTokens.length} pasted Unique IDs`}
+            >
+              <Icon name={selectingAll ? 'refresh' : 'playlist_add'} size={15} className={selectingAll ? 'spin' : ''} />
+              <span>{selectingAll ? 'Selecting…' : `Select All ${pastedTokens.length} IDs`}</span>
+            </button>
+          )}
           <div className="toolbar-inline-group">
             <div className="field filter-sort">
               <span className="field-label">Sort</span>
@@ -1498,9 +1664,47 @@ export default function Records({
                 ariaLabel="Sort records"
               />
             </div>
+            <button
+              type="button"
+              className={`btn btn-sm ${filtersExpanded ? 'btn-secondary' : 'btn-primary'}`}
+              onClick={() => {
+                setFiltersExpanded((prev) => {
+                  const next = !prev;
+                  localStorage.setItem('kuri_admin_filters_expanded', String(next));
+                  return next;
+                });
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                height: 30,
+                fontSize: 11.5,
+                borderRadius: 6,
+                fontWeight: 650,
+                whiteSpace: 'nowrap',
+              }}
+              title={filtersExpanded ? 'Collapse filter section to maximize table space' : 'Expand all filters'}
+            >
+              <Icon name={filtersExpanded ? 'expand_less' : 'tune'} size={14} />
+              <span>{filtersExpanded ? 'Collapse' : 'Filters'}</span>
+              {!filtersExpanded && isFiltered && (
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    background: '#ef4444',
+                    display: 'inline-block',
+                  }}
+                  title="Active filters applied"
+                />
+              )}
+            </button>
             {isFiltered && <button type="button" className="btn btn-ghost btn-sm records-reset-btn" onClick={handleReset} aria-label="Reset filters"><Icon name="restart_alt" size={15} />Reset</button>}
           </div>
         </div>
+        {filtersExpanded && (
         <div className="toolbar-row records-filter-bar">
           {!isAuditorView && (
             <div className="filter-bar-group filter-assignment">
@@ -1578,6 +1782,7 @@ export default function Records({
             </label>
           </>}
         </div>
+        )}
       </div>
 
       {selectedIds.size > 0 && (
@@ -1937,6 +2142,106 @@ export default function Records({
 
       {records.length > 0 && (
         <div className="card table-card" style={{ position: 'relative' }}>
+          {/* Spatial Grouping Bar (Adjacent plots / Same layout / Street clusters) */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 14px',
+              backgroundColor: '#fafbfc',
+              borderBottom: '1px solid #edf2f7',
+              flexWrap: 'wrap',
+              gap: 8,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <Icon name="layers" size={13} /> Grouping:
+              </span>
+              <button
+                type="button"
+                className={`btn btn-sm ${proximityMode === 'none' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setProximityMode('none')}
+                style={{ height: 26, fontSize: 11, padding: '2px 10px', borderRadius: 6, fontWeight: 600 }}
+              >
+                Flat Table
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${proximityMode === 'village' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setProximityMode('village')}
+                style={{
+                  height: 26,
+                  fontSize: 11,
+                  padding: '2px 10px',
+                  borderRadius: 6,
+                  fontWeight: 600,
+                  backgroundColor: proximityMode === 'village' ? '#059669' : undefined,
+                  borderColor: proximityMode === 'village' ? '#059669' : undefined,
+                  color: proximityMode === 'village' ? '#ffffff' : undefined,
+                }}
+              >
+                Village Clusters ({spatialVillage.length} areas)
+              </button>
+            </div>
+
+            {/* Top Total Records Counter & Group Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
+              {proximityMode !== 'none' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-secondary"
+                    onClick={expandAllClusters}
+                    style={{ height: 26, fontSize: 11, padding: '2px 8px', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 600 }}
+                    title="Expand all groups"
+                  >
+                    <Icon name="unfold_more" size={13} />
+                    <span>Expand</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-secondary"
+                    onClick={collapseAllClusters}
+                    style={{ height: 26, fontSize: 11, padding: '2px 8px', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 600 }}
+                    title="Collapse all groups"
+                  >
+                    <Icon name="unfold_less" size={13} />
+                    <span>Collapse</span>
+                  </button>
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  height: 26,
+                  padding: '0 10px',
+                  borderRadius: 6,
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  color: '#1e293b',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <span>Showing {records.length.toLocaleString()} of {total.toLocaleString()} records</span>
+                {loadingMore && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#6366f1', fontSize: 11 }}>
+                    <Icon name="refresh" size={12} className="spin" />
+                  </span>
+                )}
+                {!loadingMore && records.length >= total && total > 0 && (
+                  <span style={{ color: '#059669', fontSize: 11 }}>✓</span>
+                )}
+              </div>
+            </div>
+          </div>
+
           {loading && (
             <div className="table-loading-bar-wrap">
               <div className="table-loading-bar-inner" />
@@ -2034,7 +2339,106 @@ export default function Records({
 </tr>
               </thead>
               <tbody>
-                {records.map((r) => {
+                {displayRows.map((rowItem) => {
+                  if (rowItem.type === 'header') {
+                    return (
+                      <tr
+                        key={rowItem.id}
+                        onClick={() => toggleClusterCollapse(rowItem.id)}
+                        style={{
+                          backgroundColor: rowItem.isCollapsed ? '#f8fafc' : '#f0fdf4',
+                          borderTop: '2px solid #34d399',
+                          borderBottom: '1px solid #cbd5e1',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                          transition: 'background-color 0.15s ease',
+                          width: '100%',
+                        }}
+                        title={rowItem.isCollapsed ? 'Click to expand group' : 'Click to collapse group'}
+                      >
+                        <td
+                          colSpan={100}
+                          style={{
+                            padding: '8px 16px',
+                            width: '100%',
+                            backgroundColor: rowItem.isCollapsed ? '#f8fafc' : '#f0fdf4',
+                          }}
+                        >
+                          <div
+                            style={{
+                              position: 'sticky',
+                              left: 14,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 16,
+                              width: 'calc(100vw - 340px)',
+                              maxWidth: 1200,
+                              minWidth: 480,
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: 6,
+                                  backgroundColor: rowItem.isCollapsed ? '#e2e8f0' : '#dcfce7',
+                                  color: '#047857',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <Icon name={rowItem.isCollapsed ? 'chevron_right' : 'expand_more'} size={17} />
+                              </span>
+                              <span style={{ fontWeight: 800, fontSize: 13, color: '#047857', whiteSpace: 'nowrap' }}>
+                                📍 {rowItem.label}
+                              </span>
+                              {rowItem.village && (
+                                <span style={{ fontSize: 11.5, color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                  • Village: <strong>{rowItem.village}</strong>
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                              <span
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: 600,
+                                  color: rowItem.isCollapsed ? '#64748b' : '#047857',
+                                  backgroundColor: rowItem.isCollapsed ? '#f1f5f9' : '#ecfdf5',
+                                  padding: '2px 8px',
+                                  borderRadius: 5,
+                                  border: `1px solid ${rowItem.isCollapsed ? '#e2e8f0' : '#bbf7d0'}`,
+                                }}
+                              >
+                                {rowItem.isCollapsed ? 'Collapsed (click to expand)' : 'Expanded (click to collapse)'}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: '#047857',
+                                  backgroundColor: '#ffffff',
+                                  padding: '3px 10px',
+                                  borderRadius: 12,
+                                  border: '1px solid #cbd5e1',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                }}
+                              >
+                                {rowItem.count} sites
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  const r = rowItem.record;
+                  const isClustered = rowItem.isClustered;
                   // No-photo inspections store their GPS fix on the record
                   // itself instead of on a CapturedImage row.
                   const fieldCoords = getFieldCoordinates(r.images) ?? (r.field_latitude != null && r.field_longitude != null
@@ -2062,10 +2466,16 @@ export default function Records({
                   const locationTone =
                     LOCATION_VERIFICATION_TONE[locationVariance?.status ?? 'far'] ?? LOCATION_VERIFICATION_TONE.far;
 
+                  const isDuplicateRow = Boolean(r.is_duplicate) || (r.status || '').toUpperCase() === 'DUPLICATE' || Boolean(r.duplicate_warning);
+
                   return (
                     <tr
                       key={r.id}
-                      className={`rowlink${selectedIds.has(r.id) ? ' row-selected' : ''}`}
+                      className={`rowlink${selectedIds.has(r.id) ? ' row-selected' : ''}${isClustered ? ' row-clustered' : ''}${isDuplicateRow ? ' row-duplicate' : ''}`}
+                      style={{
+                        borderLeft: isDuplicateRow ? '4px solid #ef4444' : isClustered ? '4px solid #6366f1' : undefined,
+                        backgroundColor: isDuplicateRow ? 'rgba(254, 242, 242, 0.35)' : undefined,
+                      }}
                       data-source={isImported ? 'imported' : 'captured'}
                       onClick={() => {
                         // Auditor queue: open the full record in a popup so
@@ -2087,10 +2497,8 @@ export default function Records({
   {visibleFields.map(item => <td key={item.key}><RecordFieldValue record={r} item={item} /></td>)}
 </> : isAuditorView ? (
   <>
-    <td>
-      {r.unique_id ? (
-        <span className="mono-sm rec-unique-id" style={{ fontWeight: 700, color: '#0f172a' }}>{r.unique_id}</span>
-      ) : nil}
+    <td className="col-unique-id" style={{ minWidth: 220, width: 250, maxWidth: 300 }}>
+      <UniqueIdCell record={r} />
     </td>
     <td><SourceBadge source={r.source} isManual={r.is_manually_added} uploadedByName={r.uploaded_by_name} /></td>
     <td className="rec-last-modified col-last-modified" style={{ whiteSpace: 'nowrap' }} title="When lead was assigned or reassigned">
@@ -2129,10 +2537,8 @@ export default function Records({
                         />
                       </td>}
 {/* 1. Unique ID — the record key operators quote on the phone. */}
-<td className="col-unique-id" style={{ minWidth: 210, width: 225, maxWidth: 260, whiteSpace: 'nowrap' }}>
-  {r.unique_id ? (
-    <span className="mono-sm rec-unique-id" style={{ fontWeight: 700, color: '#0f172a' }}>{r.unique_id}</span>
-  ) : nil}
+<td className="col-unique-id" style={{ minWidth: 220, width: 250, maxWidth: 300 }}>
+  <UniqueIdCell record={r} />
 </td>
 <td><SourceBadge source={r.source} isManual={r.is_manually_added} uploadedByName={r.uploaded_by_name} /></td>
 {/* 2. Last Modified Date — when lead was assigned or reassigned */}
@@ -2175,10 +2581,10 @@ export default function Records({
       </span>
     </div>
   ) : (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: r.audit_status === 'APPROVAL' ? '#059669' : '#b45309', fontWeight: 600, fontSize: '0.78rem', whiteSpace: 'nowrap' }}
-      title={r.audit_status === 'APPROVAL' ? 'Auditor approved — ready to assign a field verifier' : r.assigned_auditor_name ? `Routed to auditor ${r.assigned_auditor_name} — awaiting decision` : 'Staged — route it to an auditor for review'}>
-      <Icon name={r.audit_status === 'APPROVAL' ? 'check_circle' : 'pending_actions'} size={13} />
-      {r.audit_status === 'APPROVAL'
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: (r.audit_status === 'APPROVAL' || r.audit_status === 'COMMERCIAL_PROPERTY') ? '#059669' : '#b45309', fontWeight: 600, fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+      title={(r.audit_status === 'APPROVAL' || r.audit_status === 'COMMERCIAL_PROPERTY') ? 'Ready to assign to a field verifier' : r.assigned_auditor_name ? `Routed to auditor ${r.assigned_auditor_name} — awaiting decision` : 'Staged — route it to an auditor for review'}>
+      <Icon name={(r.audit_status === 'APPROVAL' || r.audit_status === 'COMMERCIAL_PROPERTY') ? 'check_circle' : 'pending_actions'} size={13} />
+      {(r.audit_status === 'APPROVAL' || r.audit_status === 'COMMERCIAL_PROPERTY')
         ? 'Ready to assign'
         : r.assigned_auditor_name
           ? `With ${r.assigned_auditor_name}`
@@ -2217,7 +2623,13 @@ export default function Records({
     const isConstructionFinished = s === 'CONSTRUCTION_FINISHED' || s === 'CONSTRUCTION FINISHED';
     const isClosed = isNotInterested || isDuplicate || isConstructionFinished;
 
-    const isReassigned = !isComplete && !isClosed && (r.reassigned_to_id != null || r.revisit_status === 'REASSIGNED' || r.revisit_status === 'PENDING_REVISIT');
+    const hasPriorHistory = Boolean(
+      (r.images && r.images.length > 0) ||
+      r.field_captured_at ||
+      r.updated_information ||
+      r.updated_coordinates
+    );
+    const isReassigned = !isComplete && !isClosed && hasPriorHistory && (r.reassigned_to_id != null || r.revisit_status === 'REASSIGNED' || r.revisit_status === 'PENDING_REVISIT');
     const isRevisited = isComplete && (r.status === 'Updated Revisited' || r.status === 'UPDATED_REVISITED' || r.revisit_status === 'Updated Revisited' || r.revisit_status === 'COMPLETED' || (r.reassigned_to_id != null && (r.updated_coordinates || r.updated_information)));
     
     let bg = isComplete ? '#ecfdf5' : isReassigned ? '#eff6ff' : '#fff7ed';
@@ -2559,19 +2971,18 @@ export default function Records({
                     </tr>
                   );
                 })}
+                {loadingMore && (
+                  <tr>
+                    <td colSpan={100} style={{ padding: '12px', textAlign: 'center', background: '#f8fafc', color: '#6366f1', fontSize: 12.5, fontWeight: 600 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        <Icon name="refresh" size={15} className="spin" />
+                        Loading more records on scroll…
+                      </span>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
-          </div>
-          <div className="table-foot">
-            <span className="table-foot-note">
-              Showing {shownFrom}–{shownTo} of {total.toLocaleString()}
-            </span>
-            <Pager
-              page={page}
-              totalPages={totalPages}
-              onPrev={() => setPage((p) => Math.max(1, p - 1))}
-              onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-            />
           </div>
         </div>
       )}

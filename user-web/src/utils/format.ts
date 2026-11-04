@@ -103,7 +103,17 @@ export function getRecordStatusBadgeInfo(record: CaptureRecord): { label: string
   if (isRecordCompleted(record)) {
     return { label: 'Completed', className: 'badge-complete', bg: '#e6f4ea', color: '#137333' };
   }
-  if (record.reassigned_to_id != null || record.revisit_status === 'REASSIGNED' || record.revisit_status === 'PENDING_REVISIT') {
+  // Genuinely reassigned/revisit: site has prior inspection history, was previously completed, or has revisit notes
+  const hasPriorHistory = Boolean(
+    (record.images && record.images.length > 0) ||
+    record.field_captured_at ||
+    record.updated_information ||
+    record.updated_coordinates
+  );
+  if (
+    hasPriorHistory &&
+    (record.reassigned_to_id != null || record.revisit_status === 'REASSIGNED' || record.revisit_status === 'PENDING_REVISIT')
+  ) {
     return { label: 'Reassigned', className: 'badge-reassigned', bg: '#e0f2fe', color: '#0369a1' };
   }
   return { label: 'Pending', className: 'badge-pending', bg: '#fff4e5', color: '#b06000' };

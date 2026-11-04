@@ -12,6 +12,10 @@ import PreviewScreen from './screens/PreviewScreen';
 import FormScreen from './screens/FormScreen';
 import ProfileModal from './screens/ProfileModal';
 import PermissionModal from './components/common/PermissionModal';
+import { NotificationProvider } from './context/NotificationContext';
+import { NotificationToastContainer } from './components/NotificationToastContainer';
+import DuplicateProximityAlertModal from './components/DuplicateProximityAlertModal';
+
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -49,6 +53,16 @@ export default function App() {
   // Modals
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [acknowledgedDuplicates, setAcknowledgedDuplicates] = useState<Set<number>>(() => new Set());
+  const [duplicateAlertTarget, setDuplicateAlertTarget] = useState<{
+    record?: CaptureRecord;
+    onProceed: () => void;
+    matchedSiteId?: string;
+    matchedRecordId?: number;
+    distanceMeters?: number;
+    warningText?: string;
+    isVisited?: boolean;
+  } | null>(null);
 
   // Dashboard matrix filter to records
   const [recordsInitialFilter, setRecordsInitialFilter] = useState<{
@@ -159,12 +173,99 @@ export default function App() {
   };
 
   // Navigation handlers
-  const handleStartInspection = (record: CaptureRecord) => {
+  const actuallyStartInspection = (record: CaptureRecord) => {
     setInspectingRecord(record);
     setEditingRecord(null);
     setCapturedPhotos([]);
     setPendingPhoto(null);
     setActiveScreen('form');
+  };
+
+  const handleMarkDuplicateFromModal = async (record: CaptureRecord) => {
+    try {
+      await api.markRecordStatus(record.id, {
+        status: 'DUPLICATE',
+        remarks: 'Marked as duplicate from pre-camera proximity alert',
+      });
+      setDuplicateAlertTarget(null);
+      setActiveScreen('records');
+    } catch (err: any) {
+      alert(err?.message || 'Failed to update record status to duplicate');
+    }
+  };
+
+  const handleStartInspection = (record: CaptureRecord, nearbyMatch?: any) => {
+    const isDuplicate =
+      Boolean(record.is_duplicate) ||
+      (record.status || '').toUpperCase() === 'DUPLICATE' ||
+      Boolean(record.duplicate_site_id) ||
+      Boolean(record.duplicate_warning) ||
+      (record.duplicate_distance_m != null && record.duplicate_distance_m <= 50) ||
+      Boolean(nearbyMatch);
+
+    if (isDuplicate && !acknowledgedDuplicates.has(record.id)) {
+      const matchedSiteId =
+        record.duplicate_site_id ||
+        nearbyMatch?.record?.unique_id ||
+        (nearbyMatch?.record?.id ? `#${nearbyMatch.record.id}` : undefined);
+      const matchedRecordId =
+        record.duplicate_record_id ||
+        nearbyMatch?.record?.id ||
+        undefined;
+      const distM = record.duplicate_distance_m ?? nearbyMatch?.distanceMeters;
+      const warn =
+        record.duplicate_warning ||
+        (nearbyMatch
+          ? `Site is within ${Math.round(nearbyMatch.distanceMeters)}m of existing site ${matchedSiteId || ''}.`
+          : 'Site may be already visited or is within 40m/50m of an existing site.');
+      const isVisited =
+        record.duplicate_is_visited ??
+        (nearbyMatch ? (nearbyMatch.record?.status === 'COMPLETED' || nearbyMatch.record?.date_of_visit != null) : true);
+
+      setDuplicateAlertTarget({
+        record,
+        onProceed: () => {
+          setAcknowledgedDuplicates((prev) => new Set(prev).add(record.id));
+          setDuplicateAlertTarget(null);
+          actuallyStartInspection(record);
+        },
+        matchedSiteId,
+        matchedRecordId,
+        distanceMeters: distM,
+        warningText: warn,
+        isVisited,
+      });
+      return;
+    }
+    actuallyStartInspection(record);
+  };
+
+  const handleOpenCameraFromForm = () => {
+    if (
+      inspectingRecord &&
+      !acknowledgedDuplicates.has(inspectingRecord.id) &&
+      (inspectingRecord.is_duplicate ||
+        (inspectingRecord.status || '').toUpperCase() === 'DUPLICATE' ||
+        inspectingRecord.duplicate_site_id ||
+        inspectingRecord.duplicate_warning ||
+        (inspectingRecord.duplicate_distance_m != null && inspectingRecord.duplicate_distance_m <= 50))
+    ) {
+      setDuplicateAlertTarget({
+        record: inspectingRecord,
+        onProceed: () => {
+          setAcknowledgedDuplicates((prev) => new Set(prev).add(inspectingRecord.id));
+          setDuplicateAlertTarget(null);
+          setActiveScreen('camera');
+        },
+        matchedSiteId: inspectingRecord.duplicate_site_id || undefined,
+        matchedRecordId: inspectingRecord.duplicate_record_id || undefined,
+        distanceMeters: inspectingRecord.duplicate_distance_m || undefined,
+        warningText: inspectingRecord.duplicate_warning || 'Site may be already visited or is within 40m/50m of an existing site.',
+        isVisited: inspectingRecord.duplicate_is_visited ?? true,
+      });
+      return;
+    }
+    setActiveScreen('camera');
   };
 
   /** Reopen a saved record's form — no camera step, the photos stay as they are. */
@@ -324,6 +425,30 @@ export default function App() {
               : null
           }
         />
+
+        {/* ⚠️ Pre-Camera Proximity / Duplicate Alert Modal */}
+        <DuplicateProximityAlertModal
+          isOpen={!!duplicateAlertTarget}
+          onClose={() => setDuplicateAlertTarget(null)}
+          onProceed={() => {
+            if (duplicateAlertTarget) {
+              const proceedFn = duplicateAlertTarget.onProceed;
+              setDuplicateAlertTarget(null);
+              proceedFn();
+            }
+          }}
+          onViewMatched={(recordId) => {
+            setDuplicateAlertTarget(null);
+            handleOpenRecord(recordId);
+          }}
+          onMarkDuplicate={handleMarkDuplicateFromModal}
+          currentRecord={duplicateAlertTarget?.record}
+          matchedSiteId={duplicateAlertTarget?.matchedSiteId}
+          matchedRecordId={duplicateAlertTarget?.matchedRecordId}
+          distanceMeters={duplicateAlertTarget?.distanceMeters}
+          warningText={duplicateAlertTarget?.warningText}
+          isVisited={duplicateAlertTarget?.isVisited}
+        />
       </div>
     );
   }
@@ -368,9 +493,10 @@ export default function App() {
   }
 
   return (
-    <>
+    <NotificationProvider>
       <AppShell
         activeScreen={activeScreen}
+        onSelectRecord={handleOpenRecord}
         onNavigate={(screen) => {
           if (screen === 'records') {
             setRecordsInitialFilter(null);
@@ -426,7 +552,7 @@ export default function App() {
         {activeScreen === 'form' && (
           <FormScreen
             photos={capturedPhotos}
-            onAddMore={() => setActiveScreen('camera')}
+            onAddMore={handleOpenCameraFromForm}
             onSubmitSuccess={(record) => {
               setCapturedPhotos([]);
               setPendingPhoto(null);
@@ -467,6 +593,33 @@ export default function App() {
         isOpen={showPermissionModal}
         onClose={() => setShowPermissionModal(false)}
       />
-    </>
+
+      {/* ⚠️ Proximity Match / Duplicate Site Alert Modal */}
+      <DuplicateProximityAlertModal
+        isOpen={!!duplicateAlertTarget}
+        onClose={() => setDuplicateAlertTarget(null)}
+        onProceed={() => {
+          if (duplicateAlertTarget) {
+            const proceedFn = duplicateAlertTarget.onProceed;
+            setDuplicateAlertTarget(null);
+            proceedFn();
+          }
+        }}
+        onViewMatched={(recordId) => {
+          setDuplicateAlertTarget(null);
+          handleOpenRecord(recordId);
+        }}
+        onMarkDuplicate={handleMarkDuplicateFromModal}
+        currentRecord={duplicateAlertTarget?.record}
+        matchedSiteId={duplicateAlertTarget?.matchedSiteId}
+        matchedRecordId={duplicateAlertTarget?.matchedRecordId}
+        distanceMeters={duplicateAlertTarget?.distanceMeters}
+        warningText={duplicateAlertTarget?.warningText}
+        isVisited={duplicateAlertTarget?.isVisited}
+      />
+
+      {/* Floating Real-Time Toast Notifications */}
+      <NotificationToastContainer onSelectRecord={handleOpenRecord} />
+    </NotificationProvider>
   );
 }

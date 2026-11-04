@@ -44,13 +44,26 @@ export const fieldCoordinates = (r: CaptureRecord) => {
   return gps ? `${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)}` : '—';
 };
 export function getUnifiedQcStatus(record: CaptureRecord): string {
+  if (
+    record.qc_status === 'Not Applicable' ||
+    record.qc_status === 'NOT_APPLICABLE' ||
+    (record.is_manually_added && record.source === 'manual')
+  ) {
+    return 'Not Applicable';
+  }
   const hasQc = record.qc_status === 'DONE' || !!record.qc_completed_at || [record.qc_vhr_comment, record.qc_street_details, record.qc_builder_contact, record.qc_sqfeet].some(v => !!v?.trim());
   return hasQc ? 'QC Done' : 'QC Pending';
 }
 
 export const RECORD_GROUPS: { key: 'imported' | 'audit' | 'field'; label: string; fields: Field[] }[] = [
   { key: 'imported', label: 'Imported Details', fields: [
-    field('id', 'Record ID', 'id'), field('unique_id', 'Unique ID'),
+    field('id', 'Record ID', 'id'),
+    {
+      key: 'unique_id',
+      label: 'Unique ID',
+      sort: 'unique_id',
+      value: (r) => <UniqueIdCell record={r} />,
+    },
     { key: 'source', label: 'Source', sort: 'source', value: r => <SourceBadge source={r.source} isManual={r.is_manually_added} uploadedByName={r.uploaded_by_name} /> },
     { key: 'last_modified_at', label: 'Last Modified Date', sort: 'last_modified_at', value: r => { const t = lastModifiedTime(r); return t ? formatDateTime(String(t)) : '—'; } },
     field('name', 'Record Name', 'name'),
@@ -83,7 +96,8 @@ export const RECORD_GROUPS: { key: 'imported' | 'audit' | 'field'; label: string
       if (s === 'CONSTRUCTION_FINISHED' || s === 'CONSTRUCTION FINISHED') return 'Construction Finished';
       if (r.is_manually_added || r.source === 'manual') return 'Manually Added';
       if (r.status === 'Updated Revisited' || r.status === 'UPDATED_REVISITED' || r.status === 'COMPLETED' || r.revisit_status === 'COMPLETED') return 'Completed';
-      if (r.reassigned_to_id != null || r.revisit_status === 'REASSIGNED' || r.revisit_status === 'PENDING_REVISIT') return 'Reassigned';
+      const hasPriorHistory = Boolean((r.images && r.images.length > 0) || r.field_captured_at || r.updated_information || r.updated_coordinates);
+      if (hasPriorHistory && (r.reassigned_to_id != null || r.revisit_status === 'REASSIGNED' || r.revisit_status === 'PENDING_REVISIT')) return 'Reassigned';
       return 'Pending';
     } },
     { key: 'captured_at', label: 'Captured or Inspection Completed', sort: 'captured_at', value: r => capturedTime(r) ? formatDateTime(capturedTime(r)!) : '—' },
@@ -327,6 +341,79 @@ export function RecordFieldValue({ record, item }: { record: CaptureRecord; item
  * each panel's <tbody>. Each one renders its own <td> so the column lines up
  * 1:1 with the matching <th>.
  */
+/** "Unique ID" cell — shows standard 6-digit ID, sleek modern proximity/duplicate badge and subtle reference line. */
+export function UniqueIdCell({ record: r }: { record: CaptureRecord }) {
+  const isDup = Boolean(r.is_duplicate) || (r.status || '').toUpperCase() === 'DUPLICATE' || Boolean(r.duplicate_warning);
+  const dupDist = r.duplicate_distance_m != null ? Math.round(r.duplicate_distance_m) : null;
+  const dupMatchedId = r.duplicate_site_id || (r.duplicate_record_id ? `#${r.duplicate_record_id}` : null);
+  const isVisited = Boolean(r.duplicate_is_visited);
+  const warningText = r.duplicate_warning || (
+    isDup
+      ? (isVisited
+          ? `Site may be already visited (within ${dupDist ?? '40'}m of ${dupMatchedId || 'existing site'})`
+          : `Potential duplicate site (within ${dupDist ?? '40'}m of ${dupMatchedId || 'existing site'})`)
+      : null
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 150, maxWidth: 290 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
+        <span className="mono-sm rec-unique-id" style={{ fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>
+          {r.unique_id || '—'}
+        </span>
+        {isDup && (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 3.5,
+              padding: '1.5px 7px',
+              borderRadius: 6,
+              background: isVisited ? '#fff1f2' : '#fffbeb',
+              color: isVisited ? '#be123c' : '#b45309',
+              border: `1px solid ${isVisited ? '#fecdd3' : '#fde68a'}`,
+              fontSize: 10,
+              fontWeight: 700,
+              lineHeight: 1.25,
+              whiteSpace: 'nowrap',
+              letterSpacing: '0.01em',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+            }}
+            title={warningText || 'Duplicate / Proximity Warning'}
+          >
+            <span style={{ fontSize: 9 }}>{isVisited ? '📍' : '⚠️'}</span>
+            <span>{dupDist != null ? `${dupDist}m` : 'Match'}</span>
+            {dupMatchedId && (
+              <span style={{ opacity: 0.85, fontWeight: 650 }}>· {dupMatchedId}</span>
+            )}
+          </span>
+        )}
+      </div>
+      {isDup && warningText && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 3,
+            fontSize: 10,
+            color: isVisited ? '#9f1239' : '#92400e',
+            lineHeight: 1.2,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+          title={warningText}
+        >
+          <span style={{ opacity: 0.65 }}>↳</span>
+          <span>{isVisited ? 'Already visited near' : 'Duplicate near'}</span>
+          <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>{dupMatchedId || 'existing'}</span>
+          {dupDist != null && <span style={{ opacity: 0.85 }}>({dupDist}m)</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const NilCell = <span style={{ color: '#0f172a', fontWeight: 600 }}>-</span>;
 
 /** When the QC (VHR imagery) assessment was last recorded. */
@@ -356,6 +443,38 @@ export function QaUserCell({ record }: { record: CaptureRecord }) {
 
 /** "QC Status" column — QC Done, QC Pending. */
 export function QcStatusCell({ record }: { record: CaptureRecord }) {
+  const isNotApplicable =
+    record.qc_status === 'Not Applicable' ||
+    record.qc_status === 'NOT_APPLICABLE' ||
+    (record.is_manually_added && record.source === 'manual');
+
+  if (isNotApplicable) {
+    return (
+      <td className="col-qc-status" style={{ whiteSpace: 'nowrap' }}>
+        <span
+          className="audit-chip"
+          style={{
+            background: '#f1f5f9',
+            color: '#64748b',
+            border: '1px solid #cbd5e1',
+            padding: '1.5px 6.5px',
+            fontSize: '0.70rem',
+            height: 20,
+            lineHeight: 1,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 3.5,
+            whiteSpace: 'nowrap',
+          }}
+          title="QC Not Applicable — direct discovery by field verifier"
+        >
+          <Icon name="block" size={12} />
+          <span style={{ fontWeight: 600 }}>Not Applicable</span>
+        </span>
+      </td>
+    );
+  }
+
   const doneTime = record.qc_completed_at;
   const isDone = record.qc_status === 'DONE' || !!doneTime || [record.qc_vhr_comment, record.qc_street_details, record.qc_builder_contact, record.qc_sqfeet].some(value => !!value?.trim());
   const parsed = doneTime ? parseUtcDate(doneTime) : null;
@@ -419,6 +538,13 @@ export function AuditStatusCell({ record }: { record: CaptureRecord }) {
       <span className="audit-chip audit-chip-re_audited" title="Audit Status: Reaudited">
         <Icon name="history" size={12} />
         <span>Reaudited</span>
+      </span>
+    );
+  } else if (s === 'NOT_APPLICABLE') {
+    chip = (
+      <span className="audit-chip" style={{ background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' }} title="Audit Status: Not Applicable">
+        <Icon name="block" size={12} />
+        <span>Not Applicable</span>
       </span>
     );
   } else {

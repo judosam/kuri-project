@@ -5,7 +5,7 @@ export type UserRole = 'USER' | 'ADMIN' | 'MANAGER' | 'AUDITOR' | 'FIELD_VERIFIE
  * shared by App.tsx's route gate and the login screen's role check. */
 export const PORTAL_ROLES: UserRole[] = ['ADMIN', 'MANAGER', 'AUDITOR', 'TELECALLER'];
 
-export type AuditStatus = 'PENDING' | 'APPROVAL' | 'DISAPPROVAL' | 'COMMERCIAL_PROPERTY' | 'RE_AUDITED';
+export type AuditStatus = 'PENDING' | 'APPROVAL' | 'DISAPPROVAL' | 'COMMERCIAL_PROPERTY' | 'RE_AUDITED' | 'NOT_APPLICABLE';
 
 export interface User {
   id: number;
@@ -32,6 +32,61 @@ export interface CapturedImage {
   created_at: string;
   image_url?: string; // API-relative path, e.g. /api/admin/records/:id/image/:imgId
   thumbnail_url?: string;
+}
+
+export interface QcHistoryEntry {
+  timestamp: string;
+  user_id?: number | null;
+  user_name?: string | null;
+  user_role?: string | null;
+  audit_status?: AuditStatus | null;
+  audit_comment?: string | null;
+  qc_vhr_comment?: string | null;
+  qc_street_details?: string | null;
+  qc_builder_contact?: string | null;
+  qc_sqfeet?: string | null;
+  coordinates?: string | null;
+  qc_reference_image_key?: string | null;
+}
+
+export interface FieldHistoryEntry {
+  timestamp: string;
+  user_id?: number | null;
+  user_name?: string | null;
+  user_role?: string | null;
+  status?: string | null;
+  revisit_status?: string | null;
+  date_of_visit?: string | null;
+  construction_happening?: string | null;
+  stage_of_construction?: string | null;
+  type_of_construction?: string | null;
+  no_of_floors?: string | null;
+  built_up_area?: string | null;
+  expected_completion?: string | null;
+  building_user_name?: string | null;
+  relationship_with_building?: string | null;
+  spoken_with?: string | null;
+  contact_number?: string | null;
+  site_contractor_architect_name?: string | null;
+  site_contractor_architect_number?: string | null;
+  remarks?: string | null;
+  updated_coordinates?: string | null;
+  updated_information?: string | null;
+  follow_up_date?: string | null;
+}
+
+export interface TelecallerHistoryEntry {
+  timestamp: string;
+  user_id?: number | null;
+  user_name?: string | null;
+  user_role?: string | null;
+  telecaller_status?: string | null;
+  telecaller_comment?: string | null;
+  telecaller_no_of_floors?: string | null;
+  telecaller_expected_completion?: string | null;
+  telecaller_built_up_area?: string | null;
+  telecaller_stage_of_construction?: string | null;
+  follow_up_date?: string | null;
 }
 
 export interface CaptureRecord {
@@ -167,6 +222,17 @@ export interface CaptureRecord {
   /** QC reference image attached by QA reviewer (synced to GDrive and local storage). */
   qc_reference_image_key?: string | null;
   qc_reference_image_url?: string | null;
+  is_duplicate?: boolean;
+  duplicate_warning?: string | null;
+  duplicate_site_id?: string | null;
+  duplicate_record_id?: number | null;
+  duplicate_distance_m?: number | null;
+  duplicate_is_visited?: boolean;
+
+  // Last 5 modified history snapshots
+  qc_history?: QcHistoryEntry[];
+  field_history?: FieldHistoryEntry[];
+  telecaller_history?: TelecallerHistoryEntry[];
 }
 
 export interface QaUserStat {
@@ -359,6 +425,9 @@ export interface ActivityEntry {
   id: string;
   ts: string;
   type: 'record' | 'photo' | 'user' | 'auth' | 'security';
+  action_type?: string;
+  user_role?: string;
+  unique_id?: string;
   title: string;
   detail?: string;
   user_id?: number;
@@ -391,8 +460,18 @@ export interface ResolveCoordsResponse {
   taluk?: string | null;
   district?: string | null;
   address?: string | null;
+  survey_no?: string | null;
+  subdivision_no?: string | null;
+  ulpin?: string | null;
+  source?: string | null;
   success: boolean;
   message?: string | null;
+  is_duplicate?: boolean;
+  duplicate_warning?: string | null;
+  duplicate_site_id?: string | null;
+  duplicate_record_id?: number | null;
+  duplicate_distance_m?: number | null;
+  duplicate_is_visited?: boolean;
 }
 
 export interface QaCreateRecordPayload {
@@ -418,4 +497,32 @@ export interface QaCreateRecordPayload {
   qc_street_details?: string;
   qc_builder_contact?: string;
   qc_sqfeet?: string;
+}
+
+export interface NotificationItem {
+  id: number;
+  recipient_id?: number | null;
+  recipient_role?: string | null;
+  type: string;
+  title: string;
+  message: string;
+  record_id?: number | null;
+  unique_id?: string | null;
+  with_sound: boolean;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface NotificationListResponse {
+  notifications: NotificationItem[];
+  total: number;
+  unread_count: number;
+  page: number;
+  page_size: number;
+}
+
+export interface NotificationPollResponse {
+  notifications: NotificationItem[];
+  unread_count: number;
+  has_sound: boolean;
 }

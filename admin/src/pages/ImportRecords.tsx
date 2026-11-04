@@ -1,10 +1,18 @@
 /**
- * Import Task Sheet — dispatch inspection tasks to field operators from Excel.
+ * Import Records — Kuri Upload Specification & Task Dispatch.
  *
- * Backfilling *completed* work is a different job, with a different sheet (15
- * planning + 9 inspection columns) and a photo step, so it lives on its own
- * page: Records → "Import Previous Records" (/records/import-previous). This
- * page only dispatches, which is why the old mode toggle is gone.
+ * Supports two distinct workflows:
+ * 1. Kuri GIS Upload Specification (Primary):
+ *    - 12 GIS signals validation (all-or-nothing reject rules for lat/lon, Village Master, Coimbatore taluk, area > 0).
+ *    - Site ID pre-assignment check (strictly rejected if present; platform mints CBE-XXXXXX).
+ *    - 40m spatial deduplication (50m for multiunit projects; updates metadata rather than duplicating).
+ *    - ~11m coordinate collision handling (stores reference in old_unique_id).
+ *    - Sub-threshold plots (<1,500 sq ft) imported with "Not Eligible" warning pre-check for QC.
+ *    - TNGIS WFS Cadastral Auto-Resolution (Survey Number, Sub-division Number, ULPIN).
+ *    - 2-Step wizard: Step 1 Dry-Run inspection -> Step 2 Atomic Commit.
+ *
+ * 2. Legacy Task Sheet Dispatch (Secondary):
+ *    - Streaming NDJSON dispatch of inspection tasks to field operators.
  */
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -56,46 +64,209 @@ interface ImportLiveProgress {
   logs: ProgressLogItem[];
 }
 
-type Step = 'pick' | 'review';
+// GIS Specification Ingestion Types
+interface GisValidationError {
+  row: number;
+  column: string;
+  reason: string;
+}
 
-const ACCEPT = '.xlsx, .xls';
+interface GisValidationWarning {
+  row: number;
+  column: string;
+  type: string;
+  message: string;
+}
 
-export default function ImportRecords({ canImportHistory = false }: { canImportHistory?: boolean }) {
+interface GisCandidateItem {
+  row_num: number;
+  lat: number;
+  lon: number;
+  village: string;
+  taluk: string;
+  district: string;
+  detection_type: string;
+  detected_stage: string;
+  area_sqm: number;
+  area_sqft: number;
+  is_eligible: boolean;
+  model_confidence_score: number;
+  priority_tier: string;
+  meets_strict_construction_definition: boolean;
+  contradicts_planetscope_vegetated: boolean;
+  dtcp_building_type?: string;
+  gmaps_link: string;
+}
+
+interface GisMergedCandidate {
+  row_num: number;
+  existing_record_id: number;
+  existing_unique_id: string;
+  distance_m: number;
+  lat: number;
+  lon: number;
+  parsed_data: GisCandidateItem;
+}
+
+interface GisValidationResponse {
+  valid: boolean;
+  rejected?: boolean;
+  reject_reason?: string;
+  total_rows: number;
+  valid_count: number;
+  errors: GisValidationError[];
+  warnings: GisValidationWarning[];
+  merged_candidates: GisMergedCandidate[];
+  new_candidates: GisCandidateItem[];
+  parsed_rows?: GisCandidateItem[];
+}
+
+interface GisCommittedRecord {
+  record_id: number;
+  unique_id: string;
+  action: string;
+  village?: string;
+  taluk?: string;
+  survey_no?: string;
+  subdivision_no?: string;
+  ulpin?: string;
+  is_eligible?: boolean;
+  cadastral_status?: string;
+}
+
+interface GisCommitResponse {
+  valid: boolean;
+  committed: boolean;
+  created_count: number;
+  merged_count: number;
+  total_processed: number;
+  committed_records: GisCommittedRecord[];
+  updated_records: any[];
+  warnings: GisValidationWarning[];
+}
+
+type TabMode = 'gis_specification' | 'legacy_dispatch';
+type Step = 'pick' | 'inspect' | 'committed';
+
+const ACCEPT_ALL = '.xlsx, .xls, .csv';
+
+export default function ImportRecords() {
   const navigate = useNavigate();
-  const [file, setFile] = useState<File | null>(null);
-  const [step, setStep] = useState<Step>('pick');
-  const [dragOver, setDragOver] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const [error, setError] = useState('');
-  const [result, setResult] = useState<DispatchResult | null>(null);
-  const [liveProgress, setLiveProgress] = useState<ImportLiveProgress | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<TabMode>('gis_specification');
 
-  const selectFile = (picked: File | null) => {
-    setError('');
-    setResult(null);
-    setLiveProgress(null);
-    setStep('pick');
+  // GIS Specification State
+  const [gisFile, setGisFile] = useState<File | null>(null);
+  const [gisStep, setGisStep] = useState<Step>('pick');
+  const [gisDragOver, setGisDragOver] = useState(false);
+  const [gisInspecting, setGisInspecting] = useState(false);
+  const [gisCommitting, setGisCommitting] = useState(false);
+  const [gisError, setGisError] = useState('');
+  const [gisValidation, setGisValidation] = useState<GisValidationResponse | null>(null);
+  const [gisCommitResult, setGisCommitResult] = useState<GisCommitResponse | null>(null);
+  const gisInputRef = useRef<HTMLInputElement>(null);
+
+  // Legacy Task Sheet State
+  const [legacyFile, setLegacyFile] = useState<File | null>(null);
+  const [legacyStep, setLegacyStep] = useState<'pick' | 'review'>('pick');
+  const [legacyDragOver, setLegacyDragOver] = useState(false);
+  const [legacyImporting, setLegacyImporting] = useState(false);
+  const [legacyDownloading, setLegacyDownloading] = useState(false);
+  const [legacyError, setLegacyError] = useState('');
+  const [legacyResult, setLegacyResult] = useState<DispatchResult | null>(null);
+  const [legacyLiveProgress, setLegacyLiveProgress] = useState<ImportLiveProgress | null>(null);
+  const legacyInputRef = useRef<HTMLInputElement>(null);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GIS Specification Handlers
+  // ──────────────────────────────────────────────────────────────────────────
+
+  const selectGisFile = async (picked: File | null) => {
+    setGisError('');
+    setGisValidation(null);
+    setGisCommitResult(null);
+    setGisStep('pick');
+
     if (!picked) {
-      setFile(null);
+      setGisFile(null);
+      return;
+    }
+
+    const lowerName = picked.name.toLowerCase();
+    if (!lowerName.endsWith('.xlsx') && !lowerName.endsWith('.xls') && !lowerName.endsWith('.csv')) {
+      setGisError('Please upload a valid .xlsx or .csv file matching the Kuri GIS upload specification.');
+      setGisFile(null);
+      return;
+    }
+
+    setGisFile(picked);
+    await runGisDryRun(picked);
+  };
+
+  const runGisDryRun = async (fileToInspect: File) => {
+    setGisInspecting(true);
+    setGisError('');
+    try {
+      const res = await recordsApi.importGisRecords(fileToInspect, true);
+      setGisValidation(res);
+      setGisStep('inspect');
+    } catch (err: any) {
+      setGisError(describeApiError(err, 'Failed to inspect GIS file. Please check file formatting.'));
+    } finally {
+      setGisInspecting(false);
+    }
+  };
+
+  const commitGisBatch = async () => {
+    if (!gisFile || !gisValidation || !gisValidation.valid) return;
+    setGisCommitting(true);
+    setGisError('');
+    try {
+      const res = await recordsApi.importGisRecords(gisFile, false);
+      setGisCommitResult(res);
+      setGisStep('committed');
+    } catch (err: any) {
+      setGisError(describeApiError(err, 'Failed to commit GIS batch to database.'));
+    } finally {
+      setGisCommitting(false);
+    }
+  };
+
+  const resetGis = () => {
+    setGisFile(null);
+    setGisValidation(null);
+    setGisCommitResult(null);
+    setGisStep('pick');
+    setGisError('');
+    if (gisInputRef.current) gisInputRef.current.value = '';
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Legacy Dispatch Sheet Handlers
+  // ──────────────────────────────────────────────────────────────────────────
+
+  const selectLegacyFile = (picked: File | null) => {
+    setLegacyError('');
+    setLegacyResult(null);
+    setLegacyLiveProgress(null);
+    setLegacyStep('pick');
+    if (!picked) {
+      setLegacyFile(null);
       return;
     }
     const err = validateExcelFile(picked);
     if (err) {
-      setError(err);
-      setFile(null);
+      setLegacyError(err);
+      setLegacyFile(null);
       return;
     }
-    setFile(picked);
+    setLegacyFile(picked);
   };
 
-
-  const runImport = async () => {
-    if (!file) return;
-    setImporting(true);
-    setError('');
-    setLiveProgress({
+  const runLegacyImport = async () => {
+    if (!legacyFile) return;
+    setLegacyImporting(true);
+    setLegacyError('');
+    setLegacyLiveProgress({
       current: 0,
       total: 0,
       percent: 0,
@@ -105,27 +276,27 @@ export default function ImportRecords({ canImportHistory = false }: { canImportH
     });
 
     try {
-      const res = await recordsApi.uploadSheetStream(file, 'dispatch', (evt) => {
+      const res = await recordsApi.uploadSheetStream(legacyFile, 'dispatch', (evt) => {
         if (evt.type === 'init') {
-          setLiveProgress({
+          setLegacyLiveProgress({
             current: 0,
             total: evt.total_rows || 0,
             percent: 0,
-            status: `Loaded sheet "${evt.sheet_name}" (${evt.total_rows} rows). Starting import and village auto-resolution...`,
+            status: `Loaded sheet "${evt.sheet_name}" (${evt.total_rows} rows). Starting import...`,
             autoResolvedCount: 0,
             logs: [{
               id: 'init',
-              text: `Sheet "${evt.sheet_name}" loaded with ${evt.total_rows} rows. Beginning live processing...`,
+              text: `Sheet "${evt.sheet_name}" loaded with ${evt.total_rows} rows. Beginning processing...`,
               success: true,
             }],
           });
         } else if (evt.type === 'progress') {
-          setLiveProgress((prev) => {
+          setLegacyLiveProgress((prev) => {
             const nextCurrent = evt.row_index || (prev ? prev.current + 1 : 1);
             const nextTotal = evt.total_rows || (prev ? prev.total : 0);
             const nextPercent = evt.percent ?? (nextTotal > 0 ? Math.round((nextCurrent / nextTotal) * 100) : 0);
             const isAuto = Boolean(evt.auto_resolved);
-            const logText = `Row ${nextCurrent}: ${evt.unique_id || `Record #${evt.record_id}`} — Village: ${evt.village || '—'}, Taluk: ${evt.taluk || '—'}, District: ${evt.district || '—'}${isAuto ? ' [✦ Auto-Filled from Master]' : ''}`;
+            const logText = `Row ${nextCurrent}: ${evt.unique_id || `Record #${evt.record_id}`} — ${evt.village || '—'}, ${evt.taluk || '—'}`;
             const newLog: ProgressLogItem = {
               id: `${nextCurrent}-${Date.now()}`,
               text: logText,
@@ -142,536 +313,937 @@ export default function ImportRecords({ canImportHistory = false }: { canImportH
               logs: [newLog, ...existing.slice(0, 49)],
             };
           });
-        } else if (evt.type === 'row_error') {
-          setLiveProgress((prev) => {
-            const errLog: ProgressLogItem = {
-              id: `err-${Date.now()}`,
-              text: `Row ${evt.row_index}: Error in '${evt.error?.column}': ${evt.error?.message}`,
-              success: false,
-            };
-            const existing = prev?.logs || [];
-            return prev ? { ...prev, logs: [errLog, ...existing.slice(0, 49)] } : null;
-          });
         }
       });
 
-      setResult({
+      setLegacyResult({
         ...res,
         errors: res.errors ?? [],
         dispatched_tasks: res.dispatched_tasks ?? [],
       });
-      setStep('review');
+      setLegacyStep('review');
     } catch (e) {
-      setError(describeApiError(e, 'Import failed.'));
+      setLegacyError(describeApiError(e, 'Import failed.'));
     } finally {
-      setImporting(false);
-      setLiveProgress(null);
+      setLegacyImporting(false);
+      setLegacyLiveProgress(null);
     }
   };
 
-  const reset = () => {
-    setFile(null);
-    setResult(null);
-    setStep('pick');
-    setError('');
+  const resetLegacy = () => {
+    setLegacyFile(null);
+    setLegacyResult(null);
+    setLegacyStep('pick');
+    setLegacyError('');
   };
 
-  const downloadTemplate = async () => {
-    setDownloading(true);
+  const downloadLegacyTemplate = async () => {
+    setLegacyDownloading(true);
     try {
       await recordsApi.downloadTemplate();
     } catch (e) {
-      setError(describeApiError(e, 'Failed to download the template.'));
+      setLegacyError(describeApiError(e, 'Failed to download the template.'));
     } finally {
-      setDownloading(false);
+      setLegacyDownloading(false);
     }
   };
 
-  const imported = result?.total_dispatched ?? 0;
-
   return (
     <PageShell>
-      {/* Page head */}
-      <div className="card" style={{ padding: '22px 24px', marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div
+      {/* Page Header */}
+      <div className="card" style={{ padding: '20px 24px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div
+              style={{
+                width: 46,
+                height: 46,
+                borderRadius: 12,
+                background: '#fff1f2',
+                color: '#E64A4E',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Icon name="upload_file" size={26} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                  Kuri Ingestion Studio
+                </h1>
+                <InfoHint label="Upload Specification">
+                  Enforces strict 12 GIS signals, Coimbatore envelope, Village Master validation,
+                  40m spatial deduplication (50m for multiunit projects), standard 6-digit CBE-XXXXXX IDs,
+                  and TNGIS WFS cadastral auto-enrichment.
+                </InfoHint>
+              </div>
+              <p style={{ margin: '3px 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                Batch ingestion, all-or-nothing validation, 40m deduplication, and cadastral parcel resolution.
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Workflow Tabs */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 12,
+            marginTop: 18,
+            borderBottom: '1px solid #e2e8f0',
+            paddingBottom: 2,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setActiveTab('gis_specification')}
             style={{
-              width: 46,
-              height: 46,
-              borderRadius: 12,
-              background: '#fff1f2',
-              color: '#E64A4E',
+              background: 'none',
+              border: 'none',
+              padding: '8px 14px',
+              fontSize: '0.88rem',
+              fontWeight: 700,
+              color: activeTab === 'gis_specification' ? '#dc2626' : '#64748b',
+              borderBottom: activeTab === 'gis_specification' ? '2.5px solid #dc2626' : '2.5px solid transparent',
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
+              gap: 8,
+              transition: 'all 0.15s ease',
             }}
           >
-            <Icon name="upload_file" size={26} />
-          </div>
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                Import Task Sheet
-              </h1>
-              <InfoHint label="How task dispatch works">
-                Import tasks, route them to an auditor, then assign approved records to a field verifier.
-                Records appear in the verifier's app only after that assignment. Optional operator emails
-                must match an active field account.
-              </InfoHint>
-            </div>
-            <p style={{ margin: '3px 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-              Import tasks for auditor review and field verification.
-            </p>
-          </div>
-          {canImportHistory && <button
+            <Icon name="satellite_alt" size={17} />
+            Kuri GIS Upload (12 Signals & Cadastral)
+            <span
+              style={{
+                fontSize: 10,
+                background: '#fee2e2',
+                color: '#dc2626',
+                padding: '2px 6px',
+                borderRadius: 4,
+                fontWeight: 800,
+              }}
+            >
+              Authoritative
+            </span>
+          </button>
+
+          <button
             type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => navigate('/records/import-previous')}
-            style={{ whiteSpace: 'normal', maxWidth: '100%' }}
-            title="Backfill inspections that were already completed before the app went live"
+            onClick={() => setActiveTab('legacy_dispatch')}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '8px 14px',
+              fontSize: '0.88rem',
+              fontWeight: 600,
+              color: activeTab === 'legacy_dispatch' ? '#dc2626' : '#64748b',
+              borderBottom: activeTab === 'legacy_dispatch' ? '2.5px solid #dc2626' : '2.5px solid transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'all 0.15s ease',
+            }}
           >
-            <Icon name="history" size={15} />
-            Import Previous Records
-          </button>}
+            <Icon name="assignment_turned_in" size={17} />
+            Task Dispatch Sheet (Legacy)
+          </button>
         </div>
       </div>
 
-      {step === 'pick' && (
-        <div className="card" style={{ padding: 24 }}>
+      {/* ════════════════════════════════════════════════════════════════════════
+          TAB 1: KURI GIS SPECIFICATION (2-STEP WIZARD)
+          ════════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'gis_specification' && (
+        <>
+          {/* Rules Banner */}
           <div
-            role="button"
-            tabIndex={0}
-            onClick={() => inputRef.current?.click()}
-            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && inputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragOver(false);
-              selectFile(e.dataTransfer.files?.[0] ?? null);
-            }}
             style={{
-              border: `2px dashed ${dragOver ? '#E64A4E' : '#cbd5e1'}`,
-              borderRadius: 14,
-              padding: '44px 20px',
-              textAlign: 'center',
-              background: dragOver ? '#fff1f2' : '#f8fafc',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '10px 16px',
+              borderRadius: 10,
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
               marginBottom: 16,
+              flexWrap: 'wrap',
+              fontSize: '0.8rem',
             }}
           >
-            <input
-              ref={inputRef}
-              type="file"
-              accept={ACCEPT}
-              style={{ display: 'none' }}
-              onChange={(e) => selectFile(e.target.files?.[0] ?? null)}
-            />
-            {file ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                <Icon name="check_circle" size={38} style={{ color: '#059669' }} />
-                <div style={{ fontWeight: 700, fontSize: '1rem', color: '#0f172a' }}>{file.name}</div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  {(file.size / 1024).toFixed(1)} KB · Excel
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    selectFile(null);
-                  }}
-                  style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}
-                >
-                  Remove
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                <Icon name="cloud_upload" size={38} style={{ color: '#E64A4E' }} />
-                <div style={{ fontWeight: 700, color: '#0f172a' }}>
-                  Drop your task sheet here, or click to browse
-                </div>
-                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                  .xlsx only · Google Sheets: File → Download → Microsoft Excel (.xlsx)
-                </div>
-              </div>
-            )}
+            <span style={{ fontWeight: 700, color: '#1e293b', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <Icon name="verified" size={15} style={{ color: '#059669' }} /> Specification Gates:
+            </span>
+            <span style={{ background: '#ecfdf5', color: '#065f46', padding: '2px 8px', borderRadius: 4, fontWeight: 650 }}>
+              ✓ Auto-minted 6-digit CBE-XXXXXX
+            </span>
+            <span style={{ background: '#f0f9ff', color: '#0284c7', padding: '2px 8px', borderRadius: 4, fontWeight: 650 }}>
+              ✓ 40m Proximity Deduplication (50m multiunit)
+            </span>
+            <span style={{ background: '#f5f3ff', color: '#7c3aed', padding: '2px 8px', borderRadius: 4, fontWeight: 650 }}>
+              ✓ TNGIS WFS Cadastral Auto-Resolution
+            </span>
+            <span style={{ background: '#fffbeb', color: '#92400e', padding: '2px 8px', borderRadius: 4, fontWeight: 650 }}>
+              ✓ Sub-threshold (&lt;1,500 sq ft) QC Pre-check
+            </span>
           </div>
 
-          {error && (
-            <div className="alert alert-error" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }} role="alert">
-              <Icon name="error" size={16} />
-              <span>{error}</span>
+          {/* STEP 1: PICK FILE */}
+          {gisStep === 'pick' && (
+            <div className="card" style={{ padding: 24 }}>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => gisInputRef.current?.click()}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && gisInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setGisDragOver(true);
+                }}
+                onDragLeave={() => setGisDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setGisDragOver(false);
+                  const files = e.dataTransfer.files;
+                  if (files && files.length > 0) {
+                    selectGisFile(files[0]);
+                  }
+                }}
+                style={{
+                  border: `2px dashed ${gisDragOver ? '#dc2626' : '#cbd5e1'}`,
+                  borderRadius: 14,
+                  padding: '36px 20px',
+                  textAlign: 'center',
+                  background: gisDragOver ? '#fef2f2' : '#fafafa',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  marginBottom: 16,
+                }}
+              >
+                <input
+                  ref={gisInputRef}
+                  type="file"
+                  accept={ACCEPT_ALL}
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      selectGisFile(e.target.files[0]);
+                    }
+                  }}
+                />
+
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 14,
+                    background: '#f1f5f9',
+                    color: '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 12px',
+                  }}
+                >
+                  <Icon name="upload" size={28} />
+                </div>
+
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                  {gisFile ? gisFile.name : 'Choose GIS Task File (.xlsx or .csv)'}
+                </div>
+                <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 4 }}>
+                  Drag & drop your 12-signal GIS sheet or click to browse.
+                </div>
+                <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: 8 }}>
+                  Strict all-or-nothing validation rules apply automatically.
+                </div>
+              </div>
+
+              {gisInspecting && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 10,
+                    padding: '16px',
+                    borderRadius: 10,
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    fontWeight: 600,
+                    fontSize: '0.88rem',
+                  }}
+                >
+                  <Icon name="refresh" size={18} className="fos-spin" />
+                  Running GIS validation, Village Master check, and 40m spatial deduplication inspection...
+                </div>
+              )}
+
+              {gisError && (
+                <div className="alert alert-error" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+                  <Icon name="error" size={16} />
+                  <span>{gisError}</span>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Live Progress Card when importing */}
-          {importing && liveProgress && (
-            <div
-              style={{
-                marginTop: 16,
-                marginBottom: 16,
-                padding: '18px 20px',
-                borderRadius: 14,
-                backgroundColor: '#ffffff',
-                border: '1.5px solid #cbd5e1',
-                boxShadow: '0 4px 16px rgba(15, 23, 42, 0.08)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          {/* STEP 2: DRY-RUN INSPECTION RESULTS */}
+          {gisStep === 'inspect' && gisValidation && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* REJECTION ALERT (ALL-OR-NOTHING HALT) */}
+              {(!gisValidation.valid || gisValidation.rejected) && (
+                <div
+                  className="card"
+                  style={{
+                    padding: '20px 24px',
+                    background: '#fef2f2',
+                    border: '1.5px solid #f87171',
+                    borderRadius: 12,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 10,
+                        background: '#dc2626',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Icon name="block" size={22} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#991b1b' }}>
+                        Batch Validation Failed — All-or-Nothing Rule Enforced
+                      </h2>
+                      <p style={{ margin: '4px 0 12px', fontSize: '0.86rem', color: '#b91c1c', lineHeight: 1.4 }}>
+                        {gisValidation.reject_reason || 'Batch was rejected because one or more rows violated strict GIS upload rules.'}
+                      </p>
+
+                      {/* Error List Table */}
+                      {gisValidation.errors.length > 0 && (
+                        <div
+                          style={{
+                            background: '#ffffff',
+                            borderRadius: 8,
+                            border: '1px solid #fca5a5',
+                            overflow: 'hidden',
+                            maxHeight: 280,
+                            overflowY: 'auto',
+                          }}
+                        >
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                            <thead>
+                              <tr style={{ background: '#fee2e2', borderBottom: '1px solid #fca5a5', color: '#7f1d1d' }}>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', width: 70 }}>Row #</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', width: 130 }}>Column</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'left' }}>Reason</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {gisValidation.errors.map((err, i) => (
+                                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '8px 12px', fontWeight: 700, color: '#991b1b' }}>
+                                    Row {err.row}
+                                  </td>
+                                  <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600, color: '#475569' }}>
+                                    {err.column}
+                                  </td>
+                                  <td style={{ padding: '8px 12px', color: '#1e293b' }}>
+                                    {err.reason}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      <div style={{ marginTop: 14 }}>
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={resetGis}>
+                          <Icon name="refresh" size={14} /> Upload Corrected File
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SUCCESSFUL INSPECTION SUMMARY */}
+              {gisValidation.valid && (
+                <>
+                  {/* Summary Metric Cards */}
                   <div
                     style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 10,
-                      background: '#eff6ff',
-                      color: '#2563eb',
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                      gap: 12,
+                    }}
+                  >
+                    <div className="card" style={{ padding: '16px 20px', borderLeft: '4px solid #6366f1' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 650, color: '#64748b', textTransform: 'uppercase' }}>
+                        Total Rows Inspected
+                      </span>
+                      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', margin: '4px 0 2px' }}>
+                        {gisValidation.total_rows}
+                      </div>
+                      <span style={{ fontSize: '0.74rem', color: '#475569' }}>All format checks passed</span>
+                    </div>
+
+                    <div className="card" style={{ padding: '16px 20px', borderLeft: '4px solid #059669' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 650, color: '#065f46', textTransform: 'uppercase' }}>
+                        New Sites to Create
+                      </span>
+                      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#059669', margin: '4px 0 2px' }}>
+                        {gisValidation.new_candidates.length}
+                      </div>
+                      <span style={{ fontSize: '0.74rem', color: '#047857' }}>Will mint standard CBE-XXXXXX IDs</span>
+                    </div>
+
+                    <div className="card" style={{ padding: '16px 20px', borderLeft: '4px solid #0284c7' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 650, color: '#0369a1', textTransform: 'uppercase' }}>
+                        40m Spatial Merges
+                      </span>
+                      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0284c7', margin: '4px 0 2px' }}>
+                        {gisValidation.merged_candidates.length}
+                      </div>
+                      <span style={{ fontSize: '0.74rem', color: '#0284c7' }}>Metadata updated, no duplicate created</span>
+                    </div>
+
+                    <div className="card" style={{ padding: '16px 20px', borderLeft: '4px solid #d97706' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 650, color: '#b45309', textTransform: 'uppercase' }}>
+                        QC Review Warnings
+                      </span>
+                      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#d97706', margin: '4px 0 2px' }}>
+                        {gisValidation.warnings.length}
+                      </div>
+                      <span style={{ fontSize: '0.74rem', color: '#92400e' }}>Preserved for desk QC audit</span>
+                    </div>
+                  </div>
+
+                  {/* QC Warnings Alert Box */}
+                  {gisValidation.warnings.length > 0 && (
+                    <div
+                      className="card"
+                      style={{
+                        padding: '14px 18px',
+                        background: '#fffbeb',
+                        border: '1px solid #fde68a',
+                        borderRadius: 10,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <Icon name="warning" size={17} style={{ color: '#d97706' }} />
+                        <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#92400e' }}>
+                          QC Review Warnings ({gisValidation.warnings.length})
+                        </span>
+                      </div>
+                      <div style={{ maxHeight: 120, overflowY: 'auto', fontSize: '0.78rem', color: '#78350f', lineHeight: 1.5 }}>
+                        {gisValidation.warnings.map((w, idx) => (
+                          <div key={idx}>
+                            • Row {w.row} ({w.column}): {w.message}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 40m Merged Duplicates Alert Box */}
+                  {gisValidation.merged_candidates.length > 0 && (
+                    <div
+                      className="card"
+                      style={{
+                        padding: '14px 18px',
+                        background: '#f0f9ff',
+                        border: '1px solid #bae6fd',
+                        borderRadius: 10,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <Icon name="pin_drop" size={17} style={{ color: '#0284c7' }} />
+                        <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#0369a1' }}>
+                          40m Spatial Deduplication Match Detected ({gisValidation.merged_candidates.length})
+                        </span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#0c4a6e', lineHeight: 1.4 }}>
+                        The following incoming rows are within 40.0m of existing live sites. In accordance with the Kuri specification,
+                        their metadata (area, detection signals, stage) will be merged into the existing records without creating duplicates.
+                      </p>
+                      <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {gisValidation.merged_candidates.map((m, idx) => (
+                          <span
+                            key={idx}
+                            style={{
+                              background: '#ffffff',
+                              border: '1px solid #7dd3fc',
+                              borderRadius: 4,
+                              padding: '2px 8px',
+                              fontSize: '0.72rem',
+                              fontFamily: 'monospace',
+                              color: '#0369a1',
+                            }}
+                          >
+                            Row {m.row_num} → Matched {m.existing_unique_id} ({m.distance_m}m)
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Candidate Records Preview Table */}
+                  <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        padding: '14px 20px',
+                        borderBottom: '1px solid #f1f5f9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: '#fafafa',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Icon name="table_view" size={17} style={{ color: '#6366f1' }} />
+                        <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a' }}>
+                          Candidate Records Preview
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                        Showing first 25 candidate rows
+                      </span>
+                    </div>
+
+                    <div style={{ overflowX: 'auto', maxHeight: 360, overflowY: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                        <thead>
+                          <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
+                            <th style={{ padding: '8px 12px', textAlign: 'left' }}>Row</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left' }}>Action</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left' }}>Coordinates</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left' }}>Village</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left' }}>Taluk</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left' }}>Area (sqm / sqft)</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left' }}>Eligibility</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left' }}>Type</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left' }}>Tier</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(gisValidation.parsed_rows || []).slice(0, 25).map((row) => {
+                            const isMerged = gisValidation.merged_candidates.some((m) => m.row_num === row.row_num);
+                            return (
+                              <tr key={row.row_num} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '8px 12px', fontWeight: 700, color: '#334155' }}>
+                                  #{row.row_num}
+                                </td>
+                                <td style={{ padding: '8px 12px' }}>
+                                  {isMerged ? (
+                                    <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: 4, fontWeight: 700, fontSize: '0.72rem' }}>
+                                      40m Merge
+                                    </span>
+                                  ) : (
+                                    <span style={{ background: '#ecfdf5', color: '#047857', padding: '2px 6px', borderRadius: 4, fontWeight: 700, fontSize: '0.72rem' }}>
+                                      New Site
+                                    </span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>
+                                  {row.lat.toFixed(5)}, {row.lon.toFixed(5)}
+                                </td>
+                                <td style={{ padding: '8px 12px', fontWeight: 600 }}>{row.village}</td>
+                                <td style={{ padding: '8px 12px', color: '#475569' }}>{row.taluk}</td>
+                                <td style={{ padding: '8px 12px' }}>
+                                  {row.area_sqm} sqm ({Math.round(row.area_sqft)} sqft)
+                                </td>
+                                <td style={{ padding: '8px 12px' }}>
+                                  {row.is_eligible ? (
+                                    <span style={{ color: '#059669', fontWeight: 700 }}>✓ Eligible</span>
+                                  ) : (
+                                    <span style={{ color: '#d97706', fontWeight: 700 }}>⚠ Not Eligible</span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '8px 12px', textTransform: 'capitalize' }}>
+                                  {row.detection_type}
+                                </td>
+                                <td style={{ padding: '8px 12px' }}>
+                                  <span style={{ fontWeight: 650, color: '#6366f1' }}>{row.priority_tier}</span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Commit Action Controls */}
+                  <div
+                    className="card"
+                    style={{
+                      padding: '16px 24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <button type="button" className="btn btn-secondary" onClick={resetGis} disabled={gisCommitting}>
+                      <Icon name="arrow_back" size={15} /> Cancel & Choose Another File
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={commitGisBatch}
+                      disabled={gisCommitting}
+                      style={{
+                        minWidth: 260,
+                        height: 42,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        fontWeight: 750,
+                        background: '#dc2626',
+                        borderColor: '#dc2626',
+                      }}
+                    >
+                      <Icon name={gisCommitting ? 'refresh' : 'check_circle'} size={18} className={gisCommitting ? 'fos-spin' : undefined} />
+                      {gisCommitting
+                        ? 'Committing & Auto-Enriching Cadastral...'
+                        : `Commit Import (${gisValidation.new_candidates.length} New, ${gisValidation.merged_candidates.length} Merged)`}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* STEP 3: COMMIT SUCCESS RESULT */}
+          {gisStep === 'committed' && gisCommitResult && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div
+                className="card"
+                style={{
+                  padding: '24px',
+                  background: '#f0fdf4',
+                  border: '1.5px solid #86efac',
+                  borderRadius: 14,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 12,
+                      background: '#059669',
+                      color: '#ffffff',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
                     }}
                   >
-                    <Icon name="refresh" size={18} className="fos-spin" />
+                    <Icon name="check_circle" size={28} />
                   </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      Importing Records & Auto-Resolving Locations...
-                    </div>
-                    <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
-                      Master village resolution active (Tamil Nadu revenue villages)
-                    </div>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#065f46' }}>
+                      GIS Batch Successfully Ingested!
+                    </h2>
+                    <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: '#047857' }}>
+                      Created <strong>{gisCommitResult.created_count}</strong> new records with standard 6-digit CBE-XXXXXX IDs,
+                      and updated <strong>{gisCommitResult.merged_count}</strong> 40m spatial duplicates.
+                      Initial status is strictly set to <strong>QC Pending</strong>.
+                    </p>
                   </div>
                 </div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#FF6467', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-                  {liveProgress.percent}%
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => navigate('/records')}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}
+                  >
+                    <Icon name="folder_open" size={16} /> View in Records / QC Queue
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={resetGis}>
+                    <Icon name="refresh" size={15} /> Ingest Another Batch
+                  </button>
                 </div>
               </div>
 
-              {/* Progress Bar Track */}
-              <div
-                style={{
-                  width: '100%',
-                  height: 10,
-                  backgroundColor: '#f1f5f9',
-                  borderRadius: 9999,
-                  overflow: 'hidden',
-                  marginBottom: 12,
-                  border: '1px solid #e2e8f0',
-                }}
-              >
-                <div
-                  style={{
-                    width: `${Math.min(100, Math.max(2, liveProgress.percent))}%`,
-                    height: '100%',
-                    background: 'linear-gradient(90deg, #FF6467 0%, #059669 100%)',
-                    borderRadius: 9999,
-                    transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                  }}
-                />
-              </div>
+              {/* Committed Records Table */}
+              {gisCommitResult.committed_records.length > 0 && (
+                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      padding: '14px 20px',
+                      borderBottom: '1px solid #f1f5f9',
+                      background: '#fafafa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a' }}>
+                      Newly Created Records ({gisCommitResult.committed_records.length})
+                    </span>
+                    <span style={{ fontSize: '0.76rem', color: '#059669', fontWeight: 650 }}>
+                      ✦ Cadastral Auto-Enriched
+                    </span>
+                  </div>
 
-              {/* Real-time Metric Badges */}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                <span style={{ padding: '4px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.76rem', color: '#334155' }}>
-                  <strong>Progress:</strong> {liveProgress.current} / {liveProgress.total} rows
-                </span>
-                <span style={{ padding: '4px 10px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 8, fontSize: '0.76rem', color: '#065f46', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <Icon name="auto_awesome" size={13} style={{ color: '#059669' }} />
-                  <strong>Auto-Filled Locations:</strong> {liveProgress.autoResolvedCount}
-                </span>
-                <span style={{ padding: '4px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.74rem', color: '#64748b', flex: 1, minWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {liveProgress.status}
-                </span>
-              </div>
-
-              {/* Live Activity Feed */}
-              {liveProgress.logs.length > 0 && (
-                <div
-                  style={{
-                    background: '#0b1c30',
-                    borderRadius: 10,
-                    padding: '10px 12px',
-                    maxHeight: 160,
-                    overflowY: 'auto',
-                    fontFamily: 'monospace',
-                    fontSize: '0.72rem',
-                    color: '#e2e8f0',
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {liveProgress.logs.map((log) => (
-                    <div
-                      key={log.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'baseline',
-                        gap: 6,
-                        color: log.success ? (log.autoResolved ? '#6ee7b7' : '#94a3b8') : '#fca5a5',
-                      }}
-                    >
-                      <span>{log.success ? (log.autoResolved ? '✦' : '✓') : '⚠'}</span>
-                      <span>{log.text}</span>
-                    </div>
-                  ))}
+                  <div style={{ overflowX: 'auto', maxHeight: 380, overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
+                          <th style={{ padding: '8px 12px', textAlign: 'left' }}>Unique ID</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left' }}>Village</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left' }}>Taluk</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left' }}>Survey No</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left' }}>Sub-division No</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left' }}>ULPIN</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left' }}>Status</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'right' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gisCommitResult.committed_records.map((rec) => (
+                          <tr key={rec.record_id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 800, color: '#0f172a' }}>
+                              {rec.unique_id}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontWeight: 600 }}>{rec.village || '—'}</td>
+                            <td style={{ padding: '8px 12px', color: '#475569' }}>{rec.taluk || '—'}</td>
+                            <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>
+                              {rec.survey_no ? (
+                                <span style={{ background: '#ecfdf5', color: '#065f46', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+                                  {rec.survey_no}
+                                </span>
+                              ) : (
+                                <span style={{ color: '#94a3b8' }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>
+                              {rec.subdivision_no ? (
+                                <span style={{ background: '#f0fdf4', color: '#15803d', padding: '1px 6px', borderRadius: 4, fontWeight: 650 }}>
+                                  {rec.subdivision_no}
+                                </span>
+                              ) : (
+                                <span style={{ color: '#94a3b8' }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: '0.72rem', color: '#64748b' }}>
+                              {rec.ulpin || '—'}
+                            </td>
+                            <td style={{ padding: '8px 12px' }}>
+                              <span style={{ background: '#fef3c7', color: '#b45309', padding: '2px 7px', borderRadius: 4, fontWeight: 700 }}>
+                                QC Pending
+                              </span>
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-xs"
+                                onClick={() => navigate(`/records/${rec.record_id}`)}
+                              >
+                                View
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
           )}
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={downloadTemplate}
-              disabled={downloading || importing}
-              title="Download the standard task dispatch template"
-            >
-              <Icon name={downloading ? 'refresh' : 'download'} size={15} className={downloading ? 'fos-spin' : undefined} />
-              {downloading ? 'Downloading…' : 'Download Template (.xlsx)'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!file || importing}
-              onClick={runImport}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, minWidth: 230, justifyContent: 'center' }}
-            >
-              <Icon name={importing ? 'refresh' : 'upload'} size={16} className={importing ? 'fos-spin' : undefined} />
-              {importing ? `Importing (${liveProgress?.percent || 0}%)…` : 'Dispatch Tasks'}
-            </button>
-          </div>
-
-          {/* Template Guidance & Instructions */}
-          <div
-            style={{
-              marginTop: 20,
-              padding: '16px 20px',
-              borderRadius: 12,
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              fontSize: '0.82rem',
-              color: '#334155',
-            }}
-          >
-            <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Icon name="info" size={16} style={{ color: '#0284c7' }} />
-              Task Sheet Guidelines & Template Columns:
-            </div>
-            <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6, color: '#475569' }}>
-              <li>
-                <strong>Template Columns:</strong> <code>coordinates</code> (lat, lng), <code>site_address</code>, <code>street_address</code>, <code>village</code>, <code>taluk</code>, <code>district</code>, <code>survey_no</code>, <code>subdivision_no</code>, <code>land_use</code>, <code>owner_name_en</code>, <code>contact_number</code>, <code>stage_of_construction</code>, <code>no_of_floors</code>, <code>built_up_area</code>, <code>expected_completion</code>, <code>visit_order</code>, <code>auditor_email</code>, <code>operator_email</code>.
-              </li>
-              <li>
-                <strong>Auto-Generated Unique ID & Duplicate Protection:</strong> Unique ID is automatically generated from GPS coordinates. Duplicate coordinates or records matching existing database records are safely skipped with a warning.
-              </li>
-              <li>
-                <strong>Optional Assignments:</strong> Both <code>auditor_email</code> and <code>operator_email</code> are optional. If left blank, tasks are imported into the QA pool as unassigned pending records, ready for assignment at any time.
-              </li>
-              <li>
-                <strong>Auto-Resolution:</strong> Missing Village, Taluk, or District values are automatically resolved from the Tamil Nadu Village Master database using GPS coordinates.
-              </li>
-            </ul>
-          </div>
-        </div>
+        </>
       )}
 
-      {step === 'review' && result && (
+      {/* ════════════════════════════════════════════════════════════════════════
+          TAB 2: LEGACY TASK DISPATCH SHEET
+          ════════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'legacy_dispatch' && (
         <>
-          {/* Summary — states plainly how many rows landed, even when none did */}
-          <div
-            className="card"
-            style={{
-              padding: '18px 24px',
-              marginBottom: 16,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              flexWrap: 'wrap',
-              background: imported > 0 ? '#f0fdf4' : '#fff7ed',
-              border: `1px solid ${imported > 0 ? '#bbf7d0' : '#fed7aa'}`,
-            }}
-          >
-            <Icon
-              name={imported > 0 ? 'check_circle' : 'warning'}
-              size={22}
-              style={{ color: imported > 0 ? '#059669' : '#d97706' }}
-            />
-            <span style={{ fontWeight: 700, color: imported > 0 ? '#065f46' : '#9a3412', fontSize: '0.95rem' }}>
-              {imported > 0
-                ? `Dispatched ${imported} task${imported === 1 ? '' : 's'}`
-                : 'No tasks were dispatched'}
-              {result.failed_count > 0 &&
-                ` · ${result.failed_count} row${result.failed_count === 1 ? '' : 's'} skipped`}
-            </span>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-              Sheet: {result.sheet_name} · {result.total_rows} row{result.total_rows === 1 ? '' : 's'} read
-            </span>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={reset}>
-                <Icon name="refresh" size={14} /> Import another sheet
-              </button>
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate('/records')}>
-                <Icon name="folder_open" size={14} /> View in Records
-              </button>
-            </div>
-          </div>
+          {legacyStep === 'pick' && (
+            <div className="card" style={{ padding: 24 }}>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => legacyInputRef.current?.click()}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && legacyInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setLegacyDragOver(true);
+                }}
+                onDragLeave={() => setLegacyDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setLegacyDragOver(false);
+                  const files = e.dataTransfer.files;
+                  if (files && files.length > 0) {
+                    selectLegacyFile(files[0]);
+                  }
+                }}
+                style={{
+                  border: `2px dashed ${legacyDragOver ? '#dc2626' : '#cbd5e1'}`,
+                  borderRadius: 14,
+                  padding: '36px 20px',
+                  textAlign: 'center',
+                  background: legacyDragOver ? '#fef2f2' : '#fafafa',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  marginBottom: 16,
+                }}
+              >
+                <input
+                  ref={legacyInputRef}
+                  type="file"
+                  accept=".xlsx, .xls"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      selectLegacyFile(e.target.files[0]);
+                    }
+                  }}
+                />
 
-          {/* Duplicate skipped banner */}
-          {((result.skipped_duplicates_count ?? 0) > 0 || ((result as any).duplicate_warnings?.length ?? 0) > 0) && (
-            <div
-              className="card"
-              style={{
-                padding: '14px 18px',
-                marginBottom: 16,
-                background: '#fffbeb',
-                border: '1px solid #fde68a',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                color: '#b45309',
-                fontSize: '0.85rem',
-              }}
-            >
-              <Icon name="warning" size={20} style={{ color: '#d97706' }} />
-              <div>
-                <strong>Duplicate Protection:</strong> Skipped{' '}
-                <strong>
-                  {result.skipped_duplicates_count ?? (result as any).duplicate_warnings?.length}
-                </strong>{' '}
-                duplicate record
-                {(result.skipped_duplicates_count ?? (result as any).duplicate_warnings?.length) === 1
-                  ? ''
-                  : 's'}{' '}
-                already existing in the database or duplicated within the sheet.
-              </div>
-            </div>
-          )}
-
-          {/* Auto-resolved locations banner */}
-          {(result.auto_resolved_count ?? 0) > 0 && (
-            <div
-              className="card"
-              style={{
-                padding: '14px 18px',
-                marginBottom: 16,
-                background: '#ecfdf5',
-                border: '1px solid #a7f3d0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                color: '#065f46',
-                fontSize: '0.85rem',
-              }}
-            >
-              <Icon name="auto_awesome" size={20} style={{ color: '#059669' }} />
-              <div>
-                <strong>Master Village Sheet Auto-Resolution:</strong> Successfully filled empty Village, Taluk, or District for <strong>{result.auto_resolved_count}</strong> record{result.auto_resolved_count === 1 ? '' : 's'} using coordinates and the Tamil Nadu Village Master.
-              </div>
-            </div>
-          )}
-
-          {/* Skipped rows — the reason a row never becomes a task */}
-          {result.errors.length > 0 && (
-            <div
-              className="card"
-              style={{ padding: '14px 18px', marginBottom: 16, background: '#fff7ed', border: '1px solid #fed7aa', fontSize: '0.82rem', color: '#9a3412' }}
-            >
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>
-                {result.errors.length} row{result.errors.length === 1 ? '' : 's'} not dispatched
-              </div>
-              {result.errors.slice(0, 12).map((er, i) => (
-                <div key={i} style={{ lineHeight: 1.6 }}>
-                  Row {er.row} · {er.column}: {er.message}
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 14,
+                    background: '#f1f5f9',
+                    color: '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 12px',
+                  }}
+                >
+                  <Icon name="upload" size={28} />
                 </div>
-              ))}
-              {result.errors.length > 12 && (
-                <div style={{ marginTop: 4, color: '#c2410c' }}>+{result.errors.length - 12} more…</div>
+
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                  {legacyFile ? legacyFile.name : 'Choose Legacy Task Sheet (.xlsx)'}
+                </div>
+                <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 4 }}>
+                  Dispatches inspection tasks to field operators via streaming NDJSON.
+                </div>
+              </div>
+
+              {legacyError && (
+                <div className="alert alert-error" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                  <Icon name="error" size={16} />
+                  <span>{legacyError}</span>
+                </div>
               )}
-              <div style={{ marginTop: 8, fontSize: '0.78rem', color: '#7c2d12' }}>
-                Optional <strong>operator_email</strong> values must match an active field account. Imported tasks must be audited before field assignment.
-              </div>
-            </div>
-          )}
 
-          {/* Dispatched tasks — one scrollable list, so a long sheet cannot
-              stretch the page into a wall of cards. */}
-          {result.dispatched_tasks.length > 0 && (
-            <div className="card list-card">
-              <div className="list-card-head">
-                <span className="list-card-title">
-                  <Icon name="task_alt" size={16} style={{ color: '#059669' }} />
-                  Dispatched tasks
-                </span>
-                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  {result.dispatched_tasks.length} task
-                  {result.dispatched_tasks.length === 1 ? '' : 's'} · scroll the list for more
-                </span>
-              </div>
-
-              <div className="list-scroll">
-                {result.dispatched_tasks.map((t) => (
-                  <div key={t.record_id} className="task-row">
-                    <span className="task-row-id">#{t.record_id}</span>
-
-                    <div className="task-row-main">
-                      <div className="task-row-name" title={t.unique_id || t.site_address}>
-                        {t.unique_id || t.site_address || '—'}
-                      </div>
-                      {t.unique_id && (
-                        <div className="task-row-site" title={t.site_address}>
-                          {t.site_address || '—'}
-                        </div>
-                      )}
-                      {(t.village || t.taluk) && (
-                        <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                          {t.village && (
-                            <span style={{ fontSize: '0.70rem', background: '#e0f2fe', color: '#0369a1', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
-                              📍 {t.village}
-                            </span>
-                          )}
-                          {t.taluk && (
-                            <span style={{ fontSize: '0.70rem', background: '#f1f5f9', color: '#475569', padding: '1px 6px', borderRadius: 4 }}>
-                              {t.taluk}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="task-row-op" title={t.operator_email || t.auditor_email || 'Unassigned'}>
-                      {t.operator_name || (t.auditor_name ? `Auditor: ${t.auditor_name}` : 'Unassigned')}
-                      <small>{t.operator_email || (t.auditor_email ? t.auditor_email : 'Pending assignment')}</small>
-                    </div>
-
-                    <span className="rd-chip rd-chip-warn" title="Waiting for the operator to inspect">
-                      <span className="rd-dot" />
-                      Pending
-                    </span>
-
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => navigate(`/records/${t.record_id}`)}
-                    >
-                      <Icon name="open_in_new" size={14} />
-                      Open
-                    </button>
+              {/* Progress bar when legacy importing */}
+              {legacyImporting && legacyLiveProgress && (
+                <div
+                  style={{
+                    marginBottom: 16,
+                    padding: '16px',
+                    borderRadius: 12,
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>Streaming Task Import...</span>
+                    <span style={{ fontWeight: 800, color: '#dc2626' }}>{legacyLiveProgress.percent}%</span>
                   </div>
-                ))}
+                  <div style={{ width: '100%', height: 8, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${legacyLiveProgress.percent}%`,
+                        height: '100%',
+                        background: '#dc2626',
+                        transition: 'width 0.2s ease',
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: '0.78rem', color: '#64748b' }}>
+                    {legacyLiveProgress.status}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={downloadLegacyTemplate}
+                  disabled={legacyDownloading || legacyImporting}
+                >
+                  <Icon name={legacyDownloading ? 'refresh' : 'download'} size={15} className={legacyDownloading ? 'fos-spin' : undefined} />
+                  {legacyDownloading ? 'Downloading…' : 'Download Legacy Template (.xlsx)'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={!legacyFile || legacyImporting}
+                  onClick={runLegacyImport}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}
+                >
+                  <Icon name={legacyImporting ? 'refresh' : 'upload'} size={16} className={legacyImporting ? 'fos-spin' : undefined} />
+                  {legacyImporting ? 'Dispatching...' : 'Dispatch Tasks'}
+                </button>
               </div>
             </div>
           )}
 
-          {result.dispatched_tasks.length === 0 && (
-            <div className="card" style={{ padding: 30, textAlign: 'center', color: '#64748b' }}>
-              Nothing was written. Fix the skipped rows above and upload the sheet again.
+          {legacyStep === 'review' && legacyResult && (
+            <div className="card" style={{ padding: 24 }}>
+              <div
+                style={{
+                  padding: '16px 20px',
+                  borderRadius: 10,
+                  background: legacyResult.total_dispatched > 0 ? '#f0fdf4' : '#fff7ed',
+                  border: `1px solid ${legacyResult.total_dispatched > 0 ? '#bbf7d0' : '#fed7aa'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: legacyResult.total_dispatched > 0 ? '#065f46' : '#9a3412' }}>
+                    {legacyResult.total_dispatched > 0
+                      ? `Dispatched ${legacyResult.total_dispatched} task(s)`
+                      : 'No tasks dispatched'}
+                  </h3>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Sheet: {legacyResult.sheet_name} · {legacyResult.total_rows} row(s) read
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={resetLegacy}>
+                    <Icon name="refresh" size={14} /> Import another sheet
+                  </button>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate('/records')}>
+                    <Icon name="folder_open" size={14} /> View in Records
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </>

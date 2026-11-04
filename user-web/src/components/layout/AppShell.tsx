@@ -2,6 +2,7 @@ import React from 'react';
 import type { ScreenName, User } from '../../types';
 import Icon from '../common/Icon';
 import PwaInstallBanner from '../common/PwaInstallBanner';
+import { NotificationBell } from '../NotificationBell';
 
 interface AppShellProps {
   activeScreen: ScreenName;
@@ -16,6 +17,7 @@ interface AppShellProps {
   headerRight?: React.ReactNode;
   /** Open the on-site manual capture flow (camera → form). */
   onAddRecord?: () => void;
+  onSelectRecord?: (recordId: number) => void;
   children: React.ReactNode;
 }
 
@@ -31,6 +33,7 @@ export default function AppShell({
   onBack,
   headerRight,
   onAddRecord,
+  onSelectRecord,
   children,
 }: AppShellProps) {
   const isDashboardActive = activeScreen === 'dashboard';
@@ -289,6 +292,9 @@ export default function AppShell({
               />
               <span>GPS Active</span>
             </div>
+
+            {/* Notification Bell with Unread Badge */}
+            <NotificationBell onSelectRecord={onSelectRecord} />
 
             {/* Cloud Sync Status Icon */}
             <div

@@ -55,10 +55,22 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
 
   // Status & feedback
   const [resolving, setResolving] = useState(false);
+  const [resolveSource, setResolveSource] = useState<'wfs' | 'gmap'>('wfs');
   const [resolveSuccess, setResolveSuccess] = useState<string | null>(null);
   const [resolveError, setResolveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Duplicate proximity info
+  const [duplicateInfo, setDuplicateInfo] = useState<{
+    is_duplicate: boolean;
+    duplicate_warning?: string | null;
+    duplicate_site_id?: string | null;
+    duplicate_record_id?: number | null;
+    duplicate_distance_m?: number | null;
+    duplicate_is_visited?: boolean;
+  } | null>(null);
+  const [overrideDuplicate, setOverrideDuplicate] = useState(false);
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -95,6 +107,8 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
       setResolveError(null);
       setResolveSuccess(null);
       setSaveError(null);
+      setDuplicateInfo(null);
+      setOverrideDuplicate(false);
     }
   }, [isOpen]);
 
@@ -110,7 +124,7 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
     return { lat, lng };
   };
 
-  const executeResolve = async (coordinatesToResolve: string) => {
+  const executeResolve = async (coordinatesToResolve: string, source: 'wfs' | 'gmap' = 'wfs') => {
     const parsed = parseCoords(coordinatesToResolve);
     if (!parsed) {
       setResolveError('Invalid format. Please enter coordinates as "latitude, longitude" (e.g. 11.0825, 76.9950).');
@@ -119,10 +133,11 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
     }
 
     setResolving(true);
+    setResolveSource(source);
     setResolveError(null);
     setResolveSuccess(null);
     try {
-      const res: ResolveCoordsResponse = await recordsApi.resolveCoords(coordinatesToResolve);
+      const res: ResolveCoordsResponse = await recordsApi.resolveCoords(coordinatesToResolve, source);
       setCurrentLat(res.latitude);
       setCurrentLng(res.longitude);
       setCoordsInput(res.coordinates);
@@ -134,8 +149,26 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
       if (res.taluk) setTaluk(res.taluk);
       if (res.district) setDistrict(res.district);
       if (res.address) setAddress(res.address);
+      if (res.survey_no) setSurveyNo(res.survey_no);
+      if (res.subdivision_no) setSubdivisionNo(res.subdivision_no);
 
-      setResolveSuccess(`Resolved: ${res.area || res.village || 'Location'}, ${res.taluk || ''} (${res.site_id})`);
+      if (res.is_duplicate) {
+        setDuplicateInfo({
+          is_duplicate: true,
+          duplicate_warning: res.duplicate_warning,
+          duplicate_site_id: res.duplicate_site_id,
+          duplicate_record_id: res.duplicate_record_id,
+          duplicate_distance_m: res.duplicate_distance_m,
+          duplicate_is_visited: res.duplicate_is_visited,
+        });
+      } else {
+        setDuplicateInfo(null);
+        setOverrideDuplicate(false);
+      }
+
+      const srcLabel = source === 'wfs' ? 'TNGIS WFS' : 'Google Maps';
+      const surveyInfo = res.survey_no ? ` · Survey ${res.survey_no}${res.subdivision_no ? `/${res.subdivision_no}` : ''}` : '';
+      setResolveSuccess(`Resolved via ${srcLabel}: ${res.village || res.area || 'Location'}, ${res.taluk || ''}${surveyInfo} (${res.site_id})`);
     } catch (err: any) {
       const msg = err.response?.data?.detail || err.message || 'Failed to resolve location from coordinates';
       setResolveError(msg);
@@ -153,7 +186,7 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
       setCurrentLng(parsed.lng);
       setHasLocationSelected(true);
     }
-    executeResolve(newCoords);
+    executeResolve(newCoords, 'wfs');
   };
 
   // Called when typing in coordinates input with auto-debounce
@@ -169,7 +202,7 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
     const parsed = parseCoords(val);
     if (parsed) {
       debounceTimerRef.current = setTimeout(() => {
-        executeResolve(val);
+        executeResolve(val, 'wfs');
       }, 700);
     }
   };
@@ -181,18 +214,12 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
       const parsed = parseCoords(pasted);
       if (parsed) {
         setCoordsInput(pasted.trim());
-        executeResolve(pasted.trim());
+        executeResolve(pasted.trim(), 'wfs');
       }
     }
   };
 
-  const handleManualResolveClick = () => {
-    if (coordsInput.trim()) {
-      executeResolve(coordsInput.trim());
-    } else {
-      setResolveError('Please enter coordinates or click on the map pin.');
-    }
-  };
+
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,6 +230,11 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
     const parsed = parseCoords(coordsInput);
     if (!parsed) {
       setSaveError('Invalid coordinates format. Expected "latitude, longitude".');
+      return;
+    }
+
+    if (duplicateInfo?.is_duplicate && !overrideDuplicate) {
+      setSaveError(`⚠️ Potential duplicate detected within ${duplicateInfo.duplicate_distance_m || ''}m of existing site ${duplicateInfo.duplicate_site_id || ''}. Please review and check "Confirm this is a distinct new plot" to proceed.`);
       return;
     }
 
@@ -354,7 +386,7 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
           )}
 
           {/* Top Section: Coordinates Input & Actions */}
-          <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+          <div style={{ background: '#f8fafc', padding: '14px 16px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
               Target Coordinates (Latitude, Longitude) *
             </label>
@@ -363,28 +395,144 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
                 <input
                   type="text"
                   className="fld"
-                  style={{ width: '100%', paddingLeft: 32, fontSize: 13, fontFamily: 'monospace' }}
+                  style={{
+                    width: '100%',
+                    height: 38,
+                    paddingLeft: 34,
+                    paddingRight: 10,
+                    fontSize: 13,
+                    fontFamily: coordsInput ? 'monospace' : 'inherit',
+                    borderRadius: 7,
+                    boxSizing: 'border-box',
+                  }}
                   placeholder="Paste or type coordinates e.g. 11.0825, 76.9950"
                   value={coordsInput}
                   onChange={(e) => handleCoordsInputChange(e.target.value)}
                   onPaste={handlePasteCoords}
                 />
-                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>
-                  <Icon name="pin_drop" size={16} />
+                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b', display: 'flex', alignItems: 'center' }}>
+                  <Icon name="pin_drop" size={17} />
                 </span>
               </div>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={handleManualResolveClick}
-                disabled={resolving || !coordsInput.trim()}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 36, whiteSpace: 'nowrap' }}
-              >
-                <Icon name={resolving ? 'refresh' : 'search'} size={15} className={resolving ? 'spin' : ''} />
-                {resolving ? 'Resolving…' : 'Resolve'}
-              </button>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${resolveSource === 'wfs' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => executeResolve(coordsInput.trim(), 'wfs')}
+                  disabled={resolving || !coordsInput.trim()}
+                  title="Resolve Cadastral Land & Revenue Details via Official TNGIS WFS (Default)"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    height: 38,
+                    whiteSpace: 'nowrap',
+                    fontWeight: 650,
+                    fontSize: 12.5,
+                    borderRadius: 7,
+                    backgroundColor: resolveSource === 'wfs' ? '#7c3aed' : undefined,
+                    borderColor: resolveSource === 'wfs' ? '#7c3aed' : undefined,
+                    color: resolveSource === 'wfs' ? '#ffffff' : undefined,
+                  }}
+                >
+                  <Icon name={resolving && resolveSource === 'wfs' ? 'refresh' : 'layers'} size={16} className={resolving && resolveSource === 'wfs' ? 'spin' : ''} />
+                  <span>Get WFS (Default)</span>
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${resolveSource === 'gmap' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => executeResolve(coordsInput.trim(), 'gmap')}
+                  disabled={resolving || !coordsInput.trim()}
+                  title="Resolve Street Address via Google Maps Geocoding"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    height: 38,
+                    whiteSpace: 'nowrap',
+                    fontWeight: 500,
+                    fontSize: 12.5,
+                    borderRadius: 7,
+                  }}
+                >
+                  <Icon name={resolving && resolveSource === 'gmap' ? 'refresh' : 'map'} size={16} className={resolving && resolveSource === 'gmap' ? 'spin' : ''} />
+                  <span>Get GMaps</span>
+                </button>
+              </div>
             </div>
-            <div style={{ marginTop: 6, fontSize: 11, color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
+
+            {/* ⚠️ Proximity & Duplicate Detection Alert Box */}
+            {duplicateInfo?.is_duplicate && (
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  backgroundColor: '#fef2f2',
+                  border: '1.5px solid #fecaca',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  animation: 'fadeIn 0.2s ease-out',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#dc2626', fontWeight: 800, fontSize: 13 }}>
+                    <Icon name="warning" size={17} style={{ color: '#dc2626' }} />
+                    <span>⚠️ Potential Duplicate Site Detected</span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                      backgroundColor: duplicateInfo.duplicate_is_visited ? '#dcfce7' : '#fef3c7',
+                      color: duplicateInfo.duplicate_is_visited ? '#15803d' : '#b45309',
+                    }}
+                  >
+                    {duplicateInfo.duplicate_is_visited ? 'Already Visited & Captured' : 'Pending Lead'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: '#7f1d1d', lineHeight: 1.45 }}>
+                  {duplicateInfo.duplicate_warning || `Location is within ${duplicateInfo.duplicate_distance_m}m of existing site ${duplicateInfo.duplicate_site_id}`}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
+                  {duplicateInfo.duplicate_site_id && (
+                    <a
+                      href={`/records?search=${encodeURIComponent(duplicateInfo.duplicate_site_id)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        color: '#0284c7',
+                        textDecoration: 'underline',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      <Icon name="open_in_new" size={14} style={{ color: '#0284c7' }} />
+                      <span>View Matched Record ({duplicateInfo.duplicate_site_id})</span>
+                    </a>
+                  )}
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#475569', cursor: 'pointer', userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={overrideDuplicate}
+                      onChange={(e) => setOverrideDuplicate(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span style={{ fontWeight: 650, color: overrideDuplicate ? '#166534' : '#334155' }}>
+                      Confirm this is a distinct new plot (allow save)
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginTop: 8, fontSize: 11, color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
               <span>Click anywhere on the map below or drag the marker to pick coordinates</span>
               {hasLocationSelected && (
                 <span style={{ color: '#059669', fontWeight: 600 }}>✓ Position set ({currentLat.toFixed(5)}, {currentLng.toFixed(5)})</span>
@@ -416,103 +564,171 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
               )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-              {/* Site ID */}
-              <div>
-                <label className="sub-field-label" htmlFor="qa-create-site-id">
-                  Unique ID (Site ID) *
-                </label>
-                <input
-                  id="qa-create-site-id"
-                  type="text"
-                  className="fld"
-                  style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}
-                  placeholder="Auto-generated (e.g. CBE-518294)"
-                  value={siteId}
-                  onChange={(e) => setSiteId(e.target.value)}
-                  required
-                />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Row 1: Identification, Area & Revenue Village (3 cols) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+                {/* Site ID */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label className="sub-field-label" style={{ display: 'block', fontSize: 12, fontWeight: 650, color: '#475569', marginBottom: 2 }} htmlFor="qa-create-site-id">
+                    Unique ID (Site ID) *
+                  </label>
+                  <input
+                    id="qa-create-site-id"
+                    type="text"
+                    className="fld"
+                    style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}
+                    placeholder="Auto-generated (e.g. CBE-518294)"
+                    value={siteId}
+                    onChange={(e) => setSiteId(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {/* Area */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label className="sub-field-label" style={{ display: 'block', fontSize: 12, fontWeight: 650, color: '#475569', marginBottom: 2 }} htmlFor="qa-create-area">
+                    Area *
+                  </label>
+                  <input
+                    id="qa-create-area"
+                    type="text"
+                    className="fld"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    placeholder="e.g. Saravanampatti, Tatabad, Peelamedu"
+                    value={area}
+                    onChange={(e) => setArea(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {/* Revenue Village */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label className="sub-field-label" style={{ display: 'block', fontSize: 12, fontWeight: 650, color: '#475569', marginBottom: 2 }} htmlFor="qa-create-village">
+                    Revenue Village *
+                  </label>
+                  <input
+                    id="qa-create-village"
+                    type="text"
+                    className="fld"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    placeholder="Revenue village from Master"
+                    value={village}
+                    onChange={(e) => setVillage(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
 
-              {/* Area */}
-              <div>
-                <label className="sub-field-label" htmlFor="qa-create-area">
-                  Area *
-                </label>
-                <input
-                  id="qa-create-area"
-                  type="text"
-                  className="fld"
-                  placeholder="e.g. Saravanampatti, Tatabad, Peelamedu"
-                  value={area}
-                  onChange={(e) => setArea(e.target.value)}
-                  required
-                />
+              {/* Row 2: Taluk, District & Priority Tier (3 cols) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+                {/* Taluk */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label className="sub-field-label" style={{ display: 'block', fontSize: 12, fontWeight: 650, color: '#475569', marginBottom: 2 }} htmlFor="qa-create-taluk">
+                    Taluk *
+                  </label>
+                  <input
+                    id="qa-create-taluk"
+                    type="text"
+                    className="fld"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    placeholder="e.g. Coimbatore North, Coimbatore South"
+                    value={taluk}
+                    onChange={(e) => setTaluk(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {/* District */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label className="sub-field-label" style={{ display: 'block', fontSize: 12, fontWeight: 650, color: '#475569', marginBottom: 2 }} htmlFor="qa-create-district">
+                    District *
+                  </label>
+                  <input
+                    id="qa-create-district"
+                    type="text"
+                    className="fld"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    placeholder="e.g. Coimbatore"
+                    value={district}
+                    onChange={(e) => setDistrict(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {/* Priority Tier */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label className="sub-field-label" style={{ display: 'block', fontSize: 12, fontWeight: 650, color: '#475569', marginBottom: 2 }} htmlFor="qa-create-priority">
+                    Priority Tier
+                  </label>
+                  <select
+                    id="qa-create-priority"
+                    className="fld"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    value={priorityTier}
+                    onChange={(e) => setPriorityTier(e.target.value)}
+                  >
+                    <option value="Tier-1">Tier-1</option>
+                    <option value="Tier-2">Tier-2</option>
+                    <option value="Tier-3">Tier-3</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Village */}
-              <div>
-                <label className="sub-field-label" htmlFor="qa-create-village">
-                  Revenue Village *
-                </label>
-                <input
-                  id="qa-create-village"
-                  type="text"
-                  className="fld"
-                  placeholder="Revenue village from Master"
-                  value={village}
-                  onChange={(e) => setVillage(e.target.value)}
-                  required
-                />
-              </div>
+              {/* Row 3: Cadastral Land Parcel Details (2 equal cols) */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                gap: 12,
+                padding: '12px 14px',
+                background: '#f8fafc',
+                borderRadius: 8,
+                border: '1px solid #e2e8f0',
+              }}>
+                {/* Survey No */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label className="sub-field-label" style={{ display: 'block', fontSize: 12, fontWeight: 650, color: '#475569', marginBottom: 2 }} htmlFor="qa-create-survey-no">
+                      Survey No
+                    </label>
+                    {surveyNo && (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', padding: '1px 6px', borderRadius: 4, border: '1px solid #ede9fe' }}>
+                        TNGIS Cadastral
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    id="qa-create-survey-no"
+                    type="text"
+                    className="fld"
+                    style={{ width: '100%', boxSizing: 'border-box', background: '#ffffff', ...(surveyNo ? { fontWeight: 600, color: '#1e293b' } : {}) }}
+                    placeholder="e.g. 348"
+                    value={surveyNo}
+                    onChange={(e) => setSurveyNo(e.target.value)}
+                  />
+                </div>
 
-              {/* Taluk */}
-              <div>
-                <label className="sub-field-label" htmlFor="qa-create-taluk">
-                  Taluk *
-                </label>
-                <input
-                  id="qa-create-taluk"
-                  type="text"
-                  className="fld"
-                  placeholder="e.g. Coimbatore North, Coimbatore South"
-                  value={taluk}
-                  onChange={(e) => setTaluk(e.target.value)}
-                  required
-                />
-              </div>
-
-              {/* District */}
-              <div>
-                <label className="sub-field-label" htmlFor="qa-create-district">
-                  District *
-                </label>
-                <input
-                  id="qa-create-district"
-                  type="text"
-                  className="fld"
-                  placeholder="e.g. Coimbatore"
-                  value={district}
-                  onChange={(e) => setDistrict(e.target.value)}
-                  required
-                />
-              </div>
-
-              {/* Priority Tier */}
-              <div>
-                <label className="sub-field-label" htmlFor="qa-create-priority">
-                  Priority Tier
-                </label>
-                <select
-                  id="qa-create-priority"
-                  className="fld"
-                  value={priorityTier}
-                  onChange={(e) => setPriorityTier(e.target.value)}
-                >
-                  <option value="Tier-1">Tier-1</option>
-                  <option value="Tier-2">Tier-2</option>
-                  <option value="Tier-3">Tier-3</option>
-                </select>
+                {/* Subdivision No */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label className="sub-field-label" style={{ display: 'block', fontSize: 12, fontWeight: 650, color: '#475569', marginBottom: 2 }} htmlFor="qa-create-subdiv-no">
+                      Sub-division No
+                    </label>
+                    {subdivisionNo && (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', padding: '1px 6px', borderRadius: 4, border: '1px solid #ede9fe' }}>
+                        Auto-resolved
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    id="qa-create-subdiv-no"
+                    type="text"
+                    className="fld"
+                    style={{ width: '100%', boxSizing: 'border-box', background: '#ffffff', ...(subdivisionNo ? { fontWeight: 600, color: '#1e293b' } : {}) }}
+                    placeholder="e.g. 1A1A2"
+                    value={subdivisionNo}
+                    onChange={(e) => setSubdivisionNo(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 
@@ -794,7 +1010,7 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
               style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#6366f1', fontSize: 12, padding: 0 }}
             >
               <Icon name={showExtraDetails ? 'expand_less' : 'expand_more'} size={16} />
-              {showExtraDetails ? 'Hide Additional Information' : '+ Add Survey No, Owner or DTCP Info (Optional)'}
+              {showExtraDetails ? 'Hide Additional Information' : '+ Add Owner or DTCP Info (Optional)'}
             </button>
 
             {showExtraDetails && (
@@ -803,14 +1019,7 @@ export default function QaCreateRecordModal({ isOpen, onClose, onSuccess }: Prop
                   <label className="sub-field-label">Owner Name</label>
                   <input type="text" className="fld" placeholder="Applicant / Owner name" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} />
                 </div>
-                <div>
-                  <label className="sub-field-label">Survey No</label>
-                  <input type="text" className="fld" placeholder="Survey No" value={surveyNo} onChange={(e) => setSurveyNo(e.target.value)} />
-                </div>
-                <div>
-                  <label className="sub-field-label">Sub Division</label>
-                  <input type="text" className="fld" placeholder="Sub Division" value={subdivisionNo} onChange={(e) => setSubdivisionNo(e.target.value)} />
-                </div>
+
                 <div>
                   <label className="sub-field-label">DTCP Application No</label>
                   <input type="text" className="fld" placeholder="DTCP Application No" value={dtcpAppNo} onChange={(e) => setDtcpAppNo(e.target.value)} />

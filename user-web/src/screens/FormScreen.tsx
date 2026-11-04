@@ -127,6 +127,36 @@ export default function FormScreen({
   );
   const [remarks, setRemarks] = useState(editingRecord?.remarks || '');
 
+  // Land & Cadastral Details (WFS / GMaps)
+  const [surveyNo, setSurveyNo] = useState(
+    editingRecord?.survey_no || inspectingRecord?.survey_no || editingRecord?.survey_number || inspectingRecord?.survey_number || ''
+  );
+  const [subdivisionNo, setSubdivisionNo] = useState(
+    editingRecord?.subdivision_no || inspectingRecord?.subdivision_no || editingRecord?.sub_division || inspectingRecord?.sub_division || ''
+  );
+  const [village, setVillage] = useState(
+    editingRecord?.village || inspectingRecord?.village || ''
+  );
+  const [taluk, setTaluk] = useState(
+    editingRecord?.taluk || inspectingRecord?.taluk || ''
+  );
+  const [district, setDistrict] = useState(
+    editingRecord?.district || inspectingRecord?.district || 'Coimbatore'
+  );
+  const [wfsResolving, setWfsResolving] = useState(false);
+  const [wfsSource, setWfsSource] = useState<'wfs' | 'gmap'>('wfs');
+  const [wfsStatusMsg, setWfsStatusMsg] = useState<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    is_duplicate: boolean;
+    duplicate_warning?: string | null;
+    duplicate_site_id?: string | null;
+    duplicate_record_id?: number | null;
+    duplicate_distance_m?: number | null;
+    duplicate_is_visited?: boolean;
+  } | null>(null);
+  const [acknowledgedDuplicateWarning, setAcknowledgedDuplicateWarning] = useState(false);
+  const lastResolvedCoordsRef = useRef<string>('');
+
   // UI states
   const [loading, setLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState<string>('');
@@ -138,6 +168,75 @@ export default function FormScreen({
   const [savedRecord, setSavedRecord] = useState<CaptureRecord | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
   const [preparingUploads, setPreparingUploads] = useState(false);
+
+  const resolveLandDetails = async (source: 'wfs' | 'gmap' = 'wfs') => {
+    let lat: number | null = null;
+    let lng: number | null = null;
+    if (gps.fix && gps.fix.latitude !== 0 && gps.fix.longitude !== 0) {
+      lat = gps.fix.latitude;
+      lng = gps.fix.longitude;
+    } else if (sourceRecord?.coordinates) {
+      const parts = sourceRecord.coordinates.split(',').map((p) => parseFloat(p.trim()));
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        lat = parts[0];
+        lng = parts[1];
+      }
+    } else if (photos.length > 0) {
+      const pWithGps = photos.find((p) => p.latitude !== 0 && p.longitude !== 0);
+      if (pWithGps) {
+        lat = pWithGps.latitude;
+        lng = pWithGps.longitude;
+      }
+    }
+
+    if (lat === null || lng === null) {
+      setWfsStatusMsg('Waiting for GPS lock to resolve cadastral details.');
+      return;
+    }
+
+    const coordsStr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    setWfsResolving(true);
+    setWfsSource(source);
+    try {
+      const res = await api.resolveCoords(coordsStr, source);
+      if (res.survey_no) setSurveyNo(res.survey_no);
+      if (res.subdivision_no) setSubdivisionNo(res.subdivision_no);
+      if (res.village) setVillage(res.village);
+      if (res.taluk) setTaluk(res.taluk);
+      if (res.district) setDistrict(res.district);
+
+      if (res.is_duplicate) {
+        setDuplicateWarning({
+          is_duplicate: true,
+          duplicate_warning: res.duplicate_warning,
+          duplicate_site_id: res.duplicate_site_id,
+          duplicate_record_id: res.duplicate_record_id,
+          duplicate_distance_m: res.duplicate_distance_m,
+          duplicate_is_visited: res.duplicate_is_visited,
+        });
+      } else {
+        setDuplicateWarning(null);
+      }
+
+      const srcName = source === 'wfs' ? 'TNGIS WFS' : 'Google Maps';
+      const surveyInfo = res.survey_no ? ` · Survey ${res.survey_no}${res.subdivision_no ? `/${res.subdivision_no}` : ''}` : '';
+      setWfsStatusMsg(`Auto-resolved via ${srcName}: ${res.village || 'Village'}, ${res.taluk || ''}${surveyInfo}`);
+      lastResolvedCoordsRef.current = coordsStr;
+    } catch (e: any) {
+      setWfsStatusMsg(`Failed to resolve: ${e.message || 'Network error'}`);
+    } finally {
+      setWfsResolving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isGpsLocked && gps.fix) {
+      const currentCoords = `${gps.fix.latitude.toFixed(5)}, ${gps.fix.longitude.toFixed(5)}`;
+      if (lastResolvedCoordsRef.current !== currentCoords) {
+        resolveLandDetails('wfs');
+      }
+    }
+  }, [isGpsLocked, gps.fix?.latitude, gps.fix?.longitude]);
 
   const uploadPhotos = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -238,8 +337,12 @@ export default function FormScreen({
       newErrors.dateOfVisit = dateErr;
     }
 
-    if (!stageOfConstruction) {
-      newErrors.stageOfConstruction = 'Please select the stage of construction.';
+    if (constructionHappening !== 'No') {
+      if (!stageOfConstruction) {
+        newErrors.stageOfConstruction = 'Please select the stage of construction.';
+      } else if (stageOfConstruction === 'Other' && (!customStage || customStage.trim().length < 3)) {
+        newErrors.customStage = 'Please specify the stage of construction (at least 3 characters).';
+      }
     } else if (stageOfConstruction === 'Other' && (!customStage || customStage.trim().length < 3)) {
       newErrors.customStage = 'Please specify the stage of construction (at least 3 characters).';
     }
@@ -325,6 +428,11 @@ export default function FormScreen({
         site_contractor_architect_number: normalizedContractorPhone,
         remarks: remarks.trim(),
         follow_up_date: followUpDate.trim() || undefined,
+        survey_no: surveyNo.trim() || undefined,
+        subdivision_no: subdivisionNo.trim() || undefined,
+        village: village.trim() || undefined,
+        taluk: taluk.trim() || undefined,
+        district: district.trim() || undefined,
       };
 
       // Edit of a completed record: send ONLY the fields the verifier
@@ -778,6 +886,209 @@ export default function FormScreen({
                 readOnly={ownerNameLocked}
               />
             </div>
+          </div>
+
+          {/* Land & Cadastral Details Card (WFS / GMaps) */}
+          <div className="card" style={{ padding: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Icon name="layers" size={20} color="var(--color-primary)" />
+                <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
+                  Land & Revenue Details
+                </h2>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${wfsSource === 'wfs' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => resolveLandDetails('wfs')}
+                  disabled={wfsResolving}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    height: 32,
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    backgroundColor: wfsSource === 'wfs' ? '#7c3aed' : undefined,
+                    borderColor: wfsSource === 'wfs' ? '#7c3aed' : undefined,
+                    color: wfsSource === 'wfs' ? '#ffffff' : undefined,
+                  }}
+                  title="Resolve Cadastral Land & Revenue Details via Official TNGIS WFS (Default)"
+                >
+                  <Icon name={wfsResolving && wfsSource === 'wfs' ? 'refresh' : 'layers'} size={14} className={wfsResolving && wfsSource === 'wfs' ? 'spin' : ''} />
+                  <span>Get WFS (Default)</span>
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${wfsSource === 'gmap' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => resolveLandDetails('gmap')}
+                  disabled={wfsResolving}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    height: 32,
+                    fontSize: '0.78rem',
+                    fontWeight: 500,
+                  }}
+                  title="Resolve Street Address via Google Maps Geocoding"
+                >
+                  <Icon name={wfsResolving && wfsSource === 'gmap' ? 'refresh' : 'map'} size={14} className={wfsResolving && wfsSource === 'gmap' ? 'spin' : ''} />
+                  <span>Get GMaps</span>
+                </button>
+              </div>
+            </div>
+
+            {wfsStatusMsg && (
+              <div
+                style={{
+                  marginBottom: '1rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: wfsStatusMsg.startsWith('Failed') ? '#fef2f2' : '#f5f3ff',
+                  border: `1px solid ${wfsStatusMsg.startsWith('Failed') ? '#fca5a5' : '#ddd6fe'}`,
+                  fontSize: '0.78rem',
+                  color: wfsStatusMsg.startsWith('Failed') ? '#b91c1c' : '#6d28d9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <Icon name={wfsResolving ? 'refresh' : wfsStatusMsg.startsWith('Failed') ? 'warning' : 'verified'} size={15} className={wfsResolving ? 'spin' : ''} />
+                <span>{wfsStatusMsg}</span>
+              </div>
+            )}
+
+            {/* ⚠️ Proximity & Duplicate Warning Card */}
+            {duplicateWarning?.is_duplicate && !acknowledgedDuplicateWarning && (
+              <div
+                style={{
+                  marginBottom: '1rem',
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  backgroundColor: '#fef2f2',
+                  border: '1.5px solid #fecaca',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  animation: 'fadeIn 0.2s ease-out',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#dc2626', fontWeight: 800, fontSize: '0.82rem' }}>
+                    <Icon name="warning" size={16} color="#dc2626" />
+                    <span>⚠️ Potential Duplicate ({duplicateWarning.duplicate_distance_m}m away)</span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      backgroundColor: duplicateWarning.duplicate_is_visited ? '#dcfce7' : '#fef3c7',
+                      color: duplicateWarning.duplicate_is_visited ? '#15803d' : '#b45309',
+                    }}
+                  >
+                    {duplicateWarning.duplicate_is_visited ? 'Already Visited' : 'Pending Lead'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#7f1d1d', lineHeight: 1.4 }}>
+                  {duplicateWarning.duplicate_warning || `Location is within ${duplicateWarning.duplicate_distance_m}m of existing site ${duplicateWarning.duplicate_site_id}.`}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAcknowledgedDuplicateWarning(true)}
+                  style={{
+                    alignSelf: 'flex-start',
+                    marginTop: 4,
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #fca5a5',
+                    color: '#991b1b',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  ✓ Confirm Adjacent New Plot (Continue)
+                </button>
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="field-survey-no" style={{ fontSize: '0.78rem' }}>
+                  Survey Number {surveyNo ? '(WFS)' : ''}
+                </label>
+                <input
+                  id="field-survey-no"
+                  type="text"
+                  className="form-input"
+                  value={surveyNo}
+                  onChange={(e) => setSurveyNo(e.target.value)}
+                  placeholder="e.g. 348"
+                  style={surveyNo ? { fontWeight: 600, color: '#1e293b' } : undefined}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="field-subdiv-no" style={{ fontSize: '0.78rem' }}>
+                  Sub-division {subdivisionNo ? '(WFS)' : ''}
+                </label>
+                <input
+                  id="field-subdiv-no"
+                  type="text"
+                  className="form-input"
+                  value={subdivisionNo}
+                  onChange={(e) => setSubdivisionNo(e.target.value)}
+                  placeholder="e.g. 1A1A2"
+                  style={subdivisionNo ? { fontWeight: 600, color: '#1e293b' } : undefined}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="field-village" style={{ fontSize: '0.78rem' }}>
+                  Revenue Village
+                </label>
+                <input
+                  id="field-village"
+                  type="text"
+                  className="form-input"
+                  value={village}
+                  onChange={(e) => setVillage(e.target.value)}
+                  placeholder="Village"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="field-taluk" style={{ fontSize: '0.78rem' }}>
+                  Taluk
+                </label>
+                <input
+                  id="field-taluk"
+                  type="text"
+                  className="form-input"
+                  value={taluk}
+                  onChange={(e) => setTaluk(e.target.value)}
+                  placeholder="Taluk"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="field-district" style={{ fontSize: '0.78rem' }}>
+                  District
+                </label>
+                <input
+                  id="field-district"
+                  type="text"
+                  className="form-input"
+                  value={district}
+                  onChange={(e) => setDistrict(e.target.value)}
+                  placeholder="District"
+                />
+              </div>
+            </div>
 
             {(sourceRecord?.qc_vhr_comment || sourceRecord?.qc_street_details || sourceRecord?.qc_sqfeet || sourceRecord?.qc_reference_image_url) && (
               <div
@@ -953,7 +1264,7 @@ export default function FormScreen({
             {/* 3. Stage of Construction */}
             <div className="form-group">
               <label className="form-label" htmlFor="stage-construction">
-                3. Stage of Construction <span style={{ color: '#ef4444' }}>*</span>
+                3. Stage of Construction {constructionHappening !== 'No' && <span style={{ color: '#ef4444' }}>*</span>}
               </label>
               <select
                 id="stage-construction"

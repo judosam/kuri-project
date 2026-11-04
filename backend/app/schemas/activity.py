@@ -23,6 +23,9 @@ class ActivityEntry(BaseModel):
     user_name: Optional[str] = None
     record_id: Optional[int] = None
     record_name: Optional[str] = None
+    action_type: Optional[str] = None
+    user_role: Optional[str] = None
+    unique_id: Optional[str] = None
 
     @field_serializer("ts", when_used="json")
     def serialize_dt(self, dt_val: datetime) -> str:

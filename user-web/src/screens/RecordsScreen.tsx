@@ -12,6 +12,15 @@ import { RecordCardSkeleton } from '../components/common/Skeleton';
 import { formatDateTime, formatRecordNo, inspectionDateLabel, getGoogleMapsUrl, isRecordCompleted, isRecordClosed, getRecordStatusBadgeInfo, getRecentCaptureOrInspection } from '../utils/format';
 import { useGps } from '../hooks/useGps';
 import { useRoadRoute } from '../hooks/useRoadRoute';
+import {
+  clusterRecordsByProximity,
+  groupRecordsByGpsProximity,
+  findNearbySitesForRecord,
+  parseCoordinates,
+  haversineDistanceMeters,
+  type SpatialCluster,
+  type GpsProximityGroup,
+} from '../utils/geo';
 import { captureRange, type CaptureRange } from '../utils/dateRange';
 import { readRecordState, saveRecordState } from '../utils/recordState';
 import { useForegroundRefresh } from '../hooks/useForegroundRefresh';
@@ -21,7 +30,7 @@ export type DatePreset = CaptureRange;
 
 interface RecordsScreenProps {
   onOpenRecord: (id: number) => void;
-  onStartInspection: (record: CaptureRecord) => void;
+  onStartInspection: (record: CaptureRecord, nearbyMatch?: any) => void;
   storageKey?: string;
   onInitialFilterApplied?: () => void;
   initialFilter?: {
@@ -58,9 +67,11 @@ export default function RecordsScreen({
   const restoreScroll = useRef(true);
   const [records, setRecords] = useState<CaptureRecord[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(initialFilter ? 1 : saved.page);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [pageSize] = useState(15);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'NOT_COMPLETED' | 'COMPLETED' | 'CLOSED'>(
     initialFilter?.status && initialFilter.status !== 'ALL'
@@ -77,7 +88,47 @@ export default function RecordsScreen({
   const [search, setSearch] = useState(saved.search);
   const [selectedMapRecord, setSelectedMapRecord] = useState<CaptureRecord | null>(null);
   const [markStatusRecord, setMarkStatusRecord] = useState<CaptureRecord | null>(null);
+  const [proximityMode, setProximityMode] = useState<'none' | '50m' | '100m' | 'village' | 'gps'>('none');
+  const [collapsedClusters, setCollapsedClusters] = useState<Record<string, boolean>>({});
 
+  const toggleClusterCollapse = (clusterId: string) => {
+    setCollapsedClusters((prev) => ({
+      ...prev,
+      [clusterId]: !prev[clusterId],
+    }));
+  };
+
+  const collapseAllClusters = () => {
+    const allCollapsed: Record<string, boolean> = {};
+    if (proximityMode === '50m') {
+      spatial50m.clusters.forEach((c) => { allCollapsed[c.id] = true; });
+      spatial50m.standalone.forEach((entry: any) => {
+        const r = entry.record || entry;
+        const v = (r.village || r.taluk || 'Area').trim();
+        allCollapsed[`area-${v}`] = true;
+      });
+    } else if (proximityMode === '100m') {
+      spatial100m.clusters.forEach((c) => { allCollapsed[c.id] = true; });
+      spatial100m.standalone.forEach((entry: any) => {
+        const r = entry.record || entry;
+        const v = (r.village || r.taluk || 'Area').trim();
+        allCollapsed[`area-${v}`] = true;
+      });
+    } else if (proximityMode === 'village') {
+      displayRecords.forEach((entry: any) => {
+        const r = entry.record || entry;
+        const v = (r.village || r.taluk || 'Area').trim();
+        allCollapsed[`area-${v}`] = true;
+      });
+    }
+    setCollapsedClusters(allCollapsed);
+  };
+
+  const expandAllClusters = () => {
+    setCollapsedClusters({});
+  };
+
+  const [filtersExpanded, setFiltersExpanded] = useState<boolean>(() => localStorage.getItem('kuri_verifier_filters_expanded') === 'true');
   const [viewMode, setViewMode] = useState<'records' | 'gallery'>(
     initialFilter?.hasPhotosOnly || initialFilter?.viewMode === 'gallery' ? 'gallery' : saved.viewMode
   );
@@ -96,7 +147,8 @@ export default function RecordsScreen({
         count: vc.count,
       }));
     }
-    return (locationOptions.village || []).map((name) => ({ name }));
+
+  return (locationOptions.village || []).map((name) => ({ name }));
   }, [locationOptions]);
 
   const gps = useGps();
@@ -105,6 +157,28 @@ export default function RecordsScreen({
     statusFilter === 'NOT_COMPLETED',
     () => api.listPendingForRoute({ ...captureRange(datePreset, customStartDate, customEndDate), search: searchText.trim() || undefined, village: selectedVillages.length > 0 ? selectedVillages : undefined }),
   );
+
+  const spatial50m = useMemo(() => {
+    return clusterRecordsByProximity(displayRecords, (e) => e.record, 50);
+  }, [displayRecords]);
+
+  const spatial100m = useMemo(() => {
+    return clusterRecordsByProximity(displayRecords, (e) => e.record, 100);
+  }, [displayRecords]);
+
+  const gpsGroups = useMemo(() => {
+    if (!gps.fix) return [];
+    return groupRecordsByGpsProximity(displayRecords, (e) => e.record, gps.fix);
+  }, [displayRecords, gps.fix]);
+
+  const nearbyMap = useMemo(() => {
+    const allRecs = displayRecords.map((e) => e.record);
+    const map = new Map<number, ReturnType<typeof findNearbySitesForRecord>>();
+    for (const r of allRecs) {
+      map.set(r.id, findNearbySitesForRecord(r, allRecs, 100));
+    }
+    return map;
+  }, [displayRecords]);
 
   // Sync initialFilter if changed from parent (e.g. clicking dashboard matrix card)
   useEffect(() => {
@@ -167,9 +241,15 @@ export default function RecordsScreen({
   }, [searchText, search]);
 
   const recordsRequest = useRef(0);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const isFetchingNextPageRef = useRef(false);
+
   const loadRecords = async (background = false) => {
     const request = ++recordsRequest.current;
-    if (!background) setLoading(true);
+    if (!background) {
+      if (page === 1) setLoading(true);
+      else setLoadingMore(true);
+    }
     setError(null);
     try {
       if (datePreset === 'CUSTOM' && customStartDate && customEndDate && customStartDate > customEndDate) throw new Error('From date must be before the To date.');
@@ -199,15 +279,33 @@ export default function RecordsScreen({
           return b.id - a.id;
         });
       }
-      setRecords(resultRecords);
+
+      const isEnd = resultRecords.length === 0 || resultRecords.length < pageSize || (page * pageSize >= (res.total || 0));
+      setHasMore(!isEnd);
+
+      // If page > 1 returned 0 records unexpectedly (e.g. from an out-of-bounds page), reset to 1
+      if (page > 1 && resultRecords.length === 0 && (records.length === 0 || (res.total || 0) > 0)) {
+        setPage(1);
+        return;
+      }
+
+      setRecords((prev) => {
+        if (page === 1) return resultRecords;
+        const seen = new Set(prev.map((r) => r.id));
+        const fresh = resultRecords.filter((r) => !seen.has(r.id));
+        return [...prev, ...fresh];
+      });
       setTotal(res.total || 0);
-      if (page > 1 && page > Math.max(1, Math.ceil(res.total / pageSize))) setPage(Math.max(1, Math.ceil(res.total / pageSize)));
     } catch (err: any) {
       if (request !== recordsRequest.current) return;
       console.error('Failed to load records:', err);
       setError(err?.message || 'Failed to load records. Please check your network connection.');
     } finally {
-      if (request === recordsRequest.current) setLoading(false);
+      if (request === recordsRequest.current) {
+        setLoading(false);
+        setLoadingMore(false);
+        isFetchingNextPageRef.current = false;
+      }
     }
   };
 
@@ -217,6 +315,41 @@ export default function RecordsScreen({
   }, [page, statusFilter, datePreset, customStartDate, customEndDate, search, selectedVillages]);
   useForegroundRefresh(() => loadRecords(true));
 
+  // Infinite scroll listener & observer on .app-body
+  useEffect(() => {
+    const body = document.querySelector('.app-body');
+    if (!body) return;
+
+    const handleInfiniteScroll = () => {
+      if (!hasMore || isFetchingNextPageRef.current || loading || loadingMore) return;
+      if (records.length >= total) return;
+      const { scrollTop, scrollHeight, clientHeight } = body;
+      if (scrollHeight - (scrollTop + clientHeight) < 320) {
+        isFetchingNextPageRef.current = true;
+        setPage((prev) => prev + 1);
+      }
+    };
+
+    body.addEventListener('scroll', handleInfiniteScroll, { passive: true });
+    return () => body.removeEventListener('scroll', handleInfiniteScroll);
+  }, [hasMore, loading, loadingMore, records.length, total]);
+
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const body = document.querySelector('.app-body');
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isFetchingNextPageRef.current && !loading && !loadingMore && records.length < total) {
+          isFetchingNextPageRef.current = true;
+          setPage((prev) => prev + 1);
+        }
+      },
+      { root: body, rootMargin: '250px' }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, records.length, total]);
+
   useEffect(() => {
     let active = true;
     api.recordLocationOptions('', '', statusFilter).then(options => { if (active) { setLocationOptions(options); setLocationError(''); } })
@@ -224,8 +357,8 @@ export default function RecordsScreen({
     return () => { active = false; };
   }, [statusFilter]);
   useEffect(() => {
-    saveRecordState(storageKey, { page, statusFilter, datePreset, customStartDate, customEndDate, searchText, search, village: selectedVillages.join(','), selectedVillages, viewMode, scrollTop: scrollTop.current });
-  }, [storageKey, page, statusFilter, datePreset, customStartDate, customEndDate, searchText, search, selectedVillages, viewMode]);
+    saveRecordState(storageKey, { page: 1, statusFilter, datePreset, customStartDate, customEndDate, searchText, search, village: selectedVillages.join(','), selectedVillages, viewMode, scrollTop: scrollTop.current });
+  }, [storageKey, statusFilter, datePreset, customStartDate, customEndDate, searchText, search, selectedVillages, viewMode]);
   useEffect(() => {
     const body = document.querySelector('.app-body');
     const saveScroll = () => { if (!restoreScroll.current && body) { scrollTop.current = body.scrollTop; saveRecordState(storageKey, { ...readRecordState(storageKey, saved), scrollTop: body.scrollTop }); } };
@@ -259,6 +392,495 @@ export default function RecordsScreen({
     if (!dest) return;
     const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const renderRecordCard = (entry: any, isClustered = false) => {
+    const item = entry.record;
+    const firstImage = (item.images || [])[0];
+    const photoCount = item.images?.length ?? 0;
+    const isComplete = statusFilter === 'NOT_COMPLETED' ? false : isRecordCompleted(item);
+    const site = item.street_address || item.site_address || item.formatted_address || item.location_name;
+    const nearby = nearbyMap.get(item.id) || [];
+    const nearby50 = nearby.filter((n) => n.distanceMeters <= 50);
+
+    return (
+      <div
+        key={item.id}
+        className="record-card compact-modern-card"
+        onClick={() => onOpenRecord(item.id)}
+        style={{
+          flexDirection: 'column',
+          alignItems: 'stretch',
+          padding: '8px 10px',
+          borderRadius: 12,
+          backgroundColor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderLeft: isClustered ? '4px solid #6366f1' : undefined,
+          boxShadow: '0 1px 3px rgba(15, 23, 42, 0.05)',
+          gap: 4,
+          transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
+        {/* Top Header Row: Thumbnail + Title + Status + Duplicate badge */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <div className="record-thumb-wrap" style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, borderRadius: 8 }}>
+            <AuthThumbnail
+              imageUrl={firstImage?.image_url || (item.qc_reference_image_url ? item.qc_reference_image_url : undefined)}
+              alt={item.name || 'Record thumb'}
+              fallbackIcon={isComplete ? 'photo_camera' : 'assignment'}
+              photoCount={photoCount}
+            />
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0, overflow: 'hidden' }}>
+                <span style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {item.unique_id || item.name}
+                </span>
+                <span className="record-id-badge" style={{ fontSize: '0.64rem', padding: '1px 4px', borderRadius: 4, flexShrink: 0 }}>
+                  {formatRecordNo(item.id)}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                {(() => {
+                  const badge = getRecordStatusBadgeInfo(item);
+                  return (
+                    <span
+                      className={badge.className}
+                      style={{
+                        fontSize: '0.65rem',
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        backgroundColor: badge.bg,
+                        color: badge.color,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {badge.label}
+                    </span>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Line 2: Order / Survey / Duplicate / Proximity Chips */}
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4, margin: '2px 0 1px' }}>
+              {(() => {
+                let distLabel: string | undefined = entry.currentDistanceFormatted;
+                if (!distLabel && gps.fix) {
+                  const targetCoords = parseCoordinates(item.coordinates);
+                  if (targetCoords) {
+                    const d = haversineDistanceMeters(gps.fix.latitude, gps.fix.longitude, targetCoords[0], targetCoords[1]);
+                    distLabel = d < 1000 ? `${Math.round(d)}m` : `${(d / 1000).toFixed(1)} km`;
+                  }
+                }
+
+                return (
+                  <>
+                    {(entry.stopOrder != null || item.visit_order) && !isComplete && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 3,
+                          padding: '1px 6px',
+                          borderRadius: 4,
+                          backgroundColor: '#eff6ff',
+                          color: '#1d4ed8',
+                          fontSize: '0.66rem',
+                          fontWeight: 700,
+                          border: '1px solid #bfdbfe',
+                        }}
+                      >
+                        <Icon name={pendingSortMode === 'order_no' ? 'format_list_numbered' : 'route'} size={10} color="#2563eb" />
+                        {pendingSortMode === 'order_no'
+                          ? `Order #${entry.stopOrder ?? item.visit_order}`
+                          : `Nearest #${entry.stopOrder ?? item.visit_order}${distLabel ? ` • ${distLabel}` : ''}`}
+                      </span>
+                    )}
+
+                    {distLabel && pendingSortMode === 'order_no' && !isComplete && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 2,
+                          padding: '1px 5px',
+                          borderRadius: 4,
+                          backgroundColor: '#e0f2fe',
+                          color: '#0369a1',
+                          fontSize: '0.66rem',
+                          fontWeight: 700,
+                          border: '1px solid #bae6fd',
+                        }}
+                      >
+                        <Icon name="near_me" size={10} color="#0284c7" />
+                        {distLabel}
+                      </span>
+                    )}
+                  </>
+                );
+              })()}
+
+              {item.is_duplicate && (
+                <span
+                  style={{
+                    fontSize: '0.66rem',
+                    fontWeight: 700,
+                    color: item.duplicate_is_visited ? '#be123c' : '#b45309',
+                    backgroundColor: item.duplicate_is_visited ? '#fff1f2' : '#fffbeb',
+                    border: `1px solid ${item.duplicate_is_visited ? '#fecdd3' : '#fde68a'}`,
+                    padding: '1.5px 6px',
+                    borderRadius: 5,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+                  }}
+                  title={item.duplicate_warning || 'Site may be already visited'}
+                >
+                  <Icon name="warning" size={10} color={item.duplicate_is_visited ? '#be123c' : '#b45309'} />
+                  <span>{item.duplicate_is_visited ? 'Visited Match' : 'Match'}</span>
+                  {item.duplicate_distance_m != null && (
+                    <span style={{ opacity: 0.85 }}>({Math.round(item.duplicate_distance_m)}m)</span>
+                  )}
+                </span>
+              )}
+
+              {nearby50.length > 0 && !item.is_duplicate && (
+                <span
+                  style={{
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    color: '#4338ca',
+                    backgroundColor: '#eef2ff',
+                    border: '1px solid #c7d2fe',
+                    padding: '1px 5px',
+                    borderRadius: 4,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 2,
+                  }}
+                  title={`${nearby50.length} sites within 50m`}
+                >
+                  <Icon name="hub" size={10} color="#4f46e5" />
+                  {nearby50.length} &le; 50m
+                </span>
+              )}
+            </div>
+
+            {/* Line 3: Dedicated Location / Address row */}
+            {(item.village || item.taluk || site) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 1px', fontSize: '0.71rem', color: '#64748b', fontWeight: 600 }}>
+                <Icon name="location_on" size={11} color="#94a3b8" />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={[item.village, item.taluk, item.district, site].filter(Boolean).join(', ')}>
+                  {[item.village, item.taluk, item.district || site].filter(Boolean).join(', ')}
+                </span>
+              </div>
+            )}
+
+            {/* Line 4: QC Micro-Badges (VHR & Street View) */}
+            {(item.qc_vhr_comment || item.qc_street_details) && (
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4, margin: '2px 0 1px' }}>
+                {item.qc_vhr_comment && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 3,
+                      padding: '1px 5px',
+                      borderRadius: 4,
+                      backgroundColor: '#eff6ff',
+                      color: '#1e40af',
+                      fontSize: '0.66rem',
+                      fontWeight: 600,
+                      border: '1px solid #dbeafe',
+                      maxWidth: 240,
+                    }}
+                    title={`VHR: ${item.qc_vhr_comment}`}
+                  >
+                    <Icon name="satellite_alt" size={10} color="#2563eb" />
+                    <strong>VHR:</strong>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.qc_vhr_comment}
+                    </span>
+                  </span>
+                )}
+                {item.qc_street_details && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 3,
+                      padding: '1px 5px',
+                      borderRadius: 4,
+                      backgroundColor: '#f0fdf4',
+                      color: '#166534',
+                      fontSize: '0.66rem',
+                      fontWeight: 600,
+                      border: '1px solid #dcfce7',
+                      maxWidth: 240,
+                    }}
+                    title={`Street: ${item.qc_street_details}`}
+                  >
+                    <Icon name="streetview" size={10} color="#16a34a" />
+                    <strong>Street:</strong>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.qc_street_details}
+                    </span>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Streamlined Single-Row Action Bar */}
+        {!isComplete ? (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              marginTop: 4,
+              paddingTop: 5,
+              borderTop: '1px solid #f1f5f9',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Primary Action Button */}
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{
+                flex: 1.5,
+                padding: '5px 12px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                minHeight: 32,
+                height: 32,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 5,
+                borderRadius: 7,
+                backgroundColor: '#ea580c',
+                borderColor: '#ea580c',
+                color: '#ffffff',
+                boxShadow: '0 2px 5px rgba(234, 88, 12, 0.35)',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onStartInspection(item, nearby50[0]);
+              }}
+              title="Open camera and start site inspection"
+            >
+              <Icon name="photo_camera" size={15} color="#ffffff" />
+              <span>Start Inspection</span>
+            </button>
+
+            {(item.coordinates || site) && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{
+                    flex: 1,
+                    padding: '4px 6px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    minHeight: 30,
+                    height: 30,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 3,
+                    borderRadius: 6,
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    color: '#334155',
+                  }}
+                  onClick={() => setSelectedMapRecord(item)}
+                  title="Preview Location Map"
+                >
+                  <Icon name="map" size={13} color="#FF6467" />
+                  <span>Map</span>
+                </button>
+                <a
+                  className="btn btn-secondary btn-sm"
+                  style={{
+                    flex: 1,
+                    padding: '4px 6px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    minHeight: 30,
+                    height: 30,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 3,
+                    borderRadius: 6,
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    color: '#0284c7',
+                    textDecoration: 'none',
+                  }}
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(item.coordinates || item.street_address || item.site_address || '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  title="Open GPS navigation in Google Maps"
+                >
+                  <Icon name="directions" size={13} color="#0284c7" />
+                  <span>Nav</span>
+                </a>
+              </>
+            )}
+
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{
+                flex: 0.9,
+                padding: '4px 6px',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                minHeight: 30,
+                height: 30,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 3,
+                borderRadius: 6,
+                background: '#f8fafc',
+                border: '1px solid #cbd5e1',
+                color: '#475569',
+              }}
+              onClick={() => setMarkStatusRecord(item)}
+              title="Update Status (Not Interested / Duplicate / Finished)"
+            >
+              <Icon name="label" size={13} color="#64748b" />
+              <span>Status</span>
+            </button>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: 4,
+              paddingTop: 4,
+              borderTop: '1px solid #f8fafc',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.68rem', color: '#94a3b8' }}>
+              <Icon name="schedule" size={11} color="#94a3b8" />
+              <span>{inspectionDateLabel(item)}</span>
+            </div>
+
+            {(item.coordinates || site) && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setSelectedMapRecord(item)}
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '0.68rem',
+                  height: 24,
+                  minHeight: 24,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  borderRadius: 5,
+                  background: '#f8fafc',
+                }}
+              >
+                <Icon name="map" size={11} color="#FF6467" />
+                <span>Map</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderVillageClusters = (standaloneRecords: any[], startIdx = 1) => {
+    const groups: { [key: string]: any[] } = {};
+    standaloneRecords.forEach((entry) => {
+      const r = entry.record || entry;
+      const vName = (r.village || r.taluk || 'Coimbatore Area').trim();
+      if (!groups[vName]) groups[vName] = [];
+      groups[vName].push(entry);
+    });
+    const sortedVillages = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
+
+    return sortedVillages.map((vName, idx) => {
+      const clusterId = `area-${vName}`;
+      const isCollapsed = Boolean(collapsedClusters[clusterId]);
+
+      return (
+        <div
+          key={clusterId}
+          style={{
+            borderRadius: 14,
+            background: '#ffffff',
+            border: '1.5px solid #d1fae5',
+            padding: '10px 10px 8px',
+            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.08)',
+          }}
+        >
+          <div
+            onClick={() => toggleClusterCollapse(clusterId)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: isCollapsed ? 0 : 8,
+              paddingBottom: isCollapsed ? 0 : 6,
+              borderBottom: isCollapsed ? 'none' : '1px solid #ecfdf5',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 20,
+                  height: 20,
+                  borderRadius: 4,
+                  backgroundColor: isCollapsed ? '#f1f5f9' : '#dcfce7',
+                  color: isCollapsed ? '#64748b' : '#047857',
+                }}
+              >
+                <Icon name={isCollapsed ? 'chevron_right' : 'expand_more'} size={15} />
+              </span>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#047857' }}>
+                📍 Cluster #{startIdx + idx} • {vName} Area
+              </span>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#059669', background: '#dcfce7', padding: '1px 6px', borderRadius: 10 }}>
+                {groups[vName].length} sites
+              </span>
+            </div>
+            <span style={{ fontSize: '0.68rem', color: isCollapsed ? '#64748b' : '#059669', fontWeight: 600 }}>
+              {isCollapsed ? 'Expand ▼' : 'Collapse ▲'}
+            </span>
+          </div>
+          {!isCollapsed && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {groups[vName].map((entry: any) => renderRecordCard(entry, true))}
+            </div>
+          )}
+        </div>
+      );
+    });
   };
 
   const totalPages = Math.ceil(total / pageSize);
@@ -298,14 +920,26 @@ export default function RecordsScreen({
           </div>
         )}
 
+        {filtersExpanded && (
+        <>
         <div className="field-record-filters" style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 4 }}>
-          <label style={{ flex: 1, minWidth: 0, margin: 0 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 2, display: 'block' }}>Date</span>
+          <label style={{ flex: 1, minWidth: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ height: 18, fontSize: 11.5, fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center' }}>Date</span>
             <select
               name="date-range"
               aria-label="Filter by date"
               value={datePreset}
-              style={{ width: '100%', height: 34, minHeight: 34, fontSize: 12.5, borderRadius: 8, padding: '0 6px' }}
+              style={{
+                width: '100%',
+                height: 34,
+                minHeight: 34,
+                fontSize: 12.5,
+                borderRadius: 8,
+                padding: '0 8px',
+                border: '1px solid var(--border-line)',
+                background: '#ffffff',
+                boxSizing: 'border-box',
+              }}
               onChange={event => { setDatePreset(event.target.value as DatePreset); setPage(1); }}
             >
               <option value="ALL">All time</option>
@@ -346,6 +980,7 @@ export default function RecordsScreen({
                 background: '#ffffff',
                 border: '1px solid var(--border-line)',
                 flexShrink: 0,
+                boxSizing: 'border-box',
               }}
               onClick={() => setIsSearchOpen(true)}
               aria-label="Open search"
@@ -374,6 +1009,7 @@ export default function RecordsScreen({
                 border: '1px solid #fecdd3',
                 color: '#e11d48',
                 flexShrink: 0,
+                boxSizing: 'border-box',
               }}
               aria-label="Clear all filters"
               title="Clear all filters"
@@ -406,6 +1042,8 @@ export default function RecordsScreen({
             Dates: {statusFilter === 'NOT_COMPLETED' ? 'Assigned' : (statusFilter === 'CLOSED' ? 'Created/Assigned' : 'Capture')} · IST
           </span>
         </div>
+        </>
+        )}
         {locationError && <p role="alert" className="field-filter-error" style={{ margin: '4px 0 0', fontSize: 11 }}>{locationError}</p>}
       </div>
 
@@ -502,13 +1140,99 @@ export default function RecordsScreen({
               </div>
             </div>
           )}
+
+          {/* Proximity Grouping Selector */}
+          {filtersExpanded && (
+          <div className="proximity-group-bar" role="toolbar" aria-label="Proximity grouping options">
+            <span className="proximity-group-label">
+              <Icon name="layers" size={13} color="#64748b" />
+              Group:
+            </span>
+            <button
+              type="button"
+              onClick={() => setProximityMode('none')}
+              className={`proximity-group-pill${proximityMode === 'none' ? ' active' : ''}`}
+            >
+              Flat
+            </button>
+            <button
+              type="button"
+              onClick={() => setProximityMode('50m')}
+              className={`proximity-group-pill${proximityMode === '50m' ? ' active' : ''}`}
+              title="Group sites within 50 meters of each other (Adjacent Plots / Same Layout)"
+            >
+              <Icon name="radar" size={13} />
+              50m Clusters
+              {spatial50m.clusters.length > 0 && (
+                <span className="cluster-badge-count">{spatial50m.clusters.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setProximityMode('100m')}
+              className={`proximity-group-pill${proximityMode === '100m' ? ' active' : ''}`}
+              title="Group sites within 100 meters of each other (Same Street)"
+            >
+              <Icon name="radar" size={13} />
+              100m Clusters
+              {spatial100m.clusters.length > 0 && (
+                <span className="cluster-badge-count">{spatial100m.clusters.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setProximityMode('village')}
+              className={`proximity-group-pill${proximityMode === 'village' ? ' active' : ''}`}
+              title="Group all sites into Village Clusters"
+            >
+              <Icon name="radar" size={13} />
+              Village Clusters
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!gps.fix) gps.retry();
+                setProximityMode('gps');
+              }}
+              className={`proximity-group-pill${proximityMode === 'gps' ? ' active' : ''}`}
+              title="Group by live distance from your phone GPS"
+            >
+              <Icon name="my_location" size={13} />
+              Near Me (GPS)
+            </button>
+          </div>
+          )}
         </>
       )}
 
-      {statusFilter === 'NOT_COMPLETED' && <>
-        {routeError && <p role="alert" style={{ color: '#b91c1c', fontSize: '0.8rem' }}>{routeError}</p>}
-        {routeNotice && <p role="status" style={{ color: '#64748b', fontSize: '0.75rem' }}>{routeNotice} Includes all pending records matching these filters.</p>}
-      </>}
+      {statusFilter === 'NOT_COMPLETED' && (
+        <>
+          {routeError && <p role="alert" style={{ color: '#b91c1c', fontSize: '0.75rem', margin: '2px 0 4px' }}>{routeError}</p>}
+          {routeNotice && (
+            <div
+              role="status"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '3px 8px',
+                margin: '2px 0 6px',
+                borderRadius: 6,
+                backgroundColor: '#f1f5f9',
+                border: '1px solid #e2e8f0',
+                color: '#475569',
+                fontSize: '0.70rem',
+                lineHeight: 1.25,
+              }}
+            >
+              <Icon name="route" size={13} color="#2563eb" />
+              <span>
+                <strong>Road Route ({displayRecords.length} sites)</strong> · Nearest first from GPS. Refresh if moved &gt;100m.
+              </span>
+            </div>
+          )}
+        </>
+      )}
       {/* ─── Records / Photos Count Bar ─── */}
       <div
         style={{
@@ -533,6 +1257,38 @@ export default function RecordsScreen({
             </span>
           )}
         </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setFiltersExpanded((prev) => {
+              const next = !prev;
+              localStorage.setItem('kuri_verifier_filters_expanded', String(next));
+              return next;
+            });
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '3px 9px',
+            fontSize: '0.74rem',
+            fontWeight: 700,
+            borderRadius: 7,
+            border: '1px solid #fed7aa',
+            background: filtersExpanded ? '#fff7ed' : '#ffffff',
+            color: '#ea580c',
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+          }}
+          title={filtersExpanded ? 'Collapse filters to maximize inspection card view' : 'Expand date, village, and grouping filters'}
+        >
+          <Icon name={filtersExpanded ? 'expand_less' : 'tune'} size={14} color="#ea580c" />
+          <span>{filtersExpanded ? 'Collapse' : 'Filters & Groups'}</span>
+          {!filtersExpanded && (selectedVillages.length > 0 || datePreset !== 'ALL' || proximityMode !== 'none') && (
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ea580c', display: 'inline-block' }} />
+          )}
+        </button>
       </div>
 
       {/* ─── Gallery View Mode ─── */}
@@ -725,453 +1481,419 @@ export default function RecordsScreen({
                 pointerEvents: loading ? 'none' : 'auto',
               }}
             >
-          {displayRecords.map((entry) => {
-            const item = entry.record;
-            const firstImage = (item.images || [])[0];
-            const photoCount = item.images?.length ?? 0;
-            const isComplete = statusFilter === 'NOT_COMPLETED' ? false : isRecordCompleted(item);
-            const site = item.street_address || item.site_address || item.formatted_address || item.location_name;
 
-            return (
+          {proximityMode === '50m' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div
-                key={item.id}
-                className="record-card"
-                onClick={() => onOpenRecord(item.id)}
                 style={{
-                  flexDirection: 'column',
-                  alignItems: 'stretch',
-                  padding: '6px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '7px 12px',
+                  background: '#f5f3ff',
+                  borderRadius: 10,
+                  border: '1.5px solid #ddd6fe',
+                  fontSize: '0.78rem',
+                  color: '#5b21b6',
+                  fontWeight: 700,
+                  flexWrap: 'wrap',
+                  gap: 6,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                  <div className="record-thumb-wrap" style={{ width: 36, height: 36, minWidth: 36, minHeight: 36 }}>
-                    <AuthThumbnail
-                      imageUrl={firstImage?.image_url || (item.qc_reference_image_url ? item.qc_reference_image_url : undefined)}
-                      alt={item.name || 'Record thumb'}
-                      fallbackIcon={isComplete ? 'photo_camera' : 'assignment'}
-                      photoCount={photoCount}
-                    />
-                  </div>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Icon name="hub" size={15} color="#7c3aed" />
+                  {spatial50m.clusters.length > 0
+                    ? `${spatial50m.clusters.length} Cluster(s) within 50m (${spatial50m.totalClustered} sites)`
+                    : '50m Proximity Clusters'}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={expandAllClusters}
+                    style={{ background: '#ede9fe', border: '1px solid #c4b5fd', borderRadius: 4, padding: '2px 6px', fontSize: '0.68rem', fontWeight: 700, color: '#5b21b6', cursor: 'pointer' }}
+                  >
+                    Expand All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={collapseAllClusters}
+                    style={{ background: '#ede9fe', border: '1px solid #c4b5fd', borderRadius: 4, padding: '2px 6px', fontSize: '0.68rem', fontWeight: 700, color: '#5b21b6', cursor: 'pointer' }}
+                  >
+                    Collapse All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProximityMode('none')}
+                    style={{ background: 'none', border: 'none', color: '#6d28d9', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', padding: '0 4px' }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
 
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 2 }}>
-                      <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {item.name}
+              {spatial50m.clusters.length === 0 && (
+                <div style={{ padding: '20px 14px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>
+                  <Icon name="radar" size={24} color="#94a3b8" />
+                  <div style={{ fontWeight: 700, marginTop: 6, color: '#334155' }}>No 50m Clusters Found</div>
+                  <div style={{ fontSize: '0.74rem', marginTop: 2, color: '#64748b' }}>None of the loaded sites are within 50m of each other.</div>
+                  <button
+                    type="button"
+                    onClick={() => setProximityMode('none')}
+                    className="btn btn-secondary btn-sm"
+                    style={{ marginTop: 10, padding: '4px 12px', fontSize: '0.74rem' }}
+                  >
+                    Switch to Flat List
+                  </button>
+                </div>
+              )}
+
+              {spatial50m.clusters.map((cluster) => {
+                const isCollapsed = Boolean(collapsedClusters[cluster.id]);
+                return (
+                  <div key={cluster.id} className="cluster-card-wrap cluster-50m">
+                    <div
+                      className="cluster-header"
+                      onClick={() => toggleClusterCollapse(cluster.id)}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      title={isCollapsed ? 'Click to expand group' : 'Click to collapse group'}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        <div
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: 6,
+                            background: isCollapsed ? '#f1f5f9' : '#ede9fe',
+                            color: isCollapsed ? '#64748b' : '#6d28d9',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Icon name={isCollapsed ? 'chevron_right' : 'expand_more'} size={15} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e1b4b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {cluster.label}
+                          </div>
+                          <div style={{ fontSize: '0.70rem', color: '#6d28d9', fontWeight: 600 }}>
+                            Adjacent plots • Max span: {cluster.maxSpanMeters}m
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                        <span className="record-id-badge" style={{ fontSize: '0.66rem', padding: '1px 5px', borderRadius: 4 }}>{formatRecordNo(item.id)}</span>
-                        {(() => {
-                          const badge = getRecordStatusBadgeInfo(item);
-                          return (
-                            <span
-                              className={badge.className}
-                              style={{
-                                fontSize: '0.66rem',
-                                padding: '1px 6px',
-                                borderRadius: 4,
-                                backgroundColor: badge.bg,
-                                color: badge.color,
-                                fontWeight: 700,
-                              }}
-                            >
-                              {badge.label}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    </div>
-
-                    {/* Compact Order, Survey & Unique ID */}
-                    {(entry.stopOrder != null || item.visit_order || item.survey_no || (item.unique_id && item.unique_id !== item.name)) && (
-                      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 5, margin: '1px 0 2px' }}>
-                        {(entry.stopOrder != null || item.visit_order) && !isComplete && (
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 2,
-                              padding: '1px 5px',
-                              borderRadius: 4,
-                              backgroundColor: '#eff6ff',
-                              color: '#1d4ed8',
-                              fontSize: '0.68rem',
-                              fontWeight: 700,
-                              border: '1px solid #bfdbfe',
-                            }}
-                          >
-                            <Icon name={pendingSortMode === 'order_no' ? 'format_list_numbered' : 'route'} size={11} color="#2563eb" />
-                            {pendingSortMode === 'order_no' ? `Order #${entry.stopOrder ?? item.visit_order}` : `Nearest #${entry.stopOrder ?? item.visit_order}`}
-                          </span>
-                        )}
-                        {item.survey_no && (
-                          <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
-                            Survey: {item.survey_no}
-                          </span>
-                        )}
-                        {item.unique_id && item.unique_id !== item.name && (
-                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#FF6467', backgroundColor: '#FFF1F2', padding: '1px 5px', borderRadius: 4 }}>
-                            {item.unique_id}
-                          </span>
-                        )}
-                        {item.qc_reference_image_url && (
-                          <span
-                            style={{
-                              fontSize: '0.66rem',
-                              padding: '1px 5px',
-                              borderRadius: 4,
-                              background: '#e0f2fe',
-                              color: '#0369a1',
-                              border: '1px solid #bae6fd',
-                              fontWeight: 700,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 2,
-                            }}
-                            title="QC Reference Image Attached"
-                          >
-                            <Icon name="image" size={11} color="#0284c7" />
-                            QC Ref
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {statusFilter === 'NOT_COMPLETED' && !isComplete && <RecordRouteMetrics entry={entry} calculating={routeBusy} />}
-
-                    {(item.village || item.taluk || item.district) && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', color: '#475569', fontWeight: 600, margin: '1px 0' }}>
-                        <Icon name="holiday_village" size={12} color="#64748b" />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {[item.village, item.taluk, item.district].filter(Boolean).join(', ')}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            background: isCollapsed ? '#f1f5f9' : '#ffffff',
+                            color: isCollapsed ? '#64748b' : '#4c1d95',
+                            border: '1px solid #ddd6fe',
+                            borderRadius: 6,
+                            padding: '2px 7px',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {cluster.records.length} plots {isCollapsed ? '▼' : '▲'}
                         </span>
                       </div>
-                    )}
-
-                    {/* QC Information (VHR Imagery & Street View) - Modern compact badges */}
-                    {(item.qc_vhr_comment || item.qc_street_details) && (
-                      <div className="record-qc-box">
-                        {item.qc_vhr_comment && (() => {
-                          const isExp = !!expandedQc[`${item.id}-vhr`];
-                          const comment = item.qc_vhr_comment;
-                          const isLong = comment.length > 28 || comment.includes('\n');
-                          return (
-                            <div className={`qc-badge-row ${isExp ? 'is-expanded' : ''}`}>
-                              <span className="qc-badge-tag qc-tag-vhr" title="QC Comments (VHR Imagery)">
-                                <Icon name="satellite_alt" size={11} />
-                                <span>VHR</span>
-                              </span>
-                              <span className="qc-badge-text" title={isLong ? comment : undefined}>
-                                {comment}
-                              </span>
-                              {isLong && (
-                                <button
-                                  type="button"
-                                  className="qc-toggle-btn"
-                                  onClick={(e) => toggleQc(`${item.id}-vhr`, e)}
-                                  title={isExp ? 'Show less' : 'Read full QC comment'}
-                                >
-                                  {isExp ? 'Less' : 'More'}
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })()}
-
-                        {item.qc_street_details && (() => {
-                          const isExp = !!expandedQc[`${item.id}-street`];
-                          const comment = item.qc_street_details;
-                          const isLong = comment.length > 28 || comment.includes('\n');
-                          return (
-                            <div className={`qc-badge-row ${isExp ? 'is-expanded' : ''}`}>
-                              <span className="qc-badge-tag qc-tag-street" title="QC Additional Details (Street View)">
-                                <Icon name="streetview" size={11} />
-                                <span>Street</span>
-                              </span>
-                              <span className="qc-badge-text" title={isLong ? comment : undefined}>
-                                {comment}
-                              </span>
-                              {isLong && (
-                                <button
-                                  type="button"
-                                  className="qc-toggle-btn"
-                                  onClick={(e) => toggleQc(`${item.id}-street`, e)}
-                                  title={isExp ? 'Show less' : 'Read full Street View details'}
-                                >
-                                  {isExp ? 'Less' : 'More'}
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })()}
+                    </div>
+                    {!isCollapsed && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {cluster.records.map((entry: any) => renderRecordCard(entry, true))}
                       </div>
                     )}
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.68rem', color: '#94a3b8', margin: '1px 0' }}>
-                      <Icon name="schedule" size={11} color="#94a3b8" />
-                      <span>{inspectionDateLabel(item)}</span>
-                    </div>
                   </div>
-                </div>
-
-                {/* Direct Action Bar for pending tasks or location previews */}
-                {!isComplete ? (
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 6,
-                      marginTop: 6,
-                      paddingTop: 6,
-                      borderTop: '1px solid #f1f5f9',
-                    }}
-                    onClick={(e) => e.stopPropagation()}
+                );
+              })}
+            </div>
+          ) : proximityMode === '100m' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '7px 12px',
+                  background: '#f0f9ff',
+                  borderRadius: 10,
+                  border: '1.5px solid #bae6fd',
+                  fontSize: '0.78rem',
+                  color: '#0369a1',
+                  fontWeight: 700,
+                  flexWrap: 'wrap',
+                  gap: 6,
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Icon name="radar" size={15} color="#0284c7" />
+                  {spatial100m.clusters.length > 0
+                    ? `${spatial100m.clusters.length} Cluster(s) within 100m (${spatial100m.totalClustered} sites)`
+                    : '100m Proximity Clusters'}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={expandAllClusters}
+                    style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 4, padding: '2px 6px', fontSize: '0.68rem', fontWeight: 700, color: '#0369a1', cursor: 'pointer' }}
                   >
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      style={{
-                        width: '100%',
-                        padding: '6px 12px',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        minHeight: 34,
-                        height: 34,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 6,
-                        borderRadius: 7,
-                      }}
-                      onClick={() => onStartInspection(item)}
-                    >
-                      <Icon name="photo_camera" size={15} />
-                      <span>Start Inspection</span>
-                    </button>
+                    Expand All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={collapseAllClusters}
+                    style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 4, padding: '2px 6px', fontSize: '0.68rem', fontWeight: 700, color: '#0369a1', cursor: 'pointer' }}
+                  >
+                    Collapse All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProximityMode('none')}
+                    style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', padding: '0 4px' }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
 
+              {spatial100m.clusters.length === 0 && (
+                <div style={{ padding: '20px 14px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>
+                  <Icon name="radar" size={24} color="#94a3b8" />
+                  <div style={{ fontWeight: 700, marginTop: 6, color: '#334155' }}>No 100m Clusters Found</div>
+                  <div style={{ fontSize: '0.74rem', marginTop: 2, color: '#64748b' }}>None of the loaded sites are within 100m of each other.</div>
+                  <button
+                    type="button"
+                    onClick={() => setProximityMode('none')}
+                    className="btn btn-secondary btn-sm"
+                    style={{ marginTop: 10, padding: '4px 12px', fontSize: '0.74rem' }}
+                  >
+                    Switch to Flat List
+                  </button>
+                </div>
+              )}
+
+              {spatial100m.clusters.map((cluster) => {
+                const isCollapsed = Boolean(collapsedClusters[cluster.id]);
+                return (
+                  <div key={cluster.id} className="cluster-card-wrap cluster-100m">
+                    <div
+                      className="cluster-header"
+                      onClick={() => toggleClusterCollapse(cluster.id)}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      title={isCollapsed ? 'Click to expand group' : 'Click to collapse group'}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        <div
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: 6,
+                            background: isCollapsed ? '#f1f5f9' : '#e0f2fe',
+                            color: isCollapsed ? '#64748b' : '#0284c7',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Icon name={isCollapsed ? 'chevron_right' : 'expand_more'} size={15} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0c4a6e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {cluster.label}
+                          </div>
+                          <div style={{ fontSize: '0.70rem', color: '#0284c7', fontWeight: 600 }}>
+                            Same street • Max span: {cluster.maxSpanMeters}m
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            background: isCollapsed ? '#f1f5f9' : '#ffffff',
+                            color: isCollapsed ? '#64748b' : '#0369a1',
+                            border: '1px solid #bae6fd',
+                            borderRadius: 6,
+                            padding: '2px 7px',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {cluster.records.length} plots {isCollapsed ? '▼' : '▲'}
+                        </span>
+                      </div>
+                    </div>
+                    {!isCollapsed && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {cluster.records.map((entry: any) => renderRecordCard(entry, true))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : proximityMode === 'village' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '7px 12px',
+                  background: '#f0fdf4',
+                  borderRadius: 10,
+                  border: '1.5px solid #bbf7d0',
+                  fontSize: '0.78rem',
+                  color: '#166534',
+                  fontWeight: 700,
+                  flexWrap: 'wrap',
+                  gap: 6,
+                }}
+              >
+                <span>🏘️ Village Area Clusters ({displayRecords.length} sites)</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={expandAllClusters}
+                    style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: 4, padding: '2px 6px', fontSize: '0.68rem', fontWeight: 700, color: '#166534', cursor: 'pointer' }}
+                  >
+                    Expand All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={collapseAllClusters}
+                    style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: 4, padding: '2px 6px', fontSize: '0.68rem', fontWeight: 700, color: '#166534', cursor: 'pointer' }}
+                  >
+                    Collapse All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProximityMode('none')}
+                    style={{ background: 'none', border: 'none', color: '#166534', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', padding: '0 4px' }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              {renderVillageClusters(displayRecords, 1)}
+            </div>
+          ) : proximityMode === 'gps' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {!gps.fix ? (
+                <div
+                  style={{
+                    padding: '20px 16px',
+                    textAlign: 'center',
+                    background: '#ffffff',
+                    borderRadius: 14,
+                    border: '1.5px solid #e2e8f0',
+                  }}
+                >
+                  <Icon name="location_searching" size={32} color="#94a3b8" />
+                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b', marginTop: 8 }}>
+                    Waiting for GPS Location
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '4px 0 12px' }}>
+                    Turn on location services so we can group sites by distance from you.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => gps.retry()}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <Icon name="my_location" size={14} />
+                    <span>Retry GPS</span>
+                  </button>
+                </div>
+              ) : gpsGroups.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+                  No sites to group by GPS distance.
+                </div>
+              ) : (
+                gpsGroups.map((group) => (
+                  <div key={group.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div
                       style={{
-                        display: 'grid',
-                        gridTemplateColumns: (item.coordinates || site) ? 'repeat(3, 1fr)' : '1fr',
-                        gap: 6,
-                      }}
-                    >
-                      {(item.coordinates || site) && (
-                        <>
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            style={{
-                              padding: '5px 4px',
-                              fontSize: '0.74rem',
-                              fontWeight: 600,
-                              minHeight: 32,
-                              height: 32,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 4,
-                              borderRadius: 6,
-                              background: '#ffffff',
-                              border: '1px solid #cbd5e1',
-                              color: '#334155',
-                              width: '100%',
-                            }}
-                            onClick={() => setSelectedMapRecord(item)}
-                            title="Preview Location Map"
-                          >
-                            <Icon name="map" size={14} color="#FF6467" />
-                            <span>Map</span>
-                          </button>
-                          <a
-                            className="btn btn-secondary btn-sm"
-                            style={{
-                              padding: '5px 4px',
-                              fontSize: '0.74rem',
-                              fontWeight: 600,
-                              minHeight: 32,
-                              height: 32,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 4,
-                              borderRadius: 6,
-                              background: '#ffffff',
-                              border: '1px solid #cbd5e1',
-                              color: '#334155',
-                              textDecoration: 'none',
-                              width: '100%',
-                            }}
-                            href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(item.coordinates || item.street_address || item.site_address || '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Icon name="directions" size={14} color="#64748b" />
-                            <span>Directions</span>
-                          </a>
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm mark-status-touch-btn"
-                        style={{
-                          padding: '5px 4px',
-                          fontSize: '0.74rem',
-                          fontWeight: 600,
-                          minHeight: 32,
-                              height: 32,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 4,
-                          borderRadius: 6,
-                          background: '#f8fafc',
-                          border: '1px solid #cbd5e1',
-                          color: '#334155',
-                          width: '100%',
-                        }}
-                        onClick={() => setMarkStatusRecord(item)}
-                        title="Mark Status (Not Interested / Duplicate / Finished)"
-                      >
-                        <Icon name="label" size={14} color="#475569" />
-                        <span>Status</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: (item.coordinates || site) ? 'repeat(3, 1fr)' : '1fr',
-                      gap: 6,
-                      marginTop: 6,
-                      paddingTop: 6,
-                      borderTop: '1px solid #f8fafc',
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {(item.coordinates || site) && (
-                      <>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => setSelectedMapRecord(item)}
-                          style={{
-                            padding: '5px 4px',
-                            fontSize: '0.74rem',
-                            fontWeight: 600,
-                            minHeight: 32,
-                            height: 32,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 4,
-                            borderRadius: 6,
-                            background: '#ffffff',
-                            border: '1px solid #cbd5e1',
-                            color: '#334155',
-                            width: '100%',
-                          }}
-                        >
-                          <Icon name="map" size={14} color="#FF6467" />
-                          <span>Map</span>
-                        </button>
-                        <a
-                          className="btn btn-secondary btn-sm"
-                          style={{
-                            padding: '5px 4px',
-                            fontSize: '0.74rem',
-                            fontWeight: 600,
-                            minHeight: 32,
-                            height: 32,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 4,
-                            borderRadius: 6,
-                            background: '#ffffff',
-                            border: '1px solid #cbd5e1',
-                            color: '#334155',
-                            textDecoration: 'none',
-                            width: '100%',
-                          }}
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(item.coordinates || site || '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Icon name="directions" size={14} color="#64748b" />
-                          <span>Directions</span>
-                        </a>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm mark-status-touch-btn"
-                      onClick={() => setMarkStatusRecord(item)}
-                      style={{
-                        padding: '5px 4px',
-                        fontSize: '0.74rem',
-                        fontWeight: 600,
-                        minHeight: 32,
-                        height: 32,
-                        display: 'inline-flex',
+                        display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 4,
-                        borderRadius: 6,
-                        background: '#f8fafc',
-                        border: '1px solid #cbd5e1',
-                        color: '#334155',
-                        width: '100%',
+                        justifyContent: 'space-between',
+                        padding: '6px 10px',
+                        background: group.bg,
+                        border: `1.5px solid ${group.border}`,
+                        borderRadius: 8,
+                        gap: 8,
                       }}
-                      title="Mark or Change Status"
                     >
-                      <Icon name="label" size={14} color="#475569" />
-                      <span>Status</span>
-                    </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Icon name={group.icon as any} size={15} color={group.color} />
+                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: group.color }}>
+                          {group.title}
+                        </span>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          background: '#ffffff',
+                          color: group.color,
+                          padding: '1px 7px',
+                          borderRadius: 9999,
+                          border: `1px solid ${group.border}`,
+                        }}
+                      >
+                        {group.records.length} site{group.records.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    {group.records.map((r: any) => renderRecordCard(r.item, r.distanceMeters != null && r.distanceMeters <= 50))}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                ))
+              )}
+            </div>
+          ) : (
+            displayRecords.map((entry: any) => renderRecordCard(entry, false))
+          )}
         </div>
       )}
 
-      {/* ─── Pagination Controls ─── */}
-      {totalPages > 1 && pendingSortMode !== 'route' && (
+      {/* ─── Infinite Scroll Sentinel & Realtime Loader ─── */}
+      {hasMore && records.length > 0 && records.length < total && (
         <div
+          ref={sentinelRef}
           style={{
+            minHeight: 28,
+            padding: '14px 0 20px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 12,
-            marginTop: 20,
-            padding: '12px 0',
           }}
         >
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-          >
-            <Icon name="chevron_left" size={16} />
-            <span>Previous</span>
-          </button>
-
-          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#475569' }}>
-            Page {page} of {totalPages}
-          </span>
-
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
-          >
-            <span>Next</span>
-            <Icon name="chevron_right" size={16} />
-          </button>
+          {loadingMore && (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                color: '#ea580c',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                padding: '6px 14px',
+                borderRadius: 20,
+                background: '#fff7ed',
+                border: '1px solid #fed7aa',
+              }}
+            >
+              <Icon name="refresh" size={16} className="spin" />
+              <span>Loading more records…</span>
+            </div>
+          )}
+        </div>
+      )}
+      {records.length > 0 && (!hasMore || records.length >= total) && (
+        <div style={{ textAlign: 'center', padding: '14px 0 20px', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600 }}>
+          Showing all {records.length} records
         </div>
       )}
     </>

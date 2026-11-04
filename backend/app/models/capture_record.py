@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, and_, or_, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, and_, or_, func
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
@@ -62,6 +62,24 @@ class CaptureRecord(Base):
     field_longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     field_location_accuracy: Mapped[float | None] = mapped_column(Float, nullable=True)
     field_captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # 12 GIS Signals & Auto-Derived Cadastral Fields
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
+    detection_type: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)  # greenfield, infill, long_term
+    detected_stage: Mapped[str | None] = mapped_column(String(100), nullable=True)  # read-only from construction_stage
+    area_sqm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    area_sqft: Mapped[float | None] = mapped_column(Float, nullable=True)  # area_sqm * 10.7639
+    is_eligible: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=True)  # area_sqft >= 1500
+    model_confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)  # 0.0 to 1.0
+    meets_strict_construction_definition: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
+    contradicts_planetscope_vegetated: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
+    dtcp_building_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    sub_division_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    ulpin: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    qc_status: Mapped[str | None] = mapped_column(String(50), nullable=True, default="QC Pending", server_default="QC Pending", index=True)
+    gmaps_link: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cadastral_lookup_status: Mapped[str | None] = mapped_column(String(50), nullable=True, default="resolved")
 
     # 15 Task Dispatch Planning Fields (Admin Google Sheet)
     unique_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
@@ -140,6 +158,8 @@ class CaptureRecord(Base):
     qc_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # When the QC decision was subsequent re-edited.
     qc_edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # QC modification history (up to last 5 revisions)
+    qc_history: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
 
     qc_by_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
@@ -153,6 +173,8 @@ class CaptureRecord(Base):
     telecaller_expected_completion: Mapped[str | None] = mapped_column(String(100), nullable=True)
     telecaller_built_up_area: Mapped[str | None] = mapped_column(String(100), nullable=True)
     telecaller_stage_of_construction: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Telecaller modification history (up to last 5 revisions)
+    telecaller_history: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
 
     # Reassign & Revisit workflow
     reassigned_to_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
@@ -164,6 +186,8 @@ class CaptureRecord(Base):
     updated_by_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     updated_by_role: Mapped[str | None] = mapped_column(String(50), nullable=True)
     follow_up_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Field verification modification history (up to last 5 revisions)
+    field_history: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
 
     # Relationships
     user = relationship(

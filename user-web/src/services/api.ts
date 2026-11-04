@@ -1,4 +1,4 @@
-import type { CaptureRecord, DashboardStats, InspectionFormData, User } from '../types';
+import type { CaptureRecord, DashboardStats, InspectionFormData, ResolveCoordsResponse, User, NotificationListResponse, NotificationPollResponse, NotificationItem } from '../types';
 
 const TOKEN_KEY = 'photocapture_user_token';
 
@@ -277,6 +277,17 @@ class ApiService {
     );
   }
 
+  /** Resolve coordinates via TNGIS WFS (default) or Google Maps Geocoding. */
+  async resolveCoords(
+    coordinates: string,
+    source: 'wfs' | 'gmap' = 'wfs'
+  ): Promise<ResolveCoordsResponse> {
+    return this.request<ResolveCoordsResponse>('/records/resolve-coords', {
+      method: 'POST',
+      body: JSON.stringify({ coordinates, source }),
+    });
+  }
+
   async createRecord(payload: {
     name: string;
     description: string;
@@ -451,6 +462,26 @@ class ApiService {
     } catch {
       return false;
     }
+  }
+
+  async getNotifications(page = 1, pageSize = 20): Promise<NotificationListResponse> {
+    return this.request<NotificationListResponse>(`/notifications?page=${page}&page_size=${pageSize}`);
+  }
+
+  async pollNotifications(lastId = 0): Promise<NotificationPollResponse> {
+    return this.request<NotificationPollResponse>(`/notifications/poll?last_id=${lastId}`);
+  }
+
+  async markNotificationRead(id: number): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/notifications/${id}/read`, {
+      method: 'POST',
+    });
+  }
+
+  async markAllNotificationsRead(): Promise<{ success: boolean; count: number; message: string }> {
+    return this.request<{ success: boolean; count: number; message: string }>(`/notifications/read-all`, {
+      method: 'POST',
+    });
   }
 }
 

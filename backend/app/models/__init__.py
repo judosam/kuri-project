@@ -3,5 +3,6 @@ from app.models.capture_record import CaptureRecord
 from app.models.captured_image import CapturedImage
 from app.models.activity_log import ActivityLog
 from app.models.login_session import LoginSession
+from app.models.notification import Notification
 
-__all__ = ["User", "CaptureRecord", "CapturedImage", "ActivityLog"]
+__all__ = ["User", "CaptureRecord", "CapturedImage", "ActivityLog", "LoginSession", "Notification"]

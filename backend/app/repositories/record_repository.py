@@ -123,6 +123,7 @@ class RecordRepository:
         assigned_auditor_id: Optional[int] = None,
         unassigned_user: bool = False,
         unassigned_auditor: bool = False,
+        for_qa: bool = False,
     ) -> tuple[List[CaptureRecord], int]:
         query = self.db.query(CaptureRecord).options(
             joinedload(CaptureRecord.images), joinedload(CaptureRecord.user)
@@ -133,7 +134,7 @@ class RecordRepository:
 
         # Audit gateway: field operators only ever see non-disapproved records.
         if audit_status == "NOT_DISAPPROVED":
-            query = query.filter(CaptureRecord.audit_status.not_in(["DISAPPROVAL", "COMMERCIAL_PROPERTY"]))
+            query = query.filter(CaptureRecord.audit_status != "DISAPPROVAL")
         elif audit_status:
             query = query.filter(CaptureRecord.audit_status == audit_status)
 
@@ -209,53 +210,84 @@ class RecordRepository:
         query = apply_record_filters(query, column_filters=column_filters, district=district, taluk=taluk, village=village,
                                      assigned_auditor_id=assigned_auditor_id, unassigned_user=unassigned_user,
                                      unassigned_auditor=unassigned_auditor)
+        if for_qa:
+            # Desk review QA portal strictly excludes field-captured records where QC is Not Applicable
+            query = query.filter(CaptureRecord.qc_status != "Not Applicable", CaptureRecord.source != "manual")
+
         # QC desk-review state: explicit completion or a meaningful legacy assessment.
         has_qc = has_qc_expression()
         if qc_status == "DONE":
-            query = query.filter(has_qc)
+            query = query.filter(has_qc, CaptureRecord.qc_status != "Not Applicable")
         elif qc_status == "PENDING":
-            query = query.filter(~has_qc)
+            query = query.filter(~has_qc, CaptureRecord.qc_status != "Not Applicable")
+        elif qc_status in ("NOT_APPLICABLE", "Not Applicable"):
+            query = query.filter(CaptureRecord.qc_status == "Not Applicable")
 
         relevance = None
         if search and search.strip():
+            from sqlalchemy import or_
             term = search.strip()
-            search_filter = f"%{term}%"
-            exact_id = None
-            if term.lstrip('#').isdigit():
-                exact_id = int(term.lstrip('#'))
-
-            # Search across every user-visible record field.
-            search_condition = (
-                CaptureRecord.name.ilike(search_filter)
-                | CaptureRecord.description.ilike(search_filter)
-                | CaptureRecord.location_name.ilike(search_filter)
-                | CaptureRecord.formatted_address.ilike(search_filter)
-                | CaptureRecord.unique_id.ilike(search_filter)
-                | CaptureRecord.site_address.ilike(search_filter)
-                | CaptureRecord.survey_no.ilike(search_filter)
-                | CaptureRecord.owner_name_en.ilike(search_filter)
-                | CaptureRecord.village.ilike(search_filter)
-                | CaptureRecord.taluk.ilike(search_filter)
-                | CaptureRecord.district.ilike(search_filter)
-                | CaptureRecord.qc_vhr_comment.ilike(search_filter)
-                | CaptureRecord.qc_street_details.ilike(search_filter)
-                | User.full_name.ilike(search_filter)
-                | User.email.ilike(search_filter)
+            import re
+            has_delims = bool(re.search(r'[,;\n\r\t]', term))
+            tokens = [t.strip() for t in re.split(r'[,;\n\r\t]+' if has_delims else r'\s+', term) if t.strip()]
+            is_multi_id = len(tokens) > 1 and (
+                has_delims
+                or all(bool(re.match(r'^[a-zA-Z0-9_\-#]+$', tok)) for tok in tokens)
             )
-            if exact_id is not None:
-                search_condition = search_condition | (CaptureRecord.id == exact_id)
 
-            query = query.outerjoin(User, User.id == CaptureRecord.user_id).filter(search_condition)
+            if is_multi_id:
+                # Multi-UID batch search: match any of the provided Unique IDs or record IDs
+                unique_id_tokens = set(tokens)
+                or_conditions = [CaptureRecord.unique_id.in_(unique_id_tokens)]
+                for tok in tokens[:150]:
+                    clean_tok = tok.lstrip('#')
+                    or_conditions.append(CaptureRecord.unique_id.ilike(f"%{tok}%"))
+                    if clean_tok.isdigit():
+                        or_conditions.append(CaptureRecord.id == int(clean_tok))
+                search_condition = or_(*or_conditions)
+                query = query.outerjoin(User, User.id == CaptureRecord.user_id).filter(search_condition)
+                relevance = case(
+                    (CaptureRecord.unique_id.in_(unique_id_tokens), 0),
+                    else_=1,
+                )
+            else:
+                search_filter = f"%{term}%"
+                exact_id = None
+                if term.lstrip('#').isdigit():
+                    exact_id = int(term.lstrip('#'))
 
-            # Break equal sort values using search relevance.
-            relevance = case(
-                (CaptureRecord.id == exact_id, 0) if exact_id is not None else (CaptureRecord.id == -1, 99),
-                (CaptureRecord.unique_id.ilike(term), 1),
-                (CaptureRecord.name.ilike(term), 2),
-                (CaptureRecord.name.ilike(f"{term}%"), 3),
-                (CaptureRecord.description.ilike(f"{term}%"), 4),
-                else_=5,
-            )
+                # Search across every user-visible record field.
+                search_condition = (
+                    CaptureRecord.name.ilike(search_filter)
+                    | CaptureRecord.description.ilike(search_filter)
+                    | CaptureRecord.location_name.ilike(search_filter)
+                    | CaptureRecord.formatted_address.ilike(search_filter)
+                    | CaptureRecord.unique_id.ilike(search_filter)
+                    | CaptureRecord.site_address.ilike(search_filter)
+                    | CaptureRecord.survey_no.ilike(search_filter)
+                    | CaptureRecord.owner_name_en.ilike(search_filter)
+                    | CaptureRecord.village.ilike(search_filter)
+                    | CaptureRecord.taluk.ilike(search_filter)
+                    | CaptureRecord.district.ilike(search_filter)
+                    | CaptureRecord.qc_vhr_comment.ilike(search_filter)
+                    | CaptureRecord.qc_street_details.ilike(search_filter)
+                    | User.full_name.ilike(search_filter)
+                    | User.email.ilike(search_filter)
+                )
+                if exact_id is not None:
+                    search_condition = search_condition | (CaptureRecord.id == exact_id)
+
+                query = query.outerjoin(User, User.id == CaptureRecord.user_id).filter(search_condition)
+
+                # Break equal sort values using search relevance.
+                relevance = case(
+                    (CaptureRecord.id == exact_id, 0) if exact_id is not None else (CaptureRecord.id == -1, 99),
+                    (CaptureRecord.unique_id.ilike(term), 1),
+                    (CaptureRecord.name.ilike(term), 2),
+                    (CaptureRecord.name.ilike(f"{term}%"), 3),
+                    (CaptureRecord.description.ilike(f"{term}%"), 4),
+                    else_=5,
+                )
 
         if date_from:
             query = query.filter(func.julianday(record_date_column(date_field)) >= func.julianday(date_from))
@@ -354,9 +386,6 @@ class RecordRepository:
         skipped = 0
         now_utc = datetime.now(timezone.utc)
         for rec in records:
-            if getattr(rec, 'property_type', None) in ('Commercial Property', 'COMMERCIAL_PROPERTY') or rec.audit_status == 'COMMERCIAL_PROPERTY':
-                skipped += 1
-                continue
             if rec.status == 'COMPLETED':
                 skipped += 1
                 continue

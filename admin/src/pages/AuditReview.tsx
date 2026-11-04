@@ -29,6 +29,7 @@ const AUDIT_META: Record<AuditStatus, { label: string; icon: IconName; cls: stri
   DISAPPROVAL: { label: 'Disapproval', icon: 'block', cls: 'audit-chip-disapproval' },
   COMMERCIAL_PROPERTY: { label: 'Commercial Property', icon: 'storefront', cls: 'audit-chip-commercial_property' },
   RE_AUDITED: { label: 'Re Audited', icon: 'history', cls: 'audit-chip-re_audited' },
+  NOT_APPLICABLE: { label: 'Not Applicable', icon: 'block', cls: 'audit-chip-not-applicable' },
 };
 
 const AUDIT_FILTERS: { value: string; label: string }[] = [
@@ -78,7 +79,7 @@ export default function AuditReview() {
   const shownTo = Math.min(page * PAGE_SIZE, total);
 
   // Live counts across the whole table (independent of the active filter).
-  const [counts, setCounts] = useState({ PENDING: 0, APPROVAL: 0, DISAPPROVAL: 0, COMMERCIAL_PROPERTY: 0, RE_AUDITED: 0 });
+  const [counts, setCounts] = useState<Record<AuditStatus, number>>({ PENDING: 0, APPROVAL: 0, DISAPPROVAL: 0, COMMERCIAL_PROPERTY: 0, RE_AUDITED: 0, NOT_APPLICABLE: 0 });
 
   useTopHeader({
     left: (
@@ -100,7 +101,7 @@ export default function AuditReview() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const next: typeof counts = { PENDING: 0, APPROVAL: 0, DISAPPROVAL: 0, COMMERCIAL_PROPERTY: 0, RE_AUDITED: 0 };
+      const next: Record<AuditStatus, number> = { PENDING: 0, APPROVAL: 0, DISAPPROVAL: 0, COMMERCIAL_PROPERTY: 0, RE_AUDITED: 0, NOT_APPLICABLE: 0 };
       for (const status of Object.keys(next) as AuditStatus[]) {
         try {
           const res = await recordsApi.list({ page: 1, page_size: 1, audit_status: status });

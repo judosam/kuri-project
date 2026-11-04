@@ -107,14 +107,12 @@ export default function VillageMultiSelect({
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: 4,
-          fontSize: 12,
-          color: '#475569',
-          fontWeight: 600,
+          gap: 2,
+          margin: 0,
           minWidth: 0,
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 18, fontSize: 11.5, color: '#475569', fontWeight: 700 }}>
           <span>Village</span>
           {selected.length > 0 && (
             <span
@@ -146,9 +144,10 @@ export default function VillageMultiSelect({
             width: '100%',
             minWidth: 0,
             height: 34,
+            minHeight: 34,
             padding: '0 8px 0 10px',
             border: selected.length > 0 ? '1.5px solid #FF6467' : '1px solid var(--border-line)',
-            borderRadius: 10,
+            borderRadius: 8,
             color: selected.length > 0 ? '#0f172a' : '#64748b',
             background: selected.length > 0 ? '#fff1f2' : '#ffffff',
             font: 'inherit',
@@ -161,6 +160,7 @@ export default function VillageMultiSelect({
             cursor: disabled ? 'not-allowed' : 'pointer',
             textAlign: 'left',
             boxShadow: 'none',
+            boxSizing: 'border-box',
           }}
         >
           <span

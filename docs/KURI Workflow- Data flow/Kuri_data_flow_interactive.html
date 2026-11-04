@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kuri Site Pipeline - Authoritative Data Flow</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #f8fafc;
+    color: #0f172a;
+    margin: 0;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .canvas {
+    width: 1400px;
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    padding: 40px 50px;
+    box-shadow: 0 4px 20px -2px rgba(0,0,0,0.06);
+  }
+  .title-block {
+    text-align: center;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 20px;
+    margin-bottom: 35px;
+  }
+  h1 {
+    font-size: 26pt;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 8px 0;
+    letter-spacing: -0.02em;
+  }
+  .subtitle {
+    font-size: 13pt;
+    color: #64748b;
+    font-weight: 500;
+  }
+  .meta-tag {
+    display: inline-block;
+    background: #eff6ff;
+    color: #1d4ed8;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    font-size: 9pt;
+    font-weight: 600;
+    margin-top: 10px;
+  }
+  
+  .flow-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+  }
+  
+  .stage-row {
+    display: flex;
+    align-items: stretch;
+    gap: 20px;
+  }
+  
+  .stage-node {
+    flex: 1;
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 18px 22px;
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  }
+  
+  .node-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 8px;
+  }
+  .node-title {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .portal-pill {
+    font-size: 8pt;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    background: #f1f5f9;
+    color: #475569;
+  }
+  
+  .node-body {
+    font-size: 9.5pt;
+    line-height: 1.5;
+    color: #334155;
+  }
+  .node-body ul {
+    margin: 6px 0;
+    padding-left: 18px;
+  }
+  .node-body li {
+    margin-bottom: 4px;
+  }
+  
+  .status-tag {
+    display: inline-block;
+    font-size: 8.5pt;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-top: 10px;
+  }
+  
+  .connector {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 24px;
+    color: #94a3b8;
+    font-weight: bold;
+    font-size: 14pt;
+  }
+  
+  .decision-box {
+    background: #fefce8;
+    border: 1.5px dashed #eab308;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 10px;
+    font-size: 9pt;
+  }
+  
+  .highlight-wfs {
+    background: #f0fdf4;
+    border-left: 3px solid #22c55e;
+    padding: 6px 10px;
+    border-radius: 0 4px 4px 0;
+    margin: 8px 0;
+    font-size: 9pt;
+    color: #166534;
+  }
+  
+  .highlight-loop {
+    background: #fdf2f8;
+    border-left: 3px solid #ec4899;
+    padding: 6px 10px;
+    border-radius: 0 4px 4px 0;
+    margin: 8px 0;
+    font-size: 9pt;
+    color: #9d174d;
+  }
+
+  /* Specific stage accents */
+  .stage-1 { border-left: 5px solid #3b82f6; }
+  .stage-2 { border-left: 5px solid #8b5cf6; }
+  .stage-3 { border-left: 5px solid #06b6d4; }
+  .stage-4 { border-left: 5px solid #f59e0b; }
+  .stage-5 { border-left: 5px solid #10b981; }
+  .stage-6 { border-left: 5px solid #ec4899; }
+  .stage-7 { border-left: 5px solid #6366f1; }
+  .stage-8 { border-left: 5px solid #0f172a; }
+  
+  .badge-qc-pending { background: #fef3c7; color: #92400e; }
+  .badge-qc-done { background: #dcfce7; color: #166534; }
+  .badge-approved { background: #dbeafe; color: #1e40af; }
+  .badge-field-pending { background: #ffedd5; color: #9a3412; }
+  .badge-completed { background: #ccfbf1; color: #115e59; }
+</style>
+</head>
+<body>
+
+<div class="canvas">
+  <div class="title-block">
+    <h1>Kuri Site Pipeline — Authoritative Data Flow</h1>
+    <div class="subtitle">Complete End-to-End Lifecycle: GIS Upload → Cadastral Resolution → Desk QC → QA Gate → Field Verification → Telecalling → Supplier Delivery</div>
+    <div class="meta-tag">Updated Nov 3, 2026 • Kuri Architecture Standard</div>
+  </div>
+
+  <div class="flow-grid">
+    
+    <!-- STAGE 1: UPLOAD -->
+    <div class="stage-node stage-1">
+      <div class="node-header">
+        <div class="node-title">1. Upload & Sequence Minting</div>
+        <div class="portal-pill">Admin Portal • /admin</div>
+      </div>
+      <div class="node-body">
+        <p><strong>Inputs:</strong> GIS Excel (12 columns: <code>lat</code>, <code>lon</code>, <code>Village</code>, <code>Taluk</code>, <code>detection_type</code>, <code>area_sqm</code>, <code>priority_tier</code>, etc.).</p>
+        <div class="highlight-wfs">
+          <strong>🌿 TNGIS WFS GeoServer Auto-Resolution:</strong>
+          Point-in-polygon ray-casting against <code>cadastral_analysis:fmb_ulpin</code> auto-populates <strong>Survey No</strong>, <strong>Sub-division No</strong>, and <strong>ULPIN</strong>, canonicalizing Revenue Village & Taluk.
+        </div>
+        <ul>
+          <li><strong>ID Minting:</strong> Creates immutable standard 6-digit <code>CBE-XXXXXX</code> (legacy coordinates mapped to <code>old_unique_id</code>).</li>
+          <li><strong>Derived Attributes:</strong> <code>area_sqft</code>, 1,500 sq ft eligibility check, 40m duplicate scan, Google Maps link.</li>
+          <li><strong>Dedup Outcome:</strong> Unchanged rows ignored; changed details update site; new sites created.</li>
+        </ul>
+        <span class="status-tag badge-qc-pending">Status on Arrival: QC Pending</span>
+      </div>
+    </div>
+
+    <div class="connector">↓</div>
+
+    <!-- STAGE 2: DESK QC -->
+    <div class="stage-node stage-2">
+      <div class="node-header">
+        <div class="node-title">2. Desk QC & Imagery Assessment</div>
+        <div class="portal-pill">Data QC Portal • /auditor/dashboard</div>
+      </div>
+      <div class="node-body">
+        <p><strong>Actions:</strong> QC Analyst inspects Google Maps, Street View, and high-resolution VHR satellite imagery (Cartosat/Maxar).</p>
+        <ul>
+          <li><strong>Plot Validation:</strong> Confirms total plot &gt;= 1,500 sq ft; records observable construction features (rebar, foundations).</li>
+          <li><strong>Contact Enrichment:</strong> Gathers builder/contractor contact from site signboards + public registries with source URL.</li>
+          <li><strong>Nearby Case:</strong> If construction is visible near pin, creates child site with unique 6-digit ID linked via <code>Parent Site ID</code>.</li>
+        </ul>
+        <span class="status-tag badge-qc-done">Status on Exit: QC Done</span>
+      </div>
+    </div>
+
+    <div class="connector">↓</div>
+
+    <!-- STAGE 3: QA REVIEW -->
+    <div class="stage-node stage-3">
+      <div class="node-header">
+        <div class="node-title">3. QA Review Gate</div>
+        <div class="portal-pill">Data QC Portal • /auditor/dashboard</div>
+      </div>
+      <div class="node-body">
+        <p><strong>Independent Verification:</strong> Senior QA reviewer validates evidence and imagery dates prior to authorizing ground travel.</p>
+        <div class="decision-box">
+          <strong>Review Decision:</strong>
+          <ul>
+            <li><strong>Approved:</strong> Releases site for operations assignment. <span class="status-tag badge-approved">Approved</span></li>
+            <li><strong>Needs Correction:</strong> Loops back to Desk QC for re-evaluation.</li>
+            <li><strong>Disapproved:</strong> Marked <em>Not Eligible</em> (resting state; re-checked on next satellite pass).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector">↓ (Gated on Approved)</div>
+
+    <!-- STAGE 4: ASSIGNMENT -->
+    <div class="stage-node stage-4">
+      <div class="node-header">
+        <div class="node-title">4. Assignment & Dispatch</div>
+        <div class="portal-pill">Admin Portal • /admin</div>
+      </div>
+      <div class="node-body">
+        <p><strong>Operations Dispatch:</strong> Field verifiers assigned based on <code>Priority Tier</code> (Tier-1, Tier-2, Tier-3) and geographical clustering.</p>
+        <p><strong>Target Coordinates:</strong> Verifiers are routed strictly to QC-confirmed coordinates, never raw detection points.</p>
+        <span class="status-tag badge-field-pending">Status on Exit: Field Pending</span>
+      </div>
+    </div>
+
+    <div class="connector">↓</div>
+
+    <!-- STAGE 5: FIELD VISIT -->
+    <div class="stage-node stage-5">
+      <div class="node-header">
+        <div class="node-title">5. Field Visit & Ground Verification</div>
+        <div class="portal-pill">Field Verification Portal • /app/</div>
+      </div>
+      <div class="node-body">
+        <p><strong>GPS & On-Site Evidence:</strong> Mobile app records captured GPS, accuracy radius (m), and deviation from QC coordinates.</p>
+        <div class="decision-box">
+          <strong>Conditional Form Logic:</strong>
+          <ul>
+            <li><strong>Construction Actively Happening == 'Yes':</strong> <code>Type of Construction</code> & <code>Stage of Construction</code> are <strong>Mandatory</strong>.</li>
+            <li><strong>Construction Actively Happening == 'No':</strong> <code>Type</code> & <code>Stage</code> are <strong>Optional/Disabled</strong>; verifier selects structured <em>Inactivity Reason</em> (Vacant Land, Stalled, Demolished).</li>
+          </ul>
+        </div>
+        <ul>
+          <li><strong>Role-Attributed Contacts:</strong> Distinct slots for Owner Phone vs Contractor Phone (strict 10-digit mobile check <code>^[6-9]\d{9}$</code>).</li>
+          <li><strong>TNGIS Cross-Check:</strong> Verifiers can verify Survey / Sub-division parcel stones on ground.</li>
+        </ul>
+        <span class="status-tag badge-completed">Status on Exit: Completed / Closed</span>
+      </div>
+    </div>
+
+    <div class="connector">↓</div>
+
+    <!-- STAGE 6: REVISIT & REAUDIT LOOPS -->
+    <div class="stage-node stage-6">
+      <div class="node-header">
+        <div class="node-title">6. Quality Loops: Revisit & Reaudit</div>
+        <div class="portal-pill">Cross-Portal Governance</div>
+      </div>
+      <div class="node-body">
+        <div class="highlight-loop">
+          <strong>🔄 Wrong Number Loopback:</strong> If a telecaller reports invalid/wrong phone, the record routes to <strong>Field Revisit</strong> for phone re-acquisition (site remains active, not dropped).
+        </div>
+        <ul>
+          <li><strong>Field Revisit:</strong> Dispatched when gate was locked, access denied, or contact missing.</li>
+          <li><strong>Desk Reaudit:</strong> Triggered when field verifier reports coordinates discrepancy. Re-evaluates satellite imagery.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="connector">↓</div>
+
+    <!-- STAGE 7: TELECALLING -->
+    <div class="stage-node stage-7">
+      <div class="node-header">
+        <div class="node-title">7. Telecalling & Commercial Qualification</div>
+        <div class="portal-pill">Telecaller Portal • /telecaller/dashboard</div>
+      </div>
+      <div class="node-body">
+        <p><strong>Eligibility Filter:</strong> Only records with at least one verified 10-digit mobile number enter telecalling queue.</p>
+        <ul>
+          <li><strong>Timezone Standard:</strong> All call logs and attempts standardized to <strong>IST (Asia/Kolkata)</strong>.</li>
+          <li><strong>Attempt History:</strong> Max 3 structured call attempts across Morning (10-1), Afternoon (2-5), and Evening (5-8).</li>
+          <li><strong>Dispositions:</strong> <code>CONSTRUCTION_CONFIRMED</code>, <code>FOLLOW_UP</code>, <code>NOT_INTERESTED</code>, <code>WRONG_NUMBER</code>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="connector">↓</div>
+
+    <!-- STAGE 8: PACKAGE & DELIVER -->
+    <div class="stage-node stage-8">
+      <div class="node-header">
+        <div class="node-title">8. Package & Client Delivery</div>
+        <div class="portal-pill">Admin Portal • /admin/export</div>
+      </div>
+      <div class="node-body">
+        <p><strong>Executive Client Delivery File (Excel):</strong> Exported for Schnell and material suppliers.</p>
+        <ul>
+          <li><strong>Comprehensive Lead Profile:</strong> 6-digit Site ID, Old Unique ID cross-reference, TNGIS Survey/Sub-div, verified address, construction stage, floor count, verified phone numbers with role designation, priority tier, and data freshness timestamp.</li>
+          <li><strong>Privacy Safeguards:</strong> Suppresses unverified contacts and declined leads.</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

@@ -535,6 +535,42 @@ export default function RecordDetailScreen({
         <h1 className="rd-identity-title">{record.name}</h1>
         {record.unique_id && <div className="rd-identity-sub">UID {record.unique_id}</div>}
 
+        {(record.is_duplicate || record.duplicate_site_id || record.duplicate_warning) && (
+          <div
+            style={{
+              margin: '8px 0',
+              padding: '8px 12px',
+              borderRadius: 8,
+              background: '#fef2f2',
+              border: '1.5px solid #fecaca',
+              color: '#991b1b',
+              fontSize: '0.80rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 8,
+            }}
+          >
+            <Icon name="warning" size={17} color="#dc2626" />
+            <div>
+              <div style={{ fontWeight: 800, color: '#b91c1c' }}>
+                ⚠️ Proximity Match / Duplicate Site Alert
+              </div>
+              {record.duplicate_site_id && (
+                <div style={{ marginTop: 2 }}>
+                  Matched site: <strong>{record.duplicate_site_id}</strong>
+                  {record.duplicate_distance_m != null && ` (${Math.round(record.duplicate_distance_m)}m away)`}.
+                </div>
+              )}
+              {record.duplicate_warning && (
+                <div style={{ marginTop: 2, fontSize: '0.74rem', color: '#7f1d1d' }}>
+                  {record.duplicate_warning}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="rd-identity-meta">
           <span className="rd-meta-line">
             <Icon name="schedule" size={15} />

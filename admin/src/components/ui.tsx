@@ -26,10 +26,13 @@ export type IconName =
   | 'arrow_upward'
   | 'arrow_downward'
   | 'unfold_more'
+  | 'unfold_less'
   | 'pending_actions'
   | 'near_me'
   | 'my_location'
   | 'location_on'
+  | 'layers'
+  | 'map'
   | 'image'
   | 'broken_image'
   | 'schedule'
@@ -104,7 +107,12 @@ export type IconName =
   | 'comment'
   | 'description'
   | 'edit_document'
-  | 'sync';
+  | 'sync'
+  | 'notifications'
+  | 'notifications_none'
+  | 'volume_up'
+  | 'volume_off'
+  | 'camera_alt';
 
 
 export function Icon({

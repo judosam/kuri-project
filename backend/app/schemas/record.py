@@ -58,9 +58,15 @@ class RecordCreateRequest(BaseModel):
     site_contractor_architect_number: Optional[str] = None
     spoken_with: Optional[str] = None
     follow_up_date: Optional[str] = None
-    no_of_floors: Optional[str] = None
-    expected_completion: Optional[str] = None
-    built_up_area: Optional[str] = None
+
+    # Land & Cadastral Details (WFS / GMaps)
+    survey_no: Optional[str] = None
+    subdivision_no: Optional[str] = None
+    village: Optional[str] = None
+    taluk: Optional[str] = None
+    district: Optional[str] = None
+    area: Optional[str] = None
+    coordinates: Optional[str] = None
 
     @field_validator("name")
     @classmethod
@@ -210,6 +216,24 @@ class RecordDetail(BaseModel):
     source: str = "captured"
     is_manually_added: bool = False
 
+    # 12 GIS Signals & Auto-Derived Cadastral Fields
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    detection_type: Optional[str] = None
+    detected_stage: Optional[str] = None
+    area_sqm: Optional[float] = None
+    area_sqft: Optional[float] = None
+    is_eligible: Optional[bool] = None
+    model_confidence_score: Optional[float] = None
+    meets_strict_construction_definition: Optional[bool] = None
+    contradicts_planetscope_vegetated: Optional[bool] = None
+    dtcp_building_type: Optional[str] = None
+    sub_division_number: Optional[str] = None
+    ulpin: Optional[str] = None
+    qc_status: Optional[str] = "QC Pending"
+    gmaps_link: Optional[str] = None
+    cadastral_lookup_status: Optional[str] = None
+
     # 15 Task Dispatch Planning Fields (Admin Google Sheet)
     unique_id: Optional[str] = None
     old_unique_id: Optional[str] = None
@@ -304,6 +328,19 @@ class RecordDetail(BaseModel):
     gmap_image_url: Optional[str] = None
     gmap_zoom: Optional[int] = None
     gmap_captured_at: Optional[datetime] = None
+
+    # Duplicate proximity tracking (40m live sites / 50m multiunit)
+    is_duplicate: bool = False
+    duplicate_warning: Optional[str] = None
+    duplicate_site_id: Optional[str] = None
+    duplicate_record_id: Optional[int] = None
+    duplicate_distance_m: Optional[float] = None
+    duplicate_is_visited: bool = False
+
+    # Revision histories (last 5 modifications for each workflow)
+    qc_history: Optional[List[dict]] = []
+    field_history: Optional[List[dict]] = []
+    telecaller_history: Optional[List[dict]] = []
 
     @field_serializer("created_at", "updated_at", "last_modified_at", "assigned_at", "reassigned_at", "audited_at", "qc_completed_at", "qc_edited_at", "telecaller_called_at", "gmap_captured_at", when_used="json")
     def serialize_dt(self, dt_val: Optional[datetime]) -> Optional[str]:
@@ -789,6 +826,7 @@ class RecordReassignResponse(BaseModel):
 
 class ResolveCoordsRequest(BaseModel):
     coordinates: str = Field(..., description="Coordinates as 'lat, lng'")
+    source: Optional[str] = Field("wfs", description="Resolution source: 'wfs' (default) or 'gmap'")
 
 
 class ResolveCoordsResponse(BaseModel):
@@ -801,8 +839,20 @@ class ResolveCoordsResponse(BaseModel):
     taluk: Optional[str] = None
     district: Optional[str] = None
     address: Optional[str] = None
+    survey_no: Optional[str] = None
+    subdivision_no: Optional[str] = None
+    ulpin: Optional[str] = None
+    source: Optional[str] = "wfs"
     success: bool = True
     message: Optional[str] = None
+
+    # Duplicate proximity tracking (40m live sites / 50m multiunit)
+    is_duplicate: bool = False
+    duplicate_warning: Optional[str] = None
+    duplicate_site_id: Optional[str] = None
+    duplicate_record_id: Optional[int] = None
+    duplicate_distance_m: Optional[float] = None
+    duplicate_is_visited: bool = False
 
 
 class QaCreateRecordRequest(BaseModel):

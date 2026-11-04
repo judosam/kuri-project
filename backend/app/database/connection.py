@@ -308,6 +308,9 @@ def _add_assigned_auditor_column(engine) -> None:
                 ("ALTER TABLE capture_records ADD COLUMN telecaller_expected_completion VARCHAR(100)", "telecaller_expected_completion"),
                 ("ALTER TABLE capture_records ADD COLUMN telecaller_built_up_area VARCHAR(100)", "telecaller_built_up_area"),
                 ("ALTER TABLE capture_records ADD COLUMN telecaller_stage_of_construction VARCHAR(255)", "telecaller_stage_of_construction"),
+                ("ALTER TABLE capture_records ADD COLUMN qc_history JSON", "qc_history"),
+                ("ALTER TABLE capture_records ADD COLUMN field_history JSON", "field_history"),
+                ("ALTER TABLE capture_records ADD COLUMN telecaller_history JSON", "telecaller_history"),
             ):
                 if name not in cols:
                     conn.execute(text(stmt))
@@ -416,6 +419,7 @@ def _grandfather_legacy_audit_rows(engine) -> None:
 
 
 def create_tables():
+    import app.models  # Ensure all model tables are registered on Base.metadata
     _migrate_capture_records_for_audit(engine)
     Base.metadata.create_all(bind=engine)
     _add_assigned_auditor_column(engine)
@@ -515,6 +519,22 @@ def create_tables():
                 ("dtcp_permit_date", "VARCHAR(50)"),
                 ("dtcp_application_no", "VARCHAR(100)"),
                 ("area", "VARCHAR(100)"),
+                ("latitude", "FLOAT"),
+                ("longitude", "FLOAT"),
+                ("detection_type", "VARCHAR(50)"),
+                ("detected_stage", "VARCHAR(100)"),
+                ("area_sqm", "FLOAT"),
+                ("area_sqft", "FLOAT"),
+                ("is_eligible", "BOOLEAN DEFAULT 1"),
+                ("model_confidence_score", "FLOAT"),
+                ("meets_strict_construction_definition", "BOOLEAN DEFAULT 0"),
+                ("contradicts_planetscope_vegetated", "BOOLEAN DEFAULT 0"),
+                ("dtcp_building_type", "VARCHAR(100)"),
+                ("sub_division_number", "VARCHAR(50)"),
+                ("ulpin", "VARCHAR(100)"),
+                ("qc_status", "VARCHAR(50) DEFAULT 'QC Pending'"),
+                ("gmaps_link", "VARCHAR(255)"),
+                ("cadastral_lookup_status", "VARCHAR(50) DEFAULT 'resolved'"),
             ]
             for col_n, col_d in audit_cols_to_check:
                 if col_n not in record_columns:
@@ -525,6 +545,10 @@ def create_tables():
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_capture_records_telecaller_status ON capture_records (telecaller_status)"))
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_capture_records_property_type ON capture_records (property_type)"))
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_capture_records_priority_tier ON capture_records (priority_tier)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_capture_records_latitude ON capture_records (latitude)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_capture_records_longitude ON capture_records (longitude)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_capture_records_qc_status ON capture_records (qc_status)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_capture_records_detection_type ON capture_records (detection_type)"))
                 conn.commit()
             # Tasks dispatched before the two addresses were split copied the
             # admin's sheet address into formatted_address, so the field

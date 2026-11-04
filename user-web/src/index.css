@@ -272,8 +272,8 @@ html, body, #root {
 
 /* Modern Web & Mobile-Friendly Sticky Header (modern-web-guidance) */
 .app-header {
-  height: 60px;
-  background: rgba(255, 255, 255, 0.92);
+  height: 48px;
+  background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   color: var(--text-main);
@@ -281,7 +281,7 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 12px;
   padding-top: env(safe-area-inset-top, 0px);
   flex-shrink: 0;
   position: sticky;
@@ -292,8 +292,8 @@ html, body, #root {
 
 @media (min-width: 640px) {
   .app-header {
-    padding: 0 24px;
-    height: 64px;
+    padding: 0 20px;
+    height: 56px;
   }
 }
 
@@ -310,20 +310,20 @@ html, body, #root {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 14px;
+  padding: 10px;
   padding-bottom: 96px; /* Space for curved bottom tab bar on mobile */
 }
 
 @media (min-width: 640px) {
   .app-body {
-    padding: 20px;
+    padding: 16px;
     padding-bottom: 104px;
   }
 }
 
 @media (min-width: 1024px) {
   .app-body {
-    padding: 28px;
+    padding: 24px;
     padding-bottom: 32px; /* Desktop has no bottom bar */
   }
 }
@@ -692,22 +692,22 @@ html, body, #root {
 /* ─── Record feed filter (mirrors the Tasks & Records segmented tabs) ─── */
 .feed-filter {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   background: var(--bg-subtle);
-  padding: 4px;
-  border-radius: 12px;
-  margin-bottom: 16px;
+  padding: 3px;
+  border-radius: 10px;
+  margin-bottom: 6px;
 }
 
 .feed-filter-btn {
   flex: 1;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border: none;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
   font-family: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.78rem;
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
@@ -718,14 +718,14 @@ html, body, #root {
 @media (max-width: 420px) {
   .feed-filter,
   .feed-subfilter {
-    gap: 4px;
-    padding: 3px;
+    gap: 3px;
+    padding: 2px;
   }
 
   .feed-filter-btn,
   .feed-subfilter-btn {
-    padding: 8px 6px;
-    font-size: 0.78rem;
+    padding: 5px 4px;
+    font-size: 0.74rem;
   }
 }
 
@@ -756,30 +756,30 @@ html, body, #root {
 /* ─── Route & Order No Sub-filter (Same segmented track as before, white bg + orange icon + black text when active) ─── */
 .feed-subfilter {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   background: var(--bg-subtle);
-  padding: 4px;
-  border-radius: 12px;
-  margin-top: -8px;
-  margin-bottom: 16px;
+  padding: 3px;
+  border-radius: 10px;
+  margin-top: -2px;
+  margin-bottom: 6px;
 }
 
 .feed-subfilter-btn {
   flex: 1;
-  padding: 8px 12px;
+  padding: 5px 8px;
   border: 1.5px solid transparent;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
   font-family: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.76rem;
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -1992,4 +1992,154 @@ html, body, #root {
   border-radius: 9999px;
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+
+/* ─── Proximity Cluster Grouping Pills ─── */
+.proximity-group-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+  margin-top: -6px;
+  margin-bottom: 8px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+.proximity-group-bar::-webkit-scrollbar {
+  display: none;
+}
+.proximity-group-label {
+  font-size: 0.70rem;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.proximity-group-pill {
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.proximity-group-pill:hover:not(.active) {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #1e293b;
+}
+.proximity-group-pill.active {
+  background: #1e293b;
+  color: #ffffff;
+  border-color: #0f172a;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.15);
+}
+.proximity-group-pill.active .material-symbols-outlined {
+  color: #38bdf8;
+}
+.cluster-badge-count {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  border-radius: 9999px;
+  padding: 1px 5px;
+  line-height: 1;
+}
+.proximity-group-pill.active .cluster-badge-count {
+  background: #38bdf8;
+  color: #0f172a;
+}
+.cluster-card-wrap {
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 10px 10px 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  position: relative;
+}
+.cluster-card-wrap.cluster-50m {
+  border-color: #818cf8;
+  background: #faf8ff;
+}
+.cluster-card-wrap.cluster-100m {
+  border-color: #38bdf8;
+  background: #f0f9ff;
+}
+.cluster-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+  gap: 8px;
+}
+
+
+/* ─── Modern Mobile Styles & Notification Animations ─── */
+@keyframes slideDownToast {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideDownModal {
+  from {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.9; }
+}
+
+.hdr-bell-btn:active {
+  transform: scale(0.92);
+}
+
+.compact-modern-card {
+  transition: transform 0.1s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
+}
+
+.compact-modern-card:active {
+  transform: scale(0.985) !important;
+}
+
+.compact-modern-card:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.08) !important;
 }
