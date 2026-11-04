@@ -112,7 +112,15 @@ export type IconName =
   | 'notifications_none'
   | 'volume_up'
   | 'volume_off'
-  | 'camera_alt';
+  | 'camera_alt'
+  | 'explore'
+  | 'construction'
+  | 'today'
+  | 'trending_up'
+  | 'pie_chart'
+  | 'bar_chart'
+  | 'show_chart'
+  | 'analytics';
 
 
 export function Icon({
@@ -369,14 +377,15 @@ export function Pager({
   );
 }
 
-/** Wrap children to constrain page width on ultra-wide displays. */
+/** Wrap children for fluid modern SaaS layout. */
 export function PageShell({ children }: { children: ReactNode }) {
   return (
     <div
+      className="fos-page-shell"
       style={{
-        maxWidth: 1500,
-        margin: '0 auto',
         width: '100%',
+        maxWidth: '100%',
+        margin: 0,
         display: 'flex',
         flexDirection: 'column',
         flex: 1,

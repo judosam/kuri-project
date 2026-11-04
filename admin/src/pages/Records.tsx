@@ -1498,24 +1498,24 @@ export default function Records({
           type="button"
           className="btn btn-primary btn-sm"
           onClick={() => setShowQaCreateModal(true)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', fontSize: 11, height: 30, borderRadius: 6, fontWeight: 600, background: '#7c3aed', color: '#fff' }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 12px', fontSize: 12, height: 32, borderRadius: 8, fontWeight: 600, background: '#7c3aed', color: '#fff', border: 'none' }}
           title="Create a new lead by picking a point on the map or pasting coordinates"
         >
-          <Icon name="add" size={14} />
+          <Icon name="add" size={15} />
           <span className="btn-label">Create Record</span>
         </button>
         <button
           type="button"
           className="btn btn-secondary btn-sm"
           onClick={() => navigate('/audit/dashboard')}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', fontSize: 11, height: 30, borderRadius: 6 }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 11px', fontSize: 12, height: 32, borderRadius: 8, fontWeight: 600 }}
           title="Open QC Analytics Dashboard"
         >
           <Icon name="dashboard" size={14} style={{ color: '#059669' }} />
           <span className="btn-label">QC Dashboard</span>
         </button>
-        <span className="topbar-badge-pill" style={{ padding: '3px 8px', fontSize: 11, height: 28, borderRadius: 6 }}>
-          <Icon name="fact_check" size={13} style={{ color: '#7c3aed' }} />
+        <span className="topbar-badge-pill" style={{ padding: '0 10px', fontSize: 11.5, height: 32, borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <Icon name="fact_check" size={14} style={{ color: '#7c3aed' }} />
           <span className="btn-label">QA Queue</span>
         </span>
       </div>
@@ -1525,20 +1525,20 @@ export default function Records({
           type="button"
           className="btn btn-primary btn-sm"
           onClick={() => setShowQaCreateModal(true)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', fontSize: 11, height: 30, borderRadius: 6, fontWeight: 600, background: '#7c3aed', color: '#fff' }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 12px', fontSize: 12, height: 32, borderRadius: 8, fontWeight: 600, background: '#7c3aed', color: '#fff', border: 'none' }}
           title="Create a new lead by picking a point on the map or pasting coordinates"
         >
-          <Icon name="add" size={14} />
+          <Icon name="add" size={15} />
           <span className="btn-label">Create Record</span>
         </button>
         <button
           type="button"
           className="btn btn-secondary btn-sm"
           onClick={() => setShowBulkEditModal(true)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, height: 30, borderRadius: 6 }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 11px', fontSize: 12, height: 32, borderRadius: 8, fontWeight: 600 }}
           title="Bulk update existing leads via Excel template"
         >
-          <Icon name="edit_note" size={14} />
+          <Icon name="edit_note" size={15} />
           <span className="btn-label">Bulk Edit</span>
         </button>
         <button
@@ -1546,14 +1546,14 @@ export default function Records({
           className="btn btn-secondary btn-sm"
           onClick={handleExportClick}
           disabled={exporting}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, height: 30, borderRadius: 6 }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 11px', fontSize: 12, height: 32, borderRadius: 8, fontWeight: 600 }}
           title="Export records to Excel (.xlsx) with customizable sections and photos"
         >
           <Icon name="table_view" size={14} />
           <span className="btn-label">{exporting ? 'Exporting…' : 'Export Excel'}</span>
         </button>
-        <span className="topbar-badge-pill" style={{ padding: '3px 8px', fontSize: 11, height: 28, borderRadius: 6 }}>
-          <Icon name="cloud_done" size={13} style={{ color: '#10b981' }} />
+        <span className="topbar-badge-pill" style={{ padding: '0 10px', fontSize: 11.5, height: 32, borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <Icon name="cloud_done" size={14} style={{ color: '#10b981' }} />
           <span className="btn-label">Sync Active</span>
         </span>
       </div>

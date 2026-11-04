@@ -39,7 +39,7 @@ export default function FieldVerifierPortal() {
 
   return (
     <PageShell>
-      <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ width: '100%', maxWidth: '100%', margin: 0, display: 'flex', flexDirection: 'column', gap: 24 }}>
         {/* Main Launcher Banner */}
         <div
           className="card"

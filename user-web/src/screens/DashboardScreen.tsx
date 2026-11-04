@@ -73,54 +73,69 @@ export default function DashboardScreen({
 
   const statItems = [
     {
-      label: 'Manually Added',
-      value: stats?.manually_added_records ?? 0,
-      icon: 'add' as const,
-      accent: '#2563eb',
-      accentBg: '#eff6ff',
-      tag: 'MANUAL',
+      label: 'Assigned Records',
+      value: stats?.total_records ?? 0,
+      icon: 'folder_open',
+      accent: '#e11d48',
+      accentBg: '#fff1f2',
+      border: '#ffe4e6',
+      badge: 'ALL QUEUE',
+      badgeBg: '#fff1f2',
+      badgeColor: '#9f1239',
+      sub: 'Total assigned sites',
       filterPreset: { datePreset: dateRange, status: 'ALL' as const },
-      isFeatured: false,
     },
     {
-      label: 'Total Completed',
+      label: 'Completed Visits',
       value: stats?.total_completed_records ?? 0,
-      icon: 'task_alt' as const,
+      icon: 'task_alt',
       accent: '#059669',
       accentBg: '#ecfdf5',
-      tag: 'COMPLETED',
+      border: '#d1fae5',
+      badge: 'COMPLETED',
+      badgeBg: '#ecfdf5',
+      badgeColor: '#065f46',
+      sub: 'Inspected with photos',
       filterPreset: { datePreset: dateRange, status: 'COMPLETED' as const },
-      isFeatured: false,
     },
     {
       label: 'Construction: Yes',
       value: stats?.construction_yes_records ?? 0,
-      icon: 'construction' as const,
-      accent: '#D97706',
-      accentBg: '#FFFBEB',
-      tag: 'YES',
+      icon: 'construction',
+      accent: '#d97706',
+      accentBg: '#fffbeb',
+      border: '#fef3c7',
+      badge: 'ACTIVE SITES',
+      badgeBg: '#fffbeb',
+      badgeColor: '#92400e',
+      sub: 'Building in progress',
       filterPreset: { datePreset: dateRange, status: 'ALL' as const },
-      isFeatured: false,
     },
     {
-      label: 'Mobile numbers',
+      label: 'Mobile Numbers',
       value: stats?.mobile_numbers_collected ?? 0,
-      icon: 'phone' as const,
-      accent: '#059669',
-      accentBg: '#ECFDF5',
-      tag: 'UNIQUE',
+      icon: 'phone',
+      accent: '#7c3aed',
+      accentBg: '#f5f3ff',
+      border: '#ede9fe',
+      badge: 'CONTACTS',
+      badgeBg: '#f5f3ff',
+      badgeColor: '#5b21b6',
+      sub: 'Owner / contractor phones',
       filterPreset: { datePreset: dateRange, status: 'ALL' as const },
-      isFeatured: false,
     },
     {
-      label: 'Total Records',
-      value: stats?.total_records ?? 0,
-      icon: 'folder_open' as const,
-      accent: '#FF6467',
-      accentBg: '#FFF1F2',
-      tag: 'ALL',
+      label: 'Field Added Sites',
+      value: stats?.manually_added_records ?? 0,
+      icon: 'add_location_alt',
+      accent: '#0284c7',
+      accentBg: '#f0f9ff',
+      border: '#e0f2fe',
+      badge: 'NEW LEADS',
+      badgeBg: '#f0f9ff',
+      badgeColor: '#075985',
+      sub: 'Discovered on-ground',
       filterPreset: { datePreset: dateRange, status: 'ALL' as const },
-      isFeatured: true,
     },
   ];
 
@@ -185,7 +200,7 @@ export default function DashboardScreen({
   const operatorName = currentUser?.full_name?.split(' ')[0] || currentUser?.email?.split('@')[0] || 'Operator';
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ width: '100%', maxWidth: '100%', margin: 0 }}>
       {/* ─── Compact Header Greeting ─── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '2px 4px' }}>
         <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -315,7 +330,7 @@ export default function DashboardScreen({
         </div>
       </div>
 
-      {/* ─── Compact Stat Cards Grid ─── */}
+      {/* ─── Modern Field Stat Cards Grid (Dasher / SaaS Style) ─── */}
       <div className="grid-stats">
         {loading && !stats ? (
           <>
@@ -328,15 +343,26 @@ export default function DashboardScreen({
           statItems.map((s) => (
             <div
               key={s.label}
-              className={`stat-card${s.isFeatured ? ' stat-card-featured' : ''}`}
+              className="stat-card"
               onClick={() => {
                 if (onSelectMatrixFilter && s.filterPreset) {
                   onSelectMatrixFilter(s.filterPreset);
                 }
               }}
-              style={{ cursor: s.filterPreset ? 'pointer' : 'default' }}
-              role={s.filterPreset ? 'button' : undefined}
-              tabIndex={s.filterPreset ? 0 : undefined}
+              style={{
+                cursor: 'pointer',
+                borderRadius: 16,
+                padding: '14px 16px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+                background: '#ffffff',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+              }}
+              role="button"
+              tabIndex={0}
               onKeyDown={(event) => {
                 if (s.filterPreset && (event.key === 'Enter' || event.key === ' ')) {
                   event.preventDefault();
@@ -345,63 +371,80 @@ export default function DashboardScreen({
               }}
               title={`View ${s.label} in Records`}
             >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 11,
+                    backgroundColor: s.accentBg,
+                    border: `1px solid ${s.border}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Icon name={s.icon} size={18} color={s.accent} />
+                </div>
+                <span
+                  style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    padding: '2px 7px',
+                    borderRadius: 9999,
+                    backgroundColor: s.badgeBg,
+                    color: s.badgeColor,
+                    border: `1px solid ${s.border}`,
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  {s.badge}
+                </span>
+              </div>
+
+              <div>
+                <div
+                  style={{
+                    fontSize: '1.65rem',
+                    fontWeight: 800,
+                    color: '#0f172a',
+                    lineHeight: 1.15,
+                    letterSpacing: '-0.025em',
+                  }}
+                >
+                  {s.value.toLocaleString()}
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    color: '#1e293b',
+                    marginTop: 3,
+                  }}
+                >
+                  {s.label}
+                </div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: 2 }}>
+                  {s.sub}
+                </div>
+              </div>
+
               <div
-                className="stat-card-glow"
-                style={{ backgroundColor: s.accent }}
-              />
-              {s.isFeatured ? (
-                <>
-                  <div className="stat-card-left">
-                    <div className="stat-card-icon" style={{ backgroundColor: s.accentBg }}>
-                      <Icon name={s.icon} size={16} color={s.accent} />
-                    </div>
-                    <div>
-                      <div className="stat-card-label">{s.label}</div>
-                      <div className="stat-card-val">{s.value}</div>
-                    </div>
-                  </div>
-                  <div className="stat-card-foot">
-                    <span
-                      className="stat-card-note"
-                      style={{ color: s.accent, display: 'flex', alignItems: 'center', gap: 3 }}
-                    >
-                      <span>View All</span>
-                      <Icon name="arrow_forward" size={13} color={s.accent} />
-                    </span>
-                    <span
-                      className="stat-card-tag"
-                      style={{ backgroundColor: s.accentBg, color: s.accent }}
-                    >
-                      {s.tag}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="stat-card-top">
-                    <span className="stat-card-label">{s.label}</span>
-                    <div className="stat-card-icon" style={{ backgroundColor: s.accentBg }}>
-                      <Icon name={s.icon} size={16} color={s.accent} />
-                    </div>
-                  </div>
-                  <div className="stat-card-val">{s.value}</div>
-                  <div className="stat-card-foot">
-                    <span
-                      className="stat-card-note"
-                      style={{ color: s.accent, display: 'flex', alignItems: 'center', gap: 3 }}
-                    >
-                      <span>View</span>
-                      <Icon name="arrow_forward" size={12} color={s.accent} />
-                    </span>
-                    <span
-                      className="stat-card-tag"
-                      style={{ backgroundColor: s.accentBg, color: s.accent }}
-                    >
-                      {s.tag}
-                    </span>
-                  </div>
-                </>
-              )}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  marginTop: 8,
+                  paddingTop: 6,
+                  borderTop: '1px solid #f1f5f9',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  color: s.accent,
+                }}
+              >
+                <span>View records</span>
+                <Icon name="arrow_forward" size={11} color={s.accent} />
+              </div>
             </div>
           ))
         )}

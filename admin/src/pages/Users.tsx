@@ -38,6 +38,7 @@ export default function Users() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const deleteDialog = useRef<HTMLDialogElement>(null);
+
   useEffect(() => {
     if (deleteUser) deleteDialog.current?.showModal();
     else deleteDialog.current?.close();
@@ -203,7 +204,6 @@ export default function Users() {
     }
   };
 
-
   const handleToggleActive = (user: User) => {
     setActionError(null);
     if (user.role === 'ADMIN' && user.is_active) {
@@ -251,17 +251,23 @@ export default function Users() {
     right: (
       <button
         type="button"
-        className={showCreate ? 'btn btn-ghost btn-sm' : 'btn btn-primary btn-sm'}
-        onClick={() => setShowCreate(!showCreate)}
+        className="btn btn-primary btn-sm"
+        style={{ height: 32, padding: '0 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+        onClick={() => {
+          setError('');
+          setCreateErrors({});
+          setShowCreate(true);
+        }}
       >
-        <Icon name={showCreate ? 'close' : 'person_add'} size={15} />
-        {showCreate ? 'Cancel' : '+ Create Account'}
+        <Icon name="person_add" size={15} />
+        + Create Account
       </button>
     ),
-  }, [total, showCreate]);
+  }, [total]);
 
   return (
     <PageShell>
+      {/* Native Delete Confirmation Dialog */}
       <dialog ref={deleteDialog} className="user-delete-dialog" aria-labelledby="delete-user-title"
         onCancel={(event) => { if (deleting) event.preventDefault(); else setDeleteUser(null); }}>
         <h2 id="delete-user-title">Delete user?</h2>
@@ -274,128 +280,204 @@ export default function Users() {
         </div>
       </dialog>
 
+      {/* Modern Create Account Modal Dialog */}
       {showCreate && (
-        <div className="create-panel">
-          <div className="create-panel-head">
-            <Icon name="person_add" />
-            <span className="h-card">Create Account</span>
-          </div>
-          <div className="field">
-            <label className="field-label" htmlFor="nu-name">
-              Full Name
-            </label>
-            <input
-              id="nu-name"
-              className="fld"
-              style={createErrors.full_name ? { borderColor: '#ef4444' } : undefined}
-              placeholder="Full Name"
-              value={newUser.full_name}
-              onChange={(e) => {
-                setNewUser({ ...newUser, full_name: e.target.value });
-                if (createErrors.full_name) setCreateErrors((prev) => ({ ...prev, full_name: undefined }));
-              }}
-              aria-invalid={!!createErrors.full_name}
-            />
-            {createErrors.full_name && (
-              <span style={{ color: '#ef4444', fontSize: '0.78rem', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }} role="alert">
-                <Icon name="error" size={13} style={{ color: '#ef4444' }} />
-                <span>{createErrors.full_name}</span>
-              </span>
-            )}
-          </div>
-          <div className="field">
-            <label className="field-label" htmlFor="nu-email">
-              Email
-            </label>
-            <input
-              id="nu-email"
-              className="fld"
-              style={createErrors.email ? { borderColor: '#ef4444' } : undefined}
-              placeholder="Email"
-              type="email"
-              value={newUser.email}
-              onChange={(e) => {
-                setNewUser({ ...newUser, email: e.target.value });
-                if (createErrors.email) setCreateErrors((prev) => ({ ...prev, email: undefined }));
-              }}
-              aria-invalid={!!createErrors.email}
-            />
-            {createErrors.email && (
-              <span style={{ color: '#ef4444', fontSize: '0.78rem', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }} role="alert">
-                <Icon name="error" size={13} style={{ color: '#ef4444' }} />
-                <span>{createErrors.email}</span>
-              </span>
-            )}
-          </div>
-
-
-          <div className="field">
-            <label className="field-label" htmlFor="nu-role">
-              Role
-            </label>
-            <CustomSelect
-              value={newUser.role}
-              onChange={(val) => setNewUser({ ...newUser, role: val })}
-              options={[
-                { value: 'TELECALLER', label: 'Telecaller — verify contacts & phone confirmations' },
-                { value: 'AUDITOR', label: 'Auditor — review routed records and set audit status' },
-                { value: 'FIELD_VERIFIER', label: 'Field Verifier — completes inspections from the mobile app' },
-                { value: 'ADMIN', label: 'Admin — full command studio access' },
-                { value: 'MANAGER', label: 'Manager — view and assign records' },
-                { value: 'USER', label: 'User — legacy field operator' },
-              ]}
-              ariaLabel="Select user role"
-            />
-          </div>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+          onClick={() => !creating && setShowCreate(false)}
+        >
           <div
             style={{
-              gridColumn: '1 / -1',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '10px 14px',
-              background: '#f8fafc',
+              background: '#ffffff',
+              borderRadius: 16,
+              maxWidth: 500,
+              width: '100%',
+              padding: '24px 26px',
+              boxShadow: '0 20px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.05)',
               border: '1px solid #e2e8f0',
-              borderRadius: 8,
-              fontSize: 12.5,
-              color: '#475569',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <Icon name="security" size={16} style={{ color: '#059669', flexShrink: 0 }} />
-            <span>
-              A secure 16-character temporary password will be auto-generated. The user will be required to choose a new password upon first sign-in.
-            </span>
-          </div>
-          <div className="create-actions" style={{ flexDirection: 'column', gap: 8, gridColumn: '1 / -1' }}>
-            {error && (
-              <div className="alert alert-error" role="alert">
-                <Icon name="error" size={16} />
-                <span>{error}</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: '#eff6ff',
+                    border: '1px solid #dbeafe',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#2563eb',
+                  }}
+                >
+                  <Icon name="person_add" size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+                    Create Team Member
+                  </h3>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>
+                    Add a new account to the Lead Management Platform
+                  </span>
+                </div>
               </div>
-            )}
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleCreate}
-              disabled={creating}
-              style={{ maxWidth: 220 }}
-            >
-              {creating ? (
-                <>
-                  <Icon name="refresh" size={16} className="fos-spin" />
-                  Creating…
-                </>
-              ) : (
-                'Create Account'
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ width: 30, height: 30, padding: 0, borderRadius: 8 }}
+                onClick={() => setShowCreate(false)}
+                disabled={creating}
+                aria-label="Close dialog"
+              >
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="field">
+                <label className="field-label" htmlFor="nu-name" style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 4 }}>
+                  Full Name
+                </label>
+                <input
+                  id="nu-name"
+                  className="fld"
+                  style={{ height: 36, borderRadius: 8, fontSize: 13, ...(createErrors.full_name ? { borderColor: '#ef4444' } : {}) }}
+                  placeholder="e.g. Samuel Prabakaran"
+                  value={newUser.full_name}
+                  onChange={(e) => {
+                    setNewUser({ ...newUser, full_name: e.target.value });
+                    if (createErrors.full_name) setCreateErrors((prev) => ({ ...prev, full_name: undefined }));
+                  }}
+                  aria-invalid={!!createErrors.full_name}
+                />
+                {createErrors.full_name && (
+                  <span style={{ color: '#ef4444', fontSize: '0.78rem', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }} role="alert">
+                    <Icon name="error" size={13} style={{ color: '#ef4444' }} />
+                    <span>{createErrors.full_name}</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="nu-email" style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 4 }}>
+                  Email Address
+                </label>
+                <input
+                  id="nu-email"
+                  className="fld"
+                  style={{ height: 36, borderRadius: 8, fontSize: 13, ...(createErrors.email ? { borderColor: '#ef4444' } : {}) }}
+                  placeholder="e.g. samuel@example.com"
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => {
+                    setNewUser({ ...newUser, email: e.target.value });
+                    if (createErrors.email) setCreateErrors((prev) => ({ ...prev, email: undefined }));
+                  }}
+                  aria-invalid={!!createErrors.email}
+                />
+                {createErrors.email && (
+                  <span style={{ color: '#ef4444', fontSize: '0.78rem', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }} role="alert">
+                    <Icon name="error" size={13} style={{ color: '#ef4444' }} />
+                    <span>{createErrors.email}</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="nu-role" style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 4 }}>
+                  Role & Permissions
+                </label>
+                <CustomSelect
+                  value={newUser.role}
+                  onChange={(val) => setNewUser({ ...newUser, role: val })}
+                  options={[
+                    { value: 'TELECALLER', label: 'Telecaller — verify contacts & phone confirmations' },
+                    { value: 'AUDITOR', label: 'Auditor — review routed records and set audit status' },
+                    { value: 'FIELD_VERIFIER', label: 'Field Verifier — completes inspections from mobile app' },
+                    { value: 'ADMIN', label: 'Admin — full command studio & access control' },
+                    { value: 'MANAGER', label: 'Manager — view and assign records' },
+                    { value: 'USER', label: 'User — legacy field operator' },
+                  ]}
+                  ariaLabel="Select user role"
+                />
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 14px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 10,
+                  fontSize: 12,
+                  color: '#475569',
+                }}
+              >
+                <Icon name="security" size={16} style={{ color: '#059669', flexShrink: 0 }} />
+                <span>
+                  A secure 16-character temporary password will be auto-generated. The user will choose a private password upon first sign-in.
+                </span>
+              </div>
+
+              {error && (
+                <div className="alert alert-error" role="alert" style={{ fontSize: 12.5, padding: '8px 12px' }}>
+                  <Icon name="error" size={16} />
+                  <span>{error}</span>
+                </div>
               )}
-            </button>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setShowCreate(false)}
+                  disabled={creating}
+                  style={{ height: 36, padding: '0 16px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleCreate}
+                  disabled={creating}
+                  style={{ height: 36, padding: '0 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  {creating ? (
+                    <>
+                      <Icon name="refresh" size={16} className="fos-spin" />
+                      Creating…
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="person_add" size={16} />
+                      Create Account
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-
       {actionError && (
-        <div className="alert alert-error" style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: 8 }} role="alert">
+        <div className="alert alert-error" style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 10 }} role="alert">
           <Icon name="error" size={16} />
           <span style={{ flex: 1 }}>{actionError}</span>
           <button type="button" className="btn btn-ghost btn-xs" onClick={() => setActionError(null)}>
@@ -404,19 +486,42 @@ export default function Users() {
         </div>
       )}
 
-      <div className="toolbar users-toolbar">
-        <div className="search-wrap">
-          <Icon name="search" />
+      {/* Modern Filter Toolbar */}
+      <div className="toolbar users-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <div className="search-wrap" style={{ flex: '1 1 280px', position: 'relative' }}>
+          <Icon name="search" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
           <input
             type="text"
             className="fld fld-soft"
-            placeholder="Search by name or email..."
+            style={{ height: 36, paddingLeft: 34, paddingRight: searchInput ? 32 : 12, borderRadius: 8, fontSize: 12.5 }}
+            placeholder="Search users by name or email..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             aria-label="Search users"
           />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={() => setSearchInput('')}
+              style={{
+                position: 'absolute',
+                right: 8,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                display: 'flex',
+                padding: 2,
+              }}
+              title="Clear search"
+            >
+              <Icon name="close" size={14} />
+            </button>
+          )}
         </div>
-        <div className="field" style={{ width: 160 }}>
+        <div style={{ width: 170 }}>
           <CustomSelect
             value={statusFilter}
             onChange={(val) => {
@@ -424,7 +529,7 @@ export default function Users() {
               setPage(1);
             }}
             options={[
-              { value: 'all', label: 'All statuses' },
+              { value: 'all', label: 'All Statuses' },
               { value: 'active', label: 'Active only' },
               { value: 'inactive', label: 'Inactive only' },
             ]}
@@ -435,9 +540,10 @@ export default function Users() {
           <button
             type="button"
             className="btn btn-ghost btn-sm"
+            style={{ height: 36, padding: '0 12px', borderRadius: 8, fontSize: 12, fontWeight: 600 }}
             onClick={handleReset}
           >
-            <Icon name="close" />
+            <Icon name="close" size={14} />
             Reset
           </button>
         )}
@@ -447,52 +553,50 @@ export default function Users() {
       {!loading && users.length === 0 && <EmptyPanel icon="group" text="No users found." />}
 
       {!loading && users.length > 0 && (
-        <div className="card table-card">
-          <div className="card-head">
-            <div className="card-title-row">
-              <Icon name="group" />
-              <h2 className="h-card">User Accounts</h2>
+        <div className="card table-card" style={{ borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)' }}>
+          <div className="card-head" style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="card-title-row" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="group" size={18} style={{ color: '#64748b' }} />
+              <h2 className="h-card" style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#0f172a' }}>User Accounts</h2>
             </div>
-            <span className="count-pill">{total.toLocaleString()}</span>
+            <span className="count-pill" style={{ background: '#f1f5f9', color: '#475569', fontSize: 11.5, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>
+              {total.toLocaleString()} total
+            </span>
           </div>
           <div className="table-scroll">
             <table className="fos-table users-table">
               <colgroup>
                 <col style={{ width: 60 }} />
-                <col style={{ width: '22%' }} />
-                <col style={{ width: '24%' }} />
-                <col style={{ width: 120 }} />
-                <col style={{ width: 120 }} />
+                <col style={{ width: '34%' }} />
+                <col style={{ width: 150 }} />
+                <col style={{ width: 140 }} />
                 <col style={{ width: 130 }} />
-                <col style={{ width: 210 }} />
+                <col style={{ width: 170 }} />
               </colgroup>
               <thead>
                 <tr>
-                  <th style={{ width: 60 }}>No.</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th style={{ width: 120 }}>Role</th>
-                  <th style={{ width: 120 }}>Status</th>
+                  <th style={{ width: 60, textAlign: 'center' }}>No.</th>
+                  <th>User Details</th>
+                  <th style={{ width: 150 }}>Role</th>
+                  <th style={{ width: 140 }}>Status</th>
                   <th style={{ width: 130 }}>Joined</th>
-                  <th style={{ width: 210 }}>Actions</th>
+                  <th style={{ width: 170, textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((u, idx) => (
                   <tr key={u.id}>
-                    <td style={{ width: 60 }}>
-                      <span className="row-id">{(page - 1) * PAGE_SIZE + idx + 1}</span>
+                    <td style={{ width: 60, textAlign: 'center', color: '#64748b', fontSize: 11.5, fontWeight: 600 }}>
+                      {(page - 1) * PAGE_SIZE + idx + 1}
                     </td>
                     <td>
-                      <div className="cell-person">
+                      <div className="user-person-cell">
                         <Avatar name={u.full_name || u.email} size="sm" />
-                        <span className="pname">{u.full_name || '—'}</span>
+                        <div className="user-person-info">
+                          <span className="user-person-name">{u.full_name || 'Unnamed User'}</span>
+                          <span className="user-person-email">{u.email}</span>
+                        </div>
                       </div>
-                    </td>
-                    <td>
-                      <span style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
-                        {u.email}
-                      </span>
                     </td>
                     <td>
                       {u.role === 'ADMIN' ? (
@@ -535,7 +639,7 @@ export default function Users() {
                         </span>
                       )}
                       {u.must_change_password && (
-                        <div style={{ marginTop: 5 }}>
+                        <div style={{ marginTop: 4 }}>
                           <span
                             style={{
                               display: 'inline-flex',
@@ -560,72 +664,73 @@ export default function Users() {
                       )}
                     </td>
                     <td>
-                      <span className="cell-date">{formatDate(u.created_at)}</span>
+                      <span className="cell-date" style={{ color: '#64748b', fontSize: 11.5, whiteSpace: 'nowrap' }}>
+                        {formatDate(u.created_at)}
+                      </span>
                     </td>
-                    <td style={{ width: 300 }}>
-                      {/* Icon-only cluster: Role Edit → Reset → Deactivate/Activate → Delete */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 4 }}>
+                    <td style={{ width: 170, textAlign: 'center' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                         <button
                           type="button"
-                          className="btn btn-ghost user-act-btn"
-                          style={{ padding: '6px 8px' }}
+                          className="user-act-btn act-role"
                           onClick={() => handleOpenRoleEdit(u)}
                           aria-label={`Change role for ${u.full_name || u.email}`}
                           title="Change user role"
                         >
-                          <Icon name="badge" size={14} />
+                          <Icon name="badge" size={15} />
                         </button>
                         <button
                           type="button"
-                          className="btn btn-ghost user-act-btn"
-                          style={{ padding: '6px 8px' }}
+                          className="user-act-btn act-reset"
                           onClick={() => handleOpenReset(u)}
                           aria-label={`Reset password for ${u.full_name || u.email}`}
                           title="Reset user password"
                         >
-                          <Icon name="lock_reset" size={14} />
+                          <Icon name="lock_reset" size={15} />
                         </button>
                         {u.is_active ? (
                           u.id === currentUser?.id ? (
                             <button
                               type="button"
-                              className="btn btn-ghost user-act-btn"
+                              className="user-act-btn"
                               disabled
-                              style={{ opacity: 0.5, cursor: 'not-allowed', padding: '6px 8px' }}
+                              style={{ opacity: 0.35, cursor: 'not-allowed' }}
                               aria-label="Cannot deactivate your own account"
                               title="Cannot deactivate your own account"
                             >
-                              <Icon name="person_off" size={14} />
+                              <Icon name="person_off" size={15} />
                             </button>
                           ) : (
                             <button
                               type="button"
-                              className="btn btn-danger user-act-btn"
-                              style={{ padding: '6px 8px' }}
+                              className="user-act-btn act-deactivate"
                               onClick={() => handleToggleActive(u)}
                               aria-label={`Deactivate ${u.full_name || u.email}`}
                               title="Deactivate user account"
                             >
-                              <Icon name="person_off" size={14} />
+                              <Icon name="person_off" size={15} />
                             </button>
                           )
                         ) : (
                           <button
                             type="button"
-                            className="btn btn-primary user-act-btn"
-                            style={{ padding: '6px 8px' }}
+                            className="user-act-btn act-activate"
                             onClick={() => handleToggleActive(u)}
                             aria-label={`Activate ${u.full_name || u.email}`}
                             title="Activate user account"
                           >
-                            <Icon name="how_to_reg" size={14} />
+                            <Icon name="how_to_reg" size={15} />
                           </button>
                         )}
-                        <button type="button" className="btn btn-danger user-act-btn" style={{ padding: '6px 8px' }} disabled={!currentUser || u.id === currentUser.id}
+                        <button
+                          type="button"
+                          className="user-act-btn act-delete"
+                          disabled={!currentUser || u.id === currentUser.id}
                           aria-label={`Delete ${u.full_name || u.email}`}
                           title={u.id === currentUser?.id ? 'Cannot delete your own account' : 'Delete user account'}
-                          onClick={() => { setDeleteError(''); setDeleteUser(u); }}>
-                          <Icon name="delete" size={14} />
+                          onClick={() => { setDeleteError(''); setDeleteUser(u); }}
+                        >
+                          <Icon name="delete" size={15} />
                         </button>
                       </div>
                     </td>
@@ -634,8 +739,8 @@ export default function Users() {
               </tbody>
             </table>
           </div>
-          <div className="table-foot">
-            <span className="table-foot-note">
+          <div className="table-foot" style={{ padding: '10px 16px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="table-foot-note" style={{ color: '#64748b', fontSize: 12 }}>
               {total.toLocaleString()} account{total === 1 ? '' : 's'} registered
             </span>
             <Pager
@@ -648,6 +753,7 @@ export default function Users() {
         </div>
       )}
 
+      {/* Deactivate User Modal */}
       {confirmUser && (
         <div
           style={{
@@ -694,7 +800,7 @@ export default function Users() {
                   <Icon name="warning" size={20} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: 'var(--c-ink, #0f172a)' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
                     Deactivate User
                   </h3>
                 </div>
@@ -710,9 +816,9 @@ export default function Users() {
               </button>
             </div>
 
-            <p style={{ margin: '0 0 16px 0', fontSize: 14, color: 'var(--c-ink2, #434655)', lineHeight: 1.55 }}>
+            <p style={{ margin: '0 0 16px 0', fontSize: 13.5, color: '#475569', lineHeight: 1.55 }}>
               Are you sure you want to deactivate{' '}
-              <strong style={{ color: 'var(--c-ink, #0f172a)' }}>
+              <strong style={{ color: '#0f172a' }}>
                 {confirmUser.full_name || confirmUser.email}
               </strong>
               ? They will be immediately prevented from logging into the mobile app or admin dashboard.
@@ -727,8 +833,8 @@ export default function Users() {
                 background: '#f8fafc',
                 borderRadius: 8,
                 border: '1px solid #e2e8f0',
-                fontSize: 12.5,
-                color: 'var(--c-ink3, #6b7082)',
+                fontSize: 12,
+                color: '#64748b',
                 marginBottom: 20,
               }}
             >
@@ -741,6 +847,7 @@ export default function Users() {
                 type="button"
                 className="btn btn-ghost"
                 onClick={() => setConfirmUser(null)}
+                style={{ height: 36, padding: '0 16px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}
               >
                 Cancel
               </button>
@@ -748,6 +855,11 @@ export default function Users() {
                 type="button"
                 className="btn btn-danger"
                 style={{
+                  height: 36,
+                  padding: '0 18px',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 600,
                   background: '#dc2626',
                   color: '#ffffff',
                   borderColor: '#dc2626',
@@ -762,7 +874,7 @@ export default function Users() {
         </div>
       )}
 
-      {/* Reset Password Modal (Admin cannot view current password) */}
+      {/* Reset Password Modal */}
       {resetUser && (
         <div
           style={{
@@ -794,15 +906,15 @@ export default function Users() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div
                   style={{
-                    width: 36,
-                    height: 36,
+                    width: 38,
+                    height: 38,
                     borderRadius: 10,
                     background: '#eff6ff',
                     border: '1px solid #dbeafe',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: 'var(--c-blue, #FF6467)',
+                    color: '#2563eb',
                   }}
                 >
                   <Icon name="lock_reset" size={20} />
@@ -812,7 +924,7 @@ export default function Users() {
                     Reset User Password
                   </h3>
                   <span style={{ fontSize: 12, color: '#64748b' }}>
-                    Set a new password for {resetUser.full_name || resetUser.email}
+                    Set a replacement credential for {resetUser.full_name || resetUser.email}
                   </span>
                 </div>
               </div>
@@ -828,7 +940,7 @@ export default function Users() {
               </button>
             </div>
 
-            {/* Privacy & Security Callout (Admin cannot see current password) */}
+            {/* Privacy & Security Callout */}
             <div
               style={{
                 display: 'flex',
@@ -846,11 +958,11 @@ export default function Users() {
             >
               <Icon name="security" size={15} style={{ color: '#059669', marginTop: 2, flexShrink: 0 }} />
               <div>
-                <strong style={{ color: '#0f172a' }}>Privacy Notice:</strong> For security, current passwords are cryptographically hashed and cannot be viewed by administrators. Enter a new replacement password below.
+                <strong style={{ color: '#0f172a' }}>Privacy Notice:</strong> Passwords are cryptographically hashed and cannot be viewed. Enter a new replacement password below.
               </div>
             </div>
 
-            {/* Target User Card */}
+            {/* Target User Info */}
             <div
               style={{
                 display: 'flex',
@@ -892,8 +1004,8 @@ export default function Users() {
                     <Icon name="check_circle" size={18} />
                     Temporary Password Generated!
                   </div>
-                  <p style={{ margin: '0 0 12px 0', fontSize: 13, color: '#065f46', lineHeight: 1.5 }}>
-                    Provide this one-time credential to <strong>{resetUser.full_name || resetUser.email}</strong>. They will be forced to set a private password immediately upon their next login:
+                  <p style={{ margin: '0 0 12px 0', fontSize: 12.5, color: '#065f46', lineHeight: 1.5 }}>
+                    Provide this one-time credential to <strong>{resetUser.full_name || resetUser.email}</strong>. They will set a private password upon sign-in:
                   </p>
                   <div
                     style={{
@@ -927,6 +1039,7 @@ export default function Users() {
                     type="button"
                     className="btn btn-primary"
                     onClick={() => setResetUser(null)}
+                    style={{ height: 36, padding: '0 20px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}
                   >
                     Done
                   </button>
@@ -967,16 +1080,13 @@ export default function Users() {
                   }}
                 >
                   <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
-                    Reset Password for {resetUser.full_name || resetUser.email}
+                    New Password
                   </div>
                   <div style={{ color: '#64748b', fontSize: '0.82rem', marginBottom: 12 }}>
-                    Enter a new password below, or leave blank to automatically generate a secure 16-character temporary password.
+                    Enter a specific password, or leave blank to auto-generate a secure 16-character temporary password.
                   </div>
 
                   <div className="field" style={{ marginBottom: 12 }}>
-                    <label className="field-label" style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, display: 'block' }}>
-                      New Password (Optional)
-                    </label>
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                       <input
                         type={showResetPassword ? 'text' : 'password'}
@@ -984,7 +1094,7 @@ export default function Users() {
                         placeholder="Leave blank to auto-generate"
                         value={resetCustomPassword}
                         onChange={(e) => setResetCustomPassword(e.target.value)}
-                        style={{ paddingRight: 36, width: '100%' }}
+                        style={{ height: 36, borderRadius: 8, paddingRight: 36, width: '100%', fontSize: 13 }}
                       />
                       <button
                         type="button"
@@ -1024,6 +1134,7 @@ export default function Users() {
                     className="btn btn-ghost"
                     onClick={() => setResetUser(null)}
                     disabled={resetLoading}
+                    style={{ height: 36, padding: '0 16px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}
                   >
                     Cancel
                   </button>
@@ -1032,7 +1143,7 @@ export default function Users() {
                     className="btn btn-primary"
                     onClick={handleExecuteResetPassword}
                     disabled={resetLoading}
-                    style={{ minWidth: 175 }}
+                    style={{ height: 36, padding: '0 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, minWidth: 175 }}
                   >
                     {resetLoading ? 'Saving…' : (resetCustomPassword.trim() ? 'Reset Password' : 'Generate Temp Password')}
                   </button>
@@ -1075,8 +1186,8 @@ export default function Users() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div
                   style={{
-                    width: 36,
-                    height: 36,
+                    width: 38,
+                    height: 38,
                     borderRadius: 10,
                     background: '#ecfdf5',
                     border: '1px solid #a7f3d0',
@@ -1145,8 +1256,8 @@ export default function Users() {
                 textAlign: 'center',
               }}
             >
-              <p style={{ margin: '0 0 12px 0', fontSize: 13, color: '#065f46', lineHeight: 1.5 }}>
-                Provide this one-time credential to <strong>{createdAccountResult.user.full_name}</strong>. They will be forced to choose a private password immediately upon their first sign-in:
+              <p style={{ margin: '0 0 12px 0', fontSize: 12.5, color: '#065f46', lineHeight: 1.5 }}>
+                Provide this one-time credential to <strong>{createdAccountResult.user.full_name}</strong>. They will choose a private password immediately upon first sign-in:
               </p>
               <div
                 style={{
@@ -1186,6 +1297,7 @@ export default function Users() {
                 type="button"
                 className="btn btn-primary"
                 onClick={() => setCreatedAccountResult(null)}
+                style={{ height: 36, padding: '0 20px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}
               >
                 Done
               </button>
@@ -1202,7 +1314,7 @@ export default function Users() {
             inset: 0,
             zIndex: 9999,
             backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(3px)',
+            backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1217,22 +1329,42 @@ export default function Users() {
               width: '100%',
               padding: 24,
               background: '#ffffff',
-              borderRadius: 14,
+              borderRadius: 16,
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
               border: '1px solid #e2e8f0',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Icon name="badge" size={20} style={{ color: '#bf3646' }} />
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
-                  Assign User Role
-                </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: '#fef2f2',
+                    border: '1px solid #fee2e2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#bf3646',
+                  }}
+                >
+                  <Icon name="badge" size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+                    Assign User Role
+                  </h3>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>
+                    Modify privileges and navigation access
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
+                style={{ width: 30, height: 30, padding: 0, borderRadius: 8 }}
                 onClick={() => setEditRoleUser(null)}
                 disabled={updatingRole}
                 aria-label="Close"
@@ -1241,25 +1373,25 @@ export default function Users() {
               </button>
             </div>
 
-            <p style={{ margin: '0 0 16px 0', fontSize: 12.5, color: '#475569', lineHeight: 1.5 }}>
+            <p style={{ margin: '0 0 16px 0', fontSize: 13, color: '#475569', lineHeight: 1.5 }}>
               Change role privileges for <strong style={{ color: '#0f172a' }}>{editRoleUser.full_name || editRoleUser.email}</strong> ({editRoleUser.email}).
             </p>
 
             {roleError && (
-              <div role="alert" className="alert alert-error" style={{ marginBottom: 12 }}>
+              <div role="alert" className="alert alert-error" style={{ marginBottom: 12, fontSize: 12.5 }}>
                 {roleError}
               </div>
             )}
 
             <div className="field" style={{ marginBottom: 20 }}>
-              <label className="field-label" style={{ marginBottom: 6, fontWeight: 700 }}>Select Role</label>
+              <label className="field-label" style={{ marginBottom: 6, fontWeight: 700, fontSize: 12, color: '#334155' }}>Select New Role</label>
               <CustomSelect
                 value={selectedNewRole}
                 onChange={(val) => setSelectedNewRole(val)}
                 options={[
                   { value: 'TELECALLER', label: 'Telecaller — calling queue & contact verification' },
                   { value: 'AUDITOR', label: 'Auditor — review routed records and set audit status' },
-                  { value: 'FIELD_VERIFIER', label: 'Field Verifier — completes inspections from the mobile app' },
+                  { value: 'FIELD_VERIFIER', label: 'Field Verifier — completes inspections from mobile app' },
                   { value: 'ADMIN', label: 'Admin — full command studio access' },
                   { value: 'MANAGER', label: 'Manager — view and assign records' },
                   { value: 'USER', label: 'User — legacy field operator' },
@@ -1268,12 +1400,13 @@ export default function Users() {
               />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="btn btn-ghost"
                 onClick={() => setEditRoleUser(null)}
                 disabled={updatingRole}
+                style={{ height: 36, padding: '0 16px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}
               >
                 Cancel
               </button>
@@ -1282,9 +1415,9 @@ export default function Users() {
                 className="btn btn-primary"
                 onClick={handleSaveRole}
                 disabled={updatingRole || selectedNewRole === editRoleUser.role}
-                style={{ background: '#bf3646', borderColor: '#bf3646' }}
+                style={{ height: 36, padding: '0 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: '#bf3646', borderColor: '#bf3646' }}
               >
-                {updatingRole ? 'Updating...' : 'Save Role'}
+                {updatingRole ? 'Updating…' : 'Save Role'}
               </button>
             </div>
           </div>
@@ -1293,4 +1426,3 @@ export default function Users() {
     </PageShell>
   );
 }
-

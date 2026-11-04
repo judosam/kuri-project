@@ -175,6 +175,7 @@ export default function TelecallerRecords() {
           type="button"
           className="btn btn-secondary btn-sm"
           onClick={() => loadRecords()}
+          style={{ height: 32, borderRadius: 8, padding: '0 12px', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}
           title="Refresh calling queue"
         >
           <Icon name="refresh" size={14} className={loading ? 'fos-spin' : undefined} />
@@ -711,16 +712,18 @@ export default function TelecallerRecords() {
                           className="btn btn-primary btn-sm"
                           onClick={() => setSelectedRecord(r)}
                           style={{
-                            height: 26,
-                            padding: '0 8px',
-                            fontSize: 11,
-                            borderRadius: 6,
+                            height: 28,
+                            padding: '0 10px',
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            borderRadius: 7,
                             background: '#bf3646',
                             borderColor: '#bf3646',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: 4,
+                            gap: 5,
                             whiteSpace: 'nowrap',
+                            boxShadow: '0 1px 2px rgba(191, 54, 70, 0.2)',
                           }}
                         >
                           <Icon name="call" size={13} />

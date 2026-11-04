@@ -19,14 +19,9 @@ type PresetKey =
   | 'custom';
 
 const PRESET_OPTIONS: { key: PresetKey; label: string }[] = [
-  { key: 'allTime', label: 'All Time' },
   { key: 'today', label: 'Today' },
   { key: 'yesterday', label: 'Yesterday' },
-  { key: 'last7Days', label: 'Last 7 Days' },
-  { key: 'last30Days', label: 'Last 30 Days' },
-  { key: 'thisMonth', label: 'This Month' },
-  { key: 'lastMonth', label: 'Last Month' },
-  { key: 'thisYear', label: 'This Year' },
+  { key: 'last7Days', label: '7 Days' },
   { key: 'custom', label: 'Custom' },
 ];
 
@@ -53,10 +48,9 @@ interface StatDetailModalData {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [preset, setPreset] = useState<PresetKey>('allTime');
+  const [preset, setPreset] = useState<PresetKey>('today');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -66,12 +60,13 @@ export default function Dashboard() {
   useTopHeader({
     left: (
       <div className="topbar-page-left">
-        <h1 className="topbar-page-title">Analytics Command Center</h1>
+        <h1 className="topbar-page-title">Dashboard</h1>
+        <span className="count-pill">Overview</span>
       </div>
     ),
     right: (
       <span className="topbar-badge-pill">
-        <Icon name="verified" size={15} /> Production Analytics • IST
+        <Icon name="verified" size={15} /> Live Operations • IST
       </span>
     ),
   }, []);
@@ -83,7 +78,6 @@ export default function Dashboard() {
         preset,
         custom_from: preset === 'custom' && customFrom ? customFrom : undefined,
         custom_to: preset === 'custom' && customTo ? customTo : undefined,
-        status: statusFilter !== 'ALL' ? statusFilter : undefined,
       })
       .then((result) => {
         setData(result);
@@ -101,7 +95,7 @@ export default function Dashboard() {
   useEffect(() => {
     setLoading(true);
     fetchData();
-  }, [preset, statusFilter]);
+  }, [preset]);
 
   // Handle custom date trigger
   const handleApplyCustomDates = () => {
@@ -121,8 +115,6 @@ export default function Dashboard() {
     const params = new URLSearchParams();
     if (options?.status) {
       params.set('status', options.status);
-    } else if (statusFilter !== 'ALL') {
-      params.set('status', statusFilter);
     }
     if (options?.userId) params.set('user_id', String(options.userId));
     if (options?.assignedAuditorId) params.set('assigned_auditor_id', String(options.assignedAuditorId));
@@ -154,7 +146,6 @@ export default function Dashboard() {
   const pendingVerifications = overview?.pending_verifications ?? data?.pending_records ?? 0;
   const completionRate = overview?.completion_rate ?? data?.completion_rate ?? 0;
   const falsePositives = funnel?.false_positives_qc ?? 0;
-  const qaNewRecords = overview?.qa_new_records ?? data?.qa_new_records ?? 0;
 
   const operators = useMemo(() => {
     return [...(data?.inspector_stats ?? [])]
@@ -190,6 +181,32 @@ export default function Dashboard() {
 
   const overallApprovalRate = totalQcReviewed > 0 ? Math.round((totalApproved / totalQcReviewed) * 100) : 0;
 
+  // Lead Status & Funnel Distribution Donut Chart data (matches TeamPulse reference)
+  const statusDonutData = useMemo(() => {
+    const items = [
+      { label: 'Completed Visits', count: completedVerifications, color: '#10b981' },
+      { label: 'Pending in Queue', count: pendingVerifications, color: '#0284c7' },
+      { label: 'Active Construction Yes', count: confirmedConstruction, color: '#f59e0b' },
+      { label: 'Commercial & Builders', count: commercialCount, color: '#8b5cf6' },
+      { label: 'Phone Contacts Captured', count: phonesObtained, color: '#f43f5e' },
+      { label: 'QA Verified & Approved', count: totalApproved, color: '#3b82f6' },
+    ];
+    const total = items.reduce((acc, it) => acc + it.count, 0) || 1;
+    let cumulative = 0;
+    return items.map((it) => {
+      const frac = it.count / total;
+      const startAngle = cumulative * 2 * Math.PI;
+      cumulative += frac;
+      const endAngle = cumulative * 2 * Math.PI;
+      return {
+        ...it,
+        percent: Math.max(1, Math.round(frac * 100)),
+        startAngle,
+        endAngle,
+      };
+    });
+  }, [completedVerifications, pendingVerifications, confirmedConstruction, commercialCount, phonesObtained, totalApproved]);
+
   return (
     <PageShell>
       {loading && !data && <LoadingPanel text="Initializing Analytics Command Center..." />}
@@ -202,49 +219,86 @@ export default function Dashboard() {
 
       {data && (
         <div className="command-center">
-          {/* ── Top Header & Global Toolbar ───────────────────────────────── */}
-          <header className="cc-header">
-            <div className="cc-header-titles">
-              <h1>
-                <Icon name="dashboard" size={24} />
-                Analytics Command Center
-              </h1>
-              <p>
-                <Icon name="calendar_today" size={14} />
+          {/* ── Compact SaaS Dashboard Header ────────────────────────────── */}
+          <header className="dashboard-hero-compact">
+            <div className="dashboard-hero-left">
+              <div className="dashboard-title-row">
+                <h1 className="dashboard-heading">
+                  <Icon name="dashboard" size={24} style={{ color: '#2563eb' }} />
+                  Dashboard
+                </h1>
+                <span className="dashboard-live-pill">
+                  <span className="dashboard-live-dot" />
+                  Live Sync • {totalRecords.toLocaleString()} Records
+                </span>
+              </div>
+              <p className="dashboard-subtitle">
+                <Icon name="calendar_today" size={13} />
                 {data.period_info?.label || 'All-Time Operations Overview'}
+                {updatedAt ? ` • Last updated ${formatClock(updatedAt)}` : ''} • Real-time field inspections, QC velocity, and lead intelligence.
               </p>
             </div>
-            <div className="cc-header-controls">
-              <span className="cc-live-badge">
-                <span className="cc-live-dot" />
-                Live Database Synchronized • {totalRecords.toLocaleString()} Records
-              </span>
+
+            <div className="dashboard-hero-right">
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => navigate('/records')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  height: 36,
+                  padding: '0 14px',
+                  borderRadius: 9,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  background: '#2563eb',
+                  color: '#fff',
+                  border: 'none',
+                  boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+                }}
+                title="Go to Records manager"
+              >
+                <Icon name="table_view" size={15} />
+                <span>Manage Records</span>
+              </button>
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
                 onClick={() => fetchData(true)}
                 disabled={isRefreshing}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  height: 36,
+                  padding: '0 13px',
+                  borderRadius: 9,
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
                 title="Refresh dashboard metrics"
               >
-                <Icon name="refresh" size={16} className={isRefreshing ? 'spin-icon' : ''} />
-                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                <Icon name="refresh" size={15} className={isRefreshing ? 'spin-icon' : ''} />
+                <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
               </button>
             </div>
           </header>
 
-          {/* ── Global Date & Filter Bar (District Filter Removed) ────────── */}
-          <section className="cc-filter-card" aria-label="Dashboard Date and Scope Filters">
-            <div className="cc-filter-row">
-              <div className="cc-filter-label-group">
-                <Icon name="filter_alt" size={16} />
-                <span>Reporting Period:</span>
+          {/* ── Compact Filter & Status Bar (Integrated 1-Row / 2-Row Sleek Toolbar) ── */}
+          <section className="dashboard-filter-bar-compact" aria-label="Dashboard Filters">
+            <div className="filter-bar-left">
+              <div className="filter-label-inline">
+                <Icon name="schedule" size={14} />
+                <span>Period:</span>
               </div>
-              <div className="cc-preset-pills" role="radiogroup" aria-label="Date Range Presets">
+              <div className="filter-pill-cluster" role="radiogroup" aria-label="Date Range Presets">
                 {PRESET_OPTIONS.map((opt) => (
                   <button
                     key={opt.key}
                     type="button"
-                    className={`cc-pill-btn ${preset === opt.key ? 'active' : ''}`}
+                    className={`filter-cluster-btn ${preset === opt.key ? 'active' : ''}`}
                     onClick={() => setPreset(opt.key)}
                   >
                     {opt.label}
@@ -272,60 +326,17 @@ export default function Dashboard() {
                     className="btn btn-primary btn-sm"
                     onClick={handleApplyCustomDates}
                     disabled={!customFrom || !customTo}
+                    style={{ height: 26, padding: '0 8px', fontSize: 11 }}
                   >
                     Apply
                   </button>
                 </div>
               )}
             </div>
-
-            <div className="cc-filter-row" style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-              <div className="cc-period-indicator">
-                <Icon name="schedule" size={14} />
-                <span>
-                  Showing active records for: <strong>{data.period_info?.label}</strong> • Last updated:{' '}
-                  {updatedAt ? formatClock(updatedAt) : '—'}
-                </span>
-                {qaNewRecords > 0 && (
-                  <span
-                    style={{
-                      marginLeft: 10,
-                      padding: '2px 8px',
-                      borderRadius: 12,
-                      background: '#ede9fe',
-                      color: '#6d28d9',
-                      fontWeight: 600,
-                      fontSize: '0.75rem',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    <Icon name="pin_drop" size={12} />
-                    {qaNewRecords} QANEW-CBE Created
-                  </span>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span className="sub-field-label">Inspection Filter:</span>
-                <div className="cc-preset-pills">
-                  {(['ALL', 'COMPLETED', 'NOT_COMPLETED'] as const).map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      className={`cc-pill-btn ${statusFilter === st ? 'active' : ''}`}
-                      onClick={() => setStatusFilter(st)}
-                    >
-                      {st === 'ALL' ? 'All Records' : st === 'COMPLETED' ? 'Completed Only' : 'Pending Only'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
           </section>
 
-          {/* ── Executive KPI Grid ────────────────────────────────────────── */}
-          <section className="cc-kpi-grid" aria-label="Executive KPI Metrics">
+          {/* ── Executive KPI Grid (8 Status Cards in Responsive Grid) ──────── */}
+          <section className="cc-kpi-grid cc-kpi-grid-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }} aria-label="Executive KPI Metrics">
             {/* Card 1: Total Properties */}
             <div
               className="cc-kpi-card clickable-stat"
@@ -345,7 +356,7 @@ export default function Dashboard() {
                     { label: 'Eligible for Field Verifiers', value: eligibleForField.toLocaleString() },
                     { label: 'Commercial Properties (QC Exclusive)', value: commercialCount.toLocaleString() },
                     { label: 'Manually Added by Verifiers', value: manuallyAdded.toLocaleString() },
-                    { label: 'QA Portal Created (QANEW-CBE)', value: qaNewRecords.toLocaleString() },
+                    { label: 'QA Verified & Approved', value: totalApproved.toLocaleString() },
                     { label: 'Completed Inspections', value: completedVerifications.toLocaleString() },
                     { label: 'Pending in Queue', value: pendingVerifications.toLocaleString() },
                   ],
@@ -355,23 +366,107 @@ export default function Dashboard() {
               title="Click to view total properties details"
             >
               <div className="cc-kpi-top">
-                <span className="cc-kpi-label">Total Properties</span>
                 <div className="cc-kpi-icon-wrap tone-blue">
                   <Icon name="dataset" size={20} />
                 </div>
+                <span className="cc-kpi-badge badge-blue">{commercialCount} Commercial</span>
               </div>
               <div className="cc-kpi-main">
                 <span className="cc-kpi-value">{totalRecords.toLocaleString()}</span>
-                <span className="cc-kpi-badge badge-blue">{commercialCount} Commercial</span>
+                <span className="cc-kpi-label">Total Properties</span>
               </div>
               <p className="cc-kpi-sub">
-                <strong>{eligibleForField.toLocaleString()}</strong> eligible •{' '}
-                <strong>{manuallyAdded}</strong> field added •{' '}
-                <strong>{qaNewRecords}</strong> QA created (QANEW-CBE)
+                <strong>{eligibleForField.toLocaleString()}</strong> eligible • <strong>{manuallyAdded}</strong> field added • <strong>{completedVerifications.toLocaleString()}</strong> completed
               </p>
             </div>
 
-            {/* Card 2: Constructions Happened */}
+            {/* Card 2: Ground Verification Scope */}
+            <div
+              className="cc-kpi-card clickable-stat"
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                setModalStat({
+                  title: 'Ground Verification Scope',
+                  category: 'Field Inspection Target',
+                  value: eligibleForField.toLocaleString(),
+                  badgeText: `${Math.round((completedVerifications / (eligibleForField || 1)) * 100)}% Verified`,
+                  badgeTone: 'blue',
+                  icon: 'explore',
+                  description:
+                    'Building and construction sites eligible for field verifier assignment and physical ground inspection, excluding commercial/big builder projects.',
+                  breakdown: [
+                    { label: 'Ground Verification Scope', value: eligibleForField.toLocaleString() },
+                    { label: 'Completed Inspections', value: completedVerifications.toLocaleString() },
+                    { label: 'Pending in Field Queue', value: pendingVerifications.toLocaleString() },
+                    { label: 'Manually Added on Site', value: manuallyAdded.toLocaleString() },
+                  ],
+                  recordLinkOptions: {},
+                })
+              }
+              title="Click to view ground verification scope details"
+            >
+              <div className="cc-kpi-top">
+                <div className="cc-kpi-icon-wrap tone-sky">
+                  <Icon name="explore" size={20} />
+                </div>
+                <span className="cc-kpi-badge badge-sky">
+                  {Math.round((completedVerifications / (eligibleForField || 1)) * 100)}% Verified
+                </span>
+              </div>
+              <div className="cc-kpi-main">
+                <span className="cc-kpi-value">{eligibleForField.toLocaleString()}</span>
+                <span className="cc-kpi-label">Ground Scope</span>
+              </div>
+              <p className="cc-kpi-sub">
+                <strong>{completedVerifications.toLocaleString()}</strong> done • <strong>{pendingVerifications.toLocaleString()}</strong> pending in queue
+              </p>
+            </div>
+
+            {/* Card 3: Completed Inspections */}
+            <div
+              className="cc-kpi-card clickable-stat"
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                setModalStat({
+                  title: 'Completed Inspections',
+                  category: 'Ground Verification Output',
+                  value: completedVerifications.toLocaleString(),
+                  badgeText: `${Math.round(completionRate)}% Rate`,
+                  badgeTone: 'green',
+                  icon: 'task_alt',
+                  description:
+                    'Physical site visits conducted by field verifiers with GPS-tagged photos, construction status verification, and contact collection.',
+                  breakdown: [
+                    { label: 'Total Completed Visits', value: completedVerifications.toLocaleString() },
+                    { label: 'Constructions Confirmed (Yes)', value: confirmedConstruction.toLocaleString() },
+                    { label: 'Mobile Numbers Collected', value: phonesObtained.toLocaleString() },
+                    { label: 'Field Added Sites', value: manuallyAdded.toLocaleString() },
+                  ],
+                  recordLinkOptions: { status: 'COMPLETED' },
+                })
+              }
+              title="Click to view completed inspections details"
+            >
+              <div className="cc-kpi-top">
+                <div className="cc-kpi-icon-wrap tone-emerald">
+                  <Icon name="task_alt" size={20} />
+                </div>
+                <span className="cc-kpi-badge badge-green">
+                  {Math.round(completionRate)}% Coverage
+                </span>
+              </div>
+              <div className="cc-kpi-main">
+                <span className="cc-kpi-value">{completedVerifications.toLocaleString()}</span>
+                <span className="cc-kpi-label">Completed Visits</span>
+              </div>
+              <p className="cc-kpi-sub">
+                <strong>{manuallyAdded}</strong> field added on-site • <strong>{confirmedConstruction}</strong> building yes
+              </p>
+            </div>
+
+            {/* Card 4: Constructions Confirmed */}
             <div
               className="cc-kpi-card clickable-stat"
               role="button"
@@ -386,7 +481,7 @@ export default function Dashboard() {
                       ? `${Math.round((confirmedConstruction / completedVerifications) * 100)}% Confirmed`
                       : 'Active Ground Sites',
                   badgeTone: 'green',
-                  icon: 'fact_check',
+                  icon: 'construction',
                   description:
                     'Properties where active, physical building work (foundations, framing, RCC pillars, brickwork, or active roofing) was verified on-ground with Construction Happened = Yes.',
                   breakdown: [
@@ -406,25 +501,65 @@ export default function Dashboard() {
               title="Click to view construction happened details"
             >
               <div className="cc-kpi-top">
-                <span className="cc-kpi-label">Constructions Happened</span>
-                <div className="cc-kpi-icon-wrap tone-emerald">
-                  <Icon name="fact_check" size={20} />
+                <div className="cc-kpi-icon-wrap tone-amber">
+                  <Icon name="construction" size={20} />
                 </div>
-              </div>
-              <div className="cc-kpi-main">
-                <span className="cc-kpi-value">{confirmedConstruction.toLocaleString()}</span>
-                <span className="cc-kpi-badge badge-green">
+                <span className="cc-kpi-badge badge-amber">
                   {completedVerifications > 0
-                    ? `${Math.round((confirmedConstruction / completedVerifications) * 100)}% Confirmed`
+                    ? `${Math.round((confirmedConstruction / completedVerifications) * 100)}% Hit Rate`
                     : 'Active'}
                 </span>
               </div>
+              <div className="cc-kpi-main">
+                <span className="cc-kpi-value">{confirmedConstruction.toLocaleString()}</span>
+                <span className="cc-kpi-label">Constructions Confirmed</span>
+              </div>
               <p className="cc-kpi-sub">
-                Active building sites on-ground out of <strong>{completedVerifications.toLocaleString()}</strong> completed visits
+                Active building sites on-ground out of <strong>{completedVerifications.toLocaleString()}</strong> visits
               </p>
             </div>
 
-            {/* Card 3: Commercial Property Excluded from Field */}
+            {/* Card 5: Pending Field Queue */}
+            <div
+              className="cc-kpi-card clickable-stat"
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                setModalStat({
+                  title: 'Pending Field Verifications',
+                  category: 'Field Inspection Backlog',
+                  value: pendingVerifications.toLocaleString(),
+                  badgeText: 'Action Required',
+                  badgeTone: 'amber',
+                  icon: 'pending_actions',
+                  description:
+                    'Catalogued properties waiting in field verifier queue for on-ground physical inspection, photo capture, and contractor outreach.',
+                  breakdown: [
+                    { label: 'Pending in Queue', value: pendingVerifications.toLocaleString() },
+                    { label: 'Ground Scope Total', value: eligibleForField.toLocaleString() },
+                    { label: 'Backlog Rate', value: eligibleForField ? `${((pendingVerifications / eligibleForField) * 100).toFixed(1)}%` : '0%' },
+                  ],
+                  recordLinkOptions: { status: 'NOT_COMPLETED' },
+                })
+              }
+              title="Click to view pending queue details"
+            >
+              <div className="cc-kpi-top">
+                <div className="cc-kpi-icon-wrap tone-amber">
+                  <Icon name="pending_actions" size={20} />
+                </div>
+                <span className="cc-kpi-badge badge-amber">Action Required</span>
+              </div>
+              <div className="cc-kpi-main">
+                <span className="cc-kpi-value" style={{ color: '#d97706' }}>{pendingVerifications.toLocaleString()}</span>
+                <span className="cc-kpi-label">Pending in Queue</span>
+              </div>
+              <p className="cc-kpi-sub">
+                Awaiting physical ground inspection by field verifiers
+              </p>
+            </div>
+
+            {/* Card 6: Commercial Property Excluded from Field */}
             <div
               className="cc-kpi-card clickable-stat"
               role="button"
@@ -452,21 +587,21 @@ export default function Dashboard() {
               title="Click to view commercial property details"
             >
               <div className="cc-kpi-top">
-                <span className="cc-kpi-label">Commercial Properties</span>
-                <div className="cc-kpi-icon-wrap tone-amber">
+                <div className="cc-kpi-icon-wrap tone-purple">
                   <Icon name="storefront" size={20} />
                 </div>
+                <span className="cc-kpi-badge badge-purple">QC Exclusive</span>
               </div>
               <div className="cc-kpi-main">
                 <span className="cc-kpi-value">{commercialCount.toLocaleString()}</span>
-                <span className="cc-kpi-badge badge-amber">Excluded From Field</span>
+                <span className="cc-kpi-label">Commercial & Builders</span>
               </div>
               <p className="cc-kpi-sub">
                 Big builders & corporate developments handled strictly via QC Desk
               </p>
             </div>
 
-            {/* Card 4: Phones Obtained */}
+            {/* Card 6: Phones Obtained */}
             <div
               className="cc-kpi-card clickable-stat"
               role="button"
@@ -501,37 +636,147 @@ export default function Dashboard() {
               title="Click to view phone numbers details"
             >
               <div className="cc-kpi-top">
-                <span className="cc-kpi-label">Phone Numbers Obtained</span>
                 <div className="cc-kpi-icon-wrap tone-rose">
                   <Icon name="call" size={20} />
                 </div>
-              </div>
-              <div className="cc-kpi-main">
-                <span className="cc-kpi-value">{phonesObtained.toLocaleString()}</span>
-                <span className="cc-kpi-badge badge-blue">
+                <span className="cc-kpi-badge badge-rose">
                   {completedVerifications > 0
                     ? `${Math.round((phonesObtained / completedVerifications) * 100)}% Yield`
                     : 'Verified'}
                 </span>
               </div>
+              <div className="cc-kpi-main">
+                <span className="cc-kpi-value">{phonesObtained.toLocaleString()}</span>
+                <span className="cc-kpi-label">Phone Numbers</span>
+              </div>
               <p className="cc-kpi-sub">
-                Unique owner & contractor contacts routed directly to Telecalling
+                Direct owner & contractor contacts routed to Telecalling
+              </p>
+            </div>
+
+            {/* Card 8: QA Auditor Approvals */}
+            <div
+              className="cc-kpi-card clickable-stat"
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                setModalStat({
+                  title: 'QA Review Velocity & Approvals',
+                  category: 'Satellite Quality Desk',
+                  value: `${overallApprovalRate}% Rate`,
+                  badgeText: `${totalApproved} Approved`,
+                  badgeTone: 'purple',
+                  icon: 'verified',
+                  description:
+                    'High-resolution satellite imagery inspection throughput and approval rate across auditor desks.',
+                  breakdown: [
+                    { label: 'Total Audits Completed', value: totalQcReviewed.toLocaleString() },
+                    { label: 'Approved Sites', value: totalApproved.toLocaleString() },
+                    { label: 'Disapproved False Positives', value: totalDisapproved.toLocaleString() },
+                    { label: 'Corporate Commercials Flagged', value: totalCommercial.toLocaleString() },
+                    { label: 'Created by QA Auditors', value: totalQaCreated.toLocaleString() },
+                  ],
+                  recordLinkOptions: { auditStatus: 'APPROVAL' },
+                })
+              }
+              title="Click to view QA audit details"
+            >
+              <div className="cc-kpi-top">
+                <div className="cc-kpi-icon-wrap tone-purple">
+                  <Icon name="verified" size={20} />
+                </div>
+                <span className="cc-kpi-badge badge-purple">{overallApprovalRate}% Approved</span>
+              </div>
+              <div className="cc-kpi-main">
+                <span className="cc-kpi-value" style={{ color: '#7c3aed' }}>{totalApproved.toLocaleString()}</span>
+                <span className="cc-kpi-label">QA Verified &amp; Approved</span>
+              </div>
+              <p className="cc-kpi-sub">
+                <strong>{totalQcReviewed.toLocaleString()}</strong> VHR audits done • <strong>{totalDisapproved}</strong> false positives
               </p>
             </div>
           </section>
 
-          {/* ── Middle Tier Grid: Trend Chart & PPT Funnel Split ─────────── */}
-          <section className="cc-middle-grid">
-            {/* Left Column: Trend Chart & Funnel Table */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Daily / Periodic Trend Curve */}
-              <AnalyticsTrendChart
-                trends={trends}
-                title="Operational Velocity & Inspection Volume"
-                subtitle="Field verification completions vs dispatched workload assignments"
-              />
+          {/* ── Middle Tier Grid: Trend Chart & Donut Distribution (matches TeamPulse reference) ── */}
+          <section className="cc-middle-grid" style={{ gridTemplateColumns: '1.45fr 1fr' }}>
+            {/* Left: Trend Curve */}
+            <AnalyticsTrendChart
+              trends={trends}
+              title="Operational Velocity & Inspection Volume"
+              subtitle="Field verification completions vs dispatched workload assignments over time"
+            />
 
-              {/* PPT Funnel & QC Split Table */}
+            {/* Right: Lead Status & Operational Funnel Donut Chart */}
+            <div className="donut-distribution-card">
+              <div className="cc-card-head">
+                <div>
+                  <h3 className="cc-card-title" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <Icon name="pie_chart" size={18} style={{ color: '#2563eb' }} />
+                    Lead Status &amp; Funnel Distribution
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>
+                    Proportional breakdown across verified and pending catalog
+                  </p>
+                </div>
+                <span className="cc-card-badge">{totalRecords.toLocaleString()} Total</span>
+              </div>
+
+              <div className="donut-chart-wrap">
+                <div className="donut-svg-center-wrap">
+                  <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+                    {statusDonutData.map((slice) => {
+                      const strokeDasharray = `${slice.percent * 2.83} 283`;
+                      const strokeDashoffset = -slice.startAngle / (2 * Math.PI) * 283;
+                      return (
+                        <circle
+                          key={slice.label}
+                          cx="50"
+                          cy="50"
+                          r="42"
+                          fill="transparent"
+                          stroke={slice.color}
+                          strokeWidth="15"
+                          strokeDasharray={strokeDasharray}
+                          strokeDashoffset={strokeDashoffset}
+                          style={{ transition: 'stroke-dasharray 0.3s ease' }}
+                        />
+                      );
+                    })}
+                  </svg>
+                  <div className="donut-svg-center-text">
+                    <strong>{totalRecords.toLocaleString()}</strong>
+                    <span>Total Scope</span>
+                  </div>
+                </div>
+
+                <div className="donut-legend-list">
+                  {statusDonutData.map((slice) => (
+                    <div
+                      key={slice.label}
+                      className="donut-legend-row"
+                      onClick={() => navigate('/records')}
+                      title={`View ${slice.label}`}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
+                        <span className="donut-legend-dot" style={{ background: slice.color }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1e293b', fontWeight: 600 }}>
+                          {slice.label}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexShrink: 0 }}>
+                        <strong style={{ color: '#0f172a' }}>{slice.count.toLocaleString()}</strong>
+                        <span style={{ color: '#64748b', fontSize: '0.7rem' }}>({slice.percent}%)</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ── Full-Width Section: PPT Operational Funnel & Stage Progression ── */}
+          <div style={{ width: '100%' }}>
+            {/* PPT Funnel & QC Split Table */}
               <div className="cc-funnel-card">
                 <div className="cc-card-head">
                   <h3 className="cc-card-title">
@@ -879,50 +1124,6 @@ export default function Dashboard() {
                         </td>
                       </tr>
 
-                      {/* Row 8: QA Created Leads (QANEW) */}
-                      <tr
-                        className="clickable-row"
-                        onClick={() =>
-                          setModalStat({
-                            title: 'QA Created Leads (QANEW-CBE)',
-                            category: 'Funnel Stage 8',
-                            value: qaNewRecords.toLocaleString(),
-                            badgeText: 'QA Portal Source',
-                            badgeTone: 'purple',
-                            icon: 'pin_drop',
-                            description:
-                              'New construction leads identified on high-resolution satellite imagery or coordinate input via the QA Auditor portal with QANEW-CBE unique ID scheme.',
-                            breakdown: [
-                              { label: 'QA Created Records (QANEW-CBE)', value: qaNewRecords.toLocaleString() },
-                              { label: 'Unique ID Prefix', value: 'QANEW-CBE' },
-                              { label: 'Source Provenance', value: 'qa_portal' },
-                            ],
-                            recordLinkOptions: {},
-                          })
-                        }
-                      >
-                        <td>
-                          <div className="cc-funnel-stage">
-                            <span className="cc-funnel-stage-name">8. QA Created Leads (QANEW-CBE)</span>
-                            <span className="cc-funnel-tag tag-qanew">
-                              <span className="cc-funnel-tag-dot" />QA New
-                            </span>
-                          </div>
-                        </td>
-                        <td style={{ textAlign: 'right', fontWeight: 700, color: '#6d28d9' }}>
-                          {qaNewRecords.toLocaleString()}
-                        </td>
-                        <td style={{ textAlign: 'right', color: '#64748b' }}>QA Portal</td>
-                        <td>
-                          <div className="cc-funnel-bar-wrap">
-                            <div
-                              className="cc-funnel-bar-fill"
-                              style={{ width: `${Math.min(100, qaNewRecords * 5)}%`, background: '#8b5cf6' }}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-
                       {/* Row 8: False Positives */}
                       <tr
                         className="clickable-row"
@@ -946,7 +1147,7 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span className="cc-funnel-stage-name">9. False Positives (Sites without Construction)</span>
+                            <span className="cc-funnel-stage-name">8. False Positives (Sites without Construction)</span>
                             <span className="cc-funnel-tag tag-disapproved">
                               <span className="cc-funnel-tag-dot" />Disapproved
                             </span>
@@ -994,7 +1195,7 @@ export default function Dashboard() {
                       >
                         <td>
                           <div className="cc-funnel-stage">
-                            <span className="cc-funnel-stage-name">10. Pending Field Verifications</span>
+                            <span className="cc-funnel-stage-name">9. Pending Field Verifications</span>
                             <span className="cc-funnel-tag tag-queue">
                               <span className="cc-funnel-tag-dot" />In Queue
                             </span>
@@ -1022,10 +1223,10 @@ export default function Dashboard() {
                   </table>
                 </div>
               </div>
-            </div>
+          </div>
 
-            {/* Right Column: Telecaller Performance & Geography */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* ── 2-Column Section: Telecaller Outreach Desk & Regional Distribution ── */}
+          <section className="cc-middle-grid" style={{ gridTemplateColumns: '1.2fr 1fr' }}>
               {/* Telecaller Desk Card */}
               <div className="cc-tele-card">
                 <div className="cc-card-head">
@@ -1296,7 +1497,6 @@ export default function Dashboard() {
                   })}
                 </div>
               </div>
-            </div>
           </section>
 
           {/* ── Lower Tier: Field Verifier Workload & Performance ─────────── */}
@@ -1454,7 +1654,7 @@ export default function Dashboard() {
                   QA Reviewer &amp; Auditor Performance
                 </h3>
                 <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                  Satellite VHR imagery reviews, street-view audits, false positive filtering, and QANEW site creations.
+                  Satellite VHR imagery reviews, street-view audits, false positive filtering, and verification approvals.
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1544,7 +1744,7 @@ export default function Dashboard() {
                   {totalQaCreated.toLocaleString()}
                 </div>
                 <div style={{ fontSize: '0.70rem', color: '#8b5cf6', marginTop: 1, fontWeight: 500 }}>
-                  QANEW-CBE discoveries
+                  Auditor additions
                 </div>
               </div>
             </div>
@@ -1588,7 +1788,7 @@ export default function Dashboard() {
                               { label: 'Disapproved (False Positives)', value: aud.disapproved.toLocaleString() },
                               { label: 'Commercial Properties Flagged', value: aud.commercial.toLocaleString() },
                               { label: 'Pending in Auditor Queue', value: aud.pending.toLocaleString() },
-                              { label: 'Newly Created from QA Map (QANEW-CBE)', value: aud.qa_created.toLocaleString() },
+                              { label: 'Newly Created from QA Map', value: aud.qa_created.toLocaleString() },
                               { label: 'Reviewed Today', value: aud.today_done.toLocaleString() },
                               { label: 'Review Progress Rate', value: `${Math.round(aud.completion_rate)}%` },
                             ],
@@ -1724,6 +1924,58 @@ export default function Dashboard() {
               </div>
             </section>
           )}
+
+          {/* ── Executive Quick Actions & Operational Hub (matches TeamPulse reference) ── */}
+          <section
+            style={{
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: 16,
+              padding: '22px 24px',
+              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+            }}
+            aria-label="Executive Quick Action Hub"
+          >
+            <div className="cc-card-head" style={{ marginBottom: 14 }}>
+              <div>
+                <h3 className="cc-card-title" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <Icon name="auto_awesome" size={18} style={{ color: '#2563eb' }} />
+                  Executive Quick Actions &amp; Operations Hub
+                </h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>
+                  One-click shortcuts to key management consoles, verification desks, and task sheet imports
+                </p>
+              </div>
+              <span className="cc-card-badge">Fast Navigation</span>
+            </div>
+
+            <div className="quick-launch-grid">
+              <button type="button" className="quick-launch-btn" onClick={() => navigate('/records')}>
+                <Icon name="table_view" size={22} style={{ color: '#2563eb' }} />
+                <span>Manage Records</span>
+              </button>
+              <button type="button" className="quick-launch-btn" onClick={() => navigate('/auditor/dashboard')}>
+                <Icon name="fact_check" size={22} style={{ color: '#7c3aed' }} />
+                <span>QA Review Desk</span>
+              </button>
+              <button type="button" className="quick-launch-btn" onClick={() => navigate('/telecaller/records')}>
+                <Icon name="call" size={22} style={{ color: '#bf3646' }} />
+                <span>Calling Queue</span>
+              </button>
+              <button type="button" className="quick-launch-btn" onClick={() => navigate('/records/import')}>
+                <Icon name="cloud_upload" size={22} style={{ color: '#059669' }} />
+                <span>Import Task Sheet</span>
+              </button>
+              <button type="button" className="quick-launch-btn" onClick={() => navigate('/admin/users')}>
+                <Icon name="group" size={22} style={{ color: '#d97706' }} />
+                <span>Manage Users</span>
+              </button>
+              <button type="button" className="quick-launch-btn" onClick={() => navigate('/admin/map')}>
+                <Icon name="pin_drop" size={22} style={{ color: '#0284c7' }} />
+                <span>GIS Spatial Map</span>
+              </button>
+            </div>
+          </section>
 
           {/* ── Stat Details Popup Modal ──────────────────────────────────── */}
           {modalStat && (
