@@ -623,30 +623,33 @@ def build_records_report(
         detail["photo_count"] = len(images)
         detail["captured_at"] = images[0]["captured_at"] if images else None
 
-        # Robustly resolve Field Coordinates & GPS Fix from direct fields, photos, or manual entries
-        f_lat = detail.get("field_latitude") or getattr(record, "field_latitude", None)
-        f_lon = detail.get("field_longitude") or getattr(record, "field_longitude", None)
+        # Robustly resolve Field Coordinates & GPS Fix prioritizing primary photo GPS (matching portal & deviation)
+        f_lat = None
+        f_lon = None
+        rec_images = sorted(getattr(record, "images", []) or [], key=lambda img: getattr(img, "photo_order", 0) or 0)
+        for img in rec_images:
+            i_lat = getattr(img, "latitude", None)
+            i_lon = getattr(img, "longitude", None)
+            if i_lat is not None and i_lon is not None and (i_lat != 0 or i_lon != 0):
+                f_lat = i_lat
+                f_lon = i_lon
+                break
 
         if f_lat is None or f_lon is None or (f_lat == 0 and f_lon == 0):
-            # Fallback 1: Genuine GPS fix from captured inspection photos
-            for img in getattr(record, "images", []) or []:
-                i_lat = getattr(img, "latitude", None)
-                i_lon = getattr(img, "longitude", None)
-                if i_lat is not None and i_lon is not None and (i_lat != 0 or i_lon != 0):
-                    f_lat = i_lat
-                    f_lon = i_lon
-                    break
+            rec_flat = detail.get("field_latitude") or getattr(record, "field_latitude", None)
+            rec_flon = detail.get("field_longitude") or getattr(record, "field_longitude", None)
+            if rec_flat is not None and rec_flon is not None and (rec_flat != 0 or rec_flon != 0):
+                f_lat = rec_flat
+                f_lon = rec_flon
 
         if f_lat is None or f_lon is None or (f_lat == 0 and f_lon == 0):
-            # Fallback 2: Updated coordinates or on-site manual creation coordinates
-            cand = getattr(record, "updated_coordinates", None)
-            if not cand and (getattr(record, "source", None) in ("manual", "qa_portal") or getattr(record, "status", None) == "COMPLETED"):
-                cand = getattr(record, "coordinates", None)
-            if cand:
-                from app.services.record_service import _parse_coordinates
-                p = _parse_coordinates(cand)
-                if p:
-                    f_lat, f_lon = p
+            if getattr(record, "source", None) in ("manual", "qa_portal") or getattr(record, "is_manually_added", False):
+                cand = getattr(record, "updated_coordinates", None) or getattr(record, "coordinates", None)
+                if cand:
+                    from app.services.record_service import _parse_coordinates
+                    p = _parse_coordinates(cand)
+                    if p:
+                        f_lat, f_lon = p
 
         detail["field_latitude"] = f_lat
         detail["field_longitude"] = f_lon
