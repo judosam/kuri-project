@@ -19,6 +19,7 @@ type PresetKey =
   | 'custom';
 
 const PRESET_OPTIONS: { key: PresetKey; label: string }[] = [
+  { key: 'allTime', label: 'All Time' },
   { key: 'today', label: 'Today' },
   { key: 'yesterday', label: 'Yesterday' },
   { key: 'last7Days', label: '7 Days' },
@@ -48,7 +49,7 @@ interface StatDetailModalData {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [preset, setPreset] = useState<PresetKey>('today');
+  const [preset, setPreset] = useState<PresetKey>('allTime');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [data, setData] = useState<DashboardData | null>(null);
@@ -335,8 +336,8 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* ── Executive KPI Grid (8 Status Cards in Responsive Grid) ──────── */}
-          <section className="cc-kpi-grid cc-kpi-grid-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }} aria-label="Executive KPI Metrics">
+          {/* ── Executive KPI Grid (8 Balanced, Compact Cards in 4x2 Grid) ──────── */}
+          <section className="cc-kpi-grid cc-kpi-grid-8" aria-label="Executive KPI Metrics">
             {/* Card 1: Total Properties */}
             <div
               className="cc-kpi-card clickable-stat"
@@ -367,7 +368,7 @@ export default function Dashboard() {
             >
               <div className="cc-kpi-top">
                 <div className="cc-kpi-icon-wrap tone-blue">
-                  <Icon name="dataset" size={20} />
+                  <Icon name="dataset" size={16} />
                 </div>
                 <span className="cc-kpi-badge badge-blue">{commercialCount} Commercial</span>
               </div>
@@ -408,7 +409,7 @@ export default function Dashboard() {
             >
               <div className="cc-kpi-top">
                 <div className="cc-kpi-icon-wrap tone-sky">
-                  <Icon name="explore" size={20} />
+                  <Icon name="explore" size={16} />
                 </div>
                 <span className="cc-kpi-badge badge-sky">
                   {Math.round((completedVerifications / (eligibleForField || 1)) * 100)}% Verified
@@ -451,7 +452,7 @@ export default function Dashboard() {
             >
               <div className="cc-kpi-top">
                 <div className="cc-kpi-icon-wrap tone-emerald">
-                  <Icon name="task_alt" size={20} />
+                  <Icon name="task_alt" size={16} />
                 </div>
                 <span className="cc-kpi-badge badge-green">
                   {Math.round(completionRate)}% Coverage
@@ -466,7 +467,47 @@ export default function Dashboard() {
               </p>
             </div>
 
-            {/* Card 4: Constructions Confirmed */}
+            {/* Card 4: Pending Field Queue */}
+            <div
+              className="cc-kpi-card clickable-stat"
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                setModalStat({
+                  title: 'Pending Field Verifications',
+                  category: 'Field Inspection Backlog',
+                  value: pendingVerifications.toLocaleString(),
+                  badgeText: 'Action Required',
+                  badgeTone: 'amber',
+                  icon: 'pending_actions',
+                  description:
+                    'Catalogued properties waiting in field verifier queue for on-ground physical inspection, photo capture, and contractor outreach.',
+                  breakdown: [
+                    { label: 'Pending in Queue', value: pendingVerifications.toLocaleString() },
+                    { label: 'Ground Scope Total', value: eligibleForField.toLocaleString() },
+                    { label: 'Backlog Rate', value: eligibleForField ? `${((pendingVerifications / eligibleForField) * 100).toFixed(1)}%` : '0%' },
+                  ],
+                  recordLinkOptions: { status: 'NOT_COMPLETED' },
+                })
+              }
+              title="Click to view pending queue details"
+            >
+              <div className="cc-kpi-top">
+                <div className="cc-kpi-icon-wrap tone-amber">
+                  <Icon name="pending_actions" size={16} />
+                </div>
+                <span className="cc-kpi-badge badge-amber">Action Required</span>
+              </div>
+              <div className="cc-kpi-main">
+                <span className="cc-kpi-value" style={{ color: '#d97706' }}>{pendingVerifications.toLocaleString()}</span>
+                <span className="cc-kpi-label">Pending in Queue</span>
+              </div>
+              <p className="cc-kpi-sub">
+                Awaiting physical ground inspection by field verifiers
+              </p>
+            </div>
+
+            {/* Card 5: Constructions Confirmed */}
             <div
               className="cc-kpi-card clickable-stat"
               role="button"
@@ -502,7 +543,7 @@ export default function Dashboard() {
             >
               <div className="cc-kpi-top">
                 <div className="cc-kpi-icon-wrap tone-amber">
-                  <Icon name="construction" size={20} />
+                  <Icon name="construction" size={16} />
                 </div>
                 <span className="cc-kpi-badge badge-amber">
                   {completedVerifications > 0
@@ -516,46 +557,6 @@ export default function Dashboard() {
               </div>
               <p className="cc-kpi-sub">
                 Active building sites on-ground out of <strong>{completedVerifications.toLocaleString()}</strong> visits
-              </p>
-            </div>
-
-            {/* Card 5: Pending Field Queue */}
-            <div
-              className="cc-kpi-card clickable-stat"
-              role="button"
-              tabIndex={0}
-              onClick={() =>
-                setModalStat({
-                  title: 'Pending Field Verifications',
-                  category: 'Field Inspection Backlog',
-                  value: pendingVerifications.toLocaleString(),
-                  badgeText: 'Action Required',
-                  badgeTone: 'amber',
-                  icon: 'pending_actions',
-                  description:
-                    'Catalogued properties waiting in field verifier queue for on-ground physical inspection, photo capture, and contractor outreach.',
-                  breakdown: [
-                    { label: 'Pending in Queue', value: pendingVerifications.toLocaleString() },
-                    { label: 'Ground Scope Total', value: eligibleForField.toLocaleString() },
-                    { label: 'Backlog Rate', value: eligibleForField ? `${((pendingVerifications / eligibleForField) * 100).toFixed(1)}%` : '0%' },
-                  ],
-                  recordLinkOptions: { status: 'NOT_COMPLETED' },
-                })
-              }
-              title="Click to view pending queue details"
-            >
-              <div className="cc-kpi-top">
-                <div className="cc-kpi-icon-wrap tone-amber">
-                  <Icon name="pending_actions" size={20} />
-                </div>
-                <span className="cc-kpi-badge badge-amber">Action Required</span>
-              </div>
-              <div className="cc-kpi-main">
-                <span className="cc-kpi-value" style={{ color: '#d97706' }}>{pendingVerifications.toLocaleString()}</span>
-                <span className="cc-kpi-label">Pending in Queue</span>
-              </div>
-              <p className="cc-kpi-sub">
-                Awaiting physical ground inspection by field verifiers
               </p>
             </div>
 
@@ -588,7 +589,7 @@ export default function Dashboard() {
             >
               <div className="cc-kpi-top">
                 <div className="cc-kpi-icon-wrap tone-purple">
-                  <Icon name="storefront" size={20} />
+                  <Icon name="storefront" size={16} />
                 </div>
                 <span className="cc-kpi-badge badge-purple">QC Exclusive</span>
               </div>
@@ -637,7 +638,7 @@ export default function Dashboard() {
             >
               <div className="cc-kpi-top">
                 <div className="cc-kpi-icon-wrap tone-rose">
-                  <Icon name="call" size={20} />
+                  <Icon name="call" size={16} />
                 </div>
                 <span className="cc-kpi-badge badge-rose">
                   {completedVerifications > 0
@@ -683,7 +684,7 @@ export default function Dashboard() {
             >
               <div className="cc-kpi-top">
                 <div className="cc-kpi-icon-wrap tone-purple">
-                  <Icon name="verified" size={20} />
+                  <Icon name="verified" size={16} />
                 </div>
                 <span className="cc-kpi-badge badge-purple">{overallApprovalRate}% Approved</span>
               </div>

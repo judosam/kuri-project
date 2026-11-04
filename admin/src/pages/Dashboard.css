@@ -188,11 +188,11 @@
   color: #0f172a;
 }
 
-/* 8-Card Responsive KPI Grid */
+/* 8-Card Responsive KPI Grid (Balanced 4x2) */
 .cc-kpi-grid-8 {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 
 /* Donut Chart Component in Middle Grid */
@@ -322,20 +322,21 @@
 .cc-kpi-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 16px 18px;
+  border-radius: 12px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.18s ease;
   position: relative;
   overflow: hidden;
+  min-height: 104px;
 }
 
 .cc-kpi-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 4px 10px -2px rgba(15, 23, 42, 0.03);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px -4px rgba(15, 23, 42, 0.07), 0 3px 6px -1px rgba(15, 23, 42, 0.03);
   border-color: #cbd5e1;
 }
 
@@ -343,21 +344,21 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 
 .cc-kpi-label {
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 0.74rem;
+  font-weight: 600;
   letter-spacing: -0.01em;
-  color: #1e293b;
-  margin-top: 4px;
+  color: #334155;
+  margin-top: 2px;
 }
 
 .cc-kpi-icon-wrap {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -366,7 +367,7 @@
 }
 
 .cc-kpi-card:hover .cc-kpi-icon-wrap {
-  transform: scale(1.06);
+  transform: scale(1.05);
 }
 
 .cc-kpi-icon-wrap.tone-blue { background: #eff6ff; color: #2563eb; border: 1px solid #dbeafe; }
@@ -379,26 +380,27 @@
 .cc-kpi-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-bottom: 8px;
+  gap: 1px;
+  margin-bottom: 4px;
 }
 
 .cc-kpi-value {
-  font-size: 1.85rem;
+  font-size: 1.40rem;
   font-weight: 800;
   color: #0f172a;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
 .cc-kpi-badge {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
-  font-size: 0.72rem;
+  font-size: 0.67rem;
   font-weight: 600;
   letter-spacing: 0.01em;
+  height: 18px;
 }
 
 .cc-kpi-badge.badge-green { background: #ecfdf5; color: #065f46; border: 1px solid #d1fae5; }
@@ -409,10 +411,13 @@
 .cc-kpi-badge.badge-sky { background: #f0f9ff; color: #075985; border: 1px solid #e0f2fe; }
 
 .cc-kpi-sub {
-  font-size: 0.74rem;
+  font-size: 0.69rem;
   color: #64748b;
   margin: 0;
-  line-height: 1.45;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Middle Tier Grid (Charts + PPT Tables) ──────────────────────────────── */
