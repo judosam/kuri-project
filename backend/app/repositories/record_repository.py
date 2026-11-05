@@ -393,14 +393,20 @@ class RecordRepository:
                 continue
             rec.user_id = target_user_id
             rec.staged_operator_id = target_user_id
-            rec.reassigned_to_id = target_user_id
-            rec.reassigned_at = now_utc
             rec.assigned_at = now_utc
-
-            # Field Verification Status is marked NOT_COMPLETED and REASSIGNED
             rec.status = 'NOT_COMPLETED'
-            rec.revisit_status = 'REASSIGNED'
             rec.updated_at = now_utc
+
+            # Only genuine prior completed visits carry revisit reassignment tracking
+            has_prior_field_visit = bool(rec.field_captured_at or rec.status in ('COMPLETED', 'Updated Revisited'))
+            if has_prior_field_visit:
+                rec.reassigned_to_id = target_user_id
+                rec.reassigned_at = now_utc
+                rec.revisit_status = 'REASSIGNED'
+            else:
+                rec.reassigned_to_id = None
+                rec.reassigned_at = None
+                rec.revisit_status = None
 
             # Preserve all QC details, comments, and audit decisions intact!
             reassigned += 1

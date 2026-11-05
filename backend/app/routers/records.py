@@ -177,10 +177,14 @@ async def create_record(
         if existing and record_service.can_access(user, existing):
             record = existing
             was_completed = record.status in ("COMPLETED", "Updated Revisited", "UPDATED_REVISITED")
-            is_revisit = (
-                record.reassigned_to_id is not None
-                or record.revisit_status in ("REASSIGNED", "PENDING_REVISIT", "Updated Revisited", "UPDATED_REVISITED")
-                or was_completed
+            # First-time field verification is ALWAYS Completed (never Revisited)
+            # A visit is only a revisit if the record was ALREADY completed on a prior visit
+            is_revisit = bool(
+                was_completed
+                and (
+                    record.revisit_status in ("REASSIGNED", "PENDING_REVISIT", "Updated Revisited", "UPDATED_REVISITED")
+                    or record.follow_up_date is not None
+                )
             )
             closed_map = {
                 "NOT_INTERESTED": "Not Interested",
@@ -192,8 +196,6 @@ async def create_record(
             }
             if request.status in closed_map:
                 target_status = closed_map[request.status]
-            elif is_revisit:
-                target_status = "Updated Revisited"
             else:
                 target_status = "COMPLETED"
 
@@ -227,6 +229,9 @@ async def create_record(
                 if info_parts:
                     update_data["updated_information"] = " | ".join(info_parts)
             else:
+                # First-time completion: ensure clean Completed state without revisit flags
+                update_data["revisit_status"] = None
+                update_data["updated_information"] = None
                 if cur_coords and not (record.coordinates or "").strip() and not is_closed_status:
                     update_data["coordinates"] = cur_coords
 
@@ -917,13 +922,18 @@ async def mark_record_status(
     record.status = canonical_status
     record.field_captured_at = dt.now(dt_timezone.utc)
 
-    is_revisit = (
-        record.reassigned_to_id is not None
-        or record.revisit_status in ("REASSIGNED", "PENDING_REVISIT", "Updated Revisited", "UPDATED_REVISITED")
-        or old_status in ("COMPLETED", "Updated Revisited", "UPDATED_REVISITED")
+    was_previously_completed = old_status in ("COMPLETED", "Updated Revisited", "UPDATED_REVISITED")
+    is_revisit = bool(
+        was_previously_completed
+        and (
+            record.revisit_status in ("REASSIGNED", "PENDING_REVISIT", "Updated Revisited", "UPDATED_REVISITED")
+            or record.follow_up_date is not None
+        )
     )
     if is_revisit:
         record.revisit_status = "Updated Revisited"
+    elif not was_previously_completed:
+        record.revisit_status = None
 
     # When marking status, coordinates (coordinates, updated_coordinates, field_latitude/longitude)
     # must NEVER be updated or overwritten — preserving the original site location intact.

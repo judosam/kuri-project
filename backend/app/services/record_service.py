@@ -599,13 +599,9 @@ class RecordService:
 
         has_prior_history = bool(
             record.status in ("COMPLETED", "Updated Revisited", "UPDATED_REVISITED")
-            or record.revisit_status
-            or record.images
             or getattr(record, "field_captured_at", None)
-            or getattr(record, "updated_information", None)
         )
-        was_previously_assigned = bool(record.user_id and record.user_id != verifier_id)
-        is_reassignment = was_previously_assigned or has_prior_history
+        is_reassignment = has_prior_history
 
         now_utc = datetime.now(timezone.utc)
         record.user_id = verifier_id

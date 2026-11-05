@@ -1656,12 +1656,10 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
             {/* 5. Field operator inspection */}
             {(() => {
               const isRevisitOrEdited = Boolean(
-                record.reassigned_to_name ||
-                record.revisit_status ||
-                record.updated_coordinates ||
-                record.updated_information ||
+                record.revisit_status === 'Updated Revisited' ||
                 record.status === 'Updated Revisited' ||
-                record.status === 'UPDATED_REVISITED'
+                record.status === 'UPDATED_REVISITED' ||
+                (record.field_history && record.field_history.length > 0)
               );
               const effectiveCapturedAt = capturedTime(record);
 

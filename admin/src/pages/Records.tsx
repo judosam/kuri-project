@@ -2664,7 +2664,7 @@ export default function Records({
       r.updated_coordinates
     );
     const isReassigned = !isComplete && !isClosed && hasPriorHistory && (r.reassigned_to_id != null || r.revisit_status === 'REASSIGNED' || r.revisit_status === 'PENDING_REVISIT');
-    const isRevisited = isComplete && (r.status === 'Updated Revisited' || r.status === 'UPDATED_REVISITED' || r.revisit_status === 'Updated Revisited' || r.revisit_status === 'COMPLETED' || (r.reassigned_to_id != null && (r.updated_coordinates || r.updated_information)));
+    const isRevisited = isComplete && (r.status === 'Updated Revisited' || r.status === 'UPDATED_REVISITED' || r.revisit_status === 'Updated Revisited');
     
     let bg = isComplete ? '#ecfdf5' : isReassigned ? '#eff6ff' : '#fff7ed';
     let color = isComplete ? '#059669' : isReassigned ? '#1d4ed8' : '#d97706';
