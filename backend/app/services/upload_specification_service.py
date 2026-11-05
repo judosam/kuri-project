@@ -301,12 +301,16 @@ class UploadSpecificationService:
                 conf_val = 0.85
 
             # Priority Tier
-            prio_raw = str(self.get_val(row, ["priority_tier", "priority", "tier"], "Tier-1")).strip()
-            prio_clean = "Tier-1"
-            if "2" in prio_raw:
-                prio_clean = "Tier-2"
-            elif "3" in prio_raw:
-                prio_clean = "Tier-3"
+            prio_raw = str(self.get_val(row, ["priority_tier", "priority", "tier"], "")).strip()
+            prio_clean = None
+            if prio_raw and prio_raw.lower() not in ("none", "null", "-", "blank", "nan"):
+                prio_lower = prio_raw.lower()
+                if "1" in prio_lower or "high" in prio_lower:
+                    prio_clean = "Tier-1"
+                elif "2" in prio_lower or "moderate" in prio_lower or "medium" in prio_lower:
+                    prio_clean = "Tier-2"
+                elif "3" in prio_lower or "capacity" in prio_lower or "low" in prio_lower:
+                    prio_clean = "Tier-3"
 
             # Strict Construction Definition
             meets_strict = str(self.get_val(row, ["meets_strict_construction_definition", "strict_definition"], "true")).lower() in ("true", "1", "yes")

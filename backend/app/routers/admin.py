@@ -81,6 +81,25 @@ def _store_processed_image(processed: bytes, file_name: str, folder: str) -> tup
     return relative_path, "local"
 
 
+
+
+def normalize_priority_tier(val: str | None) -> str | None:
+    """Normalize priority tier to standard 'Tier-1', 'Tier-2', 'Tier-3', or None if blank."""
+    if not val:
+        return None
+    s = str(val).strip()
+    if not s or s.lower() in ("none", "null", "-", "blank", "nan"):
+        return None
+    lower = s.lower()
+    if "1" in lower or "high" in lower:
+        return "Tier-1"
+    if "2" in lower or "moderate" in lower or "medium" in lower:
+        return "Tier-2"
+    if "3" in lower or "capacity" in lower or "low" in lower:
+        return "Tier-3"
+    return None
+
+
 # ─── Dashboard ────────────────────────────────────────────────────────
 @router.get("/dashboard", response_model=DashboardResponse)
 async def get_dashboard(
@@ -1736,7 +1755,7 @@ async def upload_tasks_sheet(
                     extra[col] = val
 
         # GIS Upload Signals & Cadastral Auto-resolution
-        priority_tier = (row_dict.get("priority_tier") or row_dict.get("tier") or "").strip() or None
+        priority_tier = normalize_priority_tier(row_dict.get("priority_tier") or row_dict.get("tier"))
         area_sqm_raw = row_dict.get("area_sqm") or ""
         if area_sqm_raw:
             try:
@@ -2378,7 +2397,7 @@ async def upload_tasks_sheet_stream(
                         extra[col] = val
 
             # GIS Upload Signals & Cadastral Auto-resolution
-            priority_tier = (row_dict.get("priority_tier") or row_dict.get("tier") or "").strip() or None
+            priority_tier = normalize_priority_tier(row_dict.get("priority_tier") or row_dict.get("tier"))
             area_sqm_raw = row_dict.get("area_sqm") or ""
             if area_sqm_raw:
                 try:
@@ -3421,7 +3440,7 @@ async def admin_qa_create_record(
         village=village,
         taluk=taluk,
         district=district,
-        priority_tier=(payload.priority_tier or "Tier-1").strip(),
+        priority_tier=(normalize_priority_tier(payload.priority_tier) or "Tier-1").strip(),
         property_type=payload.property_type,
         owner_name_en=payload.owner_name_en,
         survey_no=payload.survey_no,
