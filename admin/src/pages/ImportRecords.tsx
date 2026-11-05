@@ -407,8 +407,8 @@ export default function ImportRecords() {
               padding: '8px 14px',
               fontSize: '0.88rem',
               fontWeight: 700,
-              color: activeTab === 'gis_specification' ? '#dc2626' : '#64748b',
-              borderBottom: activeTab === 'gis_specification' ? '2.5px solid #dc2626' : '2.5px solid transparent',
+              color: activeTab === 'gis_specification' ? '#fc602b' : '#64748b',
+              borderBottom: activeTab === 'gis_specification' ? '2.5px solid #fc602b' : '2.5px solid transparent',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -422,7 +422,7 @@ export default function ImportRecords() {
               style={{
                 fontSize: 10,
                 background: '#fee2e2',
-                color: '#dc2626',
+                color: '#fc602b',
                 padding: '2px 6px',
                 borderRadius: 4,
                 fontWeight: 800,
@@ -441,8 +441,8 @@ export default function ImportRecords() {
               padding: '8px 14px',
               fontSize: '0.88rem',
               fontWeight: 600,
-              color: activeTab === 'legacy_dispatch' ? '#dc2626' : '#64748b',
-              borderBottom: activeTab === 'legacy_dispatch' ? '2.5px solid #dc2626' : '2.5px solid transparent',
+              color: activeTab === 'legacy_dispatch' ? '#fc602b' : '#64748b',
+              borderBottom: activeTab === 'legacy_dispatch' ? '2.5px solid #fc602b' : '2.5px solid transparent',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -485,7 +485,7 @@ export default function ImportRecords() {
             <span style={{ background: '#f0f9ff', color: '#0284c7', padding: '2px 8px', borderRadius: 4, fontWeight: 650 }}>
               ✓ 40m Proximity Deduplication (50m multiunit)
             </span>
-            <span style={{ background: '#f5f3ff', color: '#7c3aed', padding: '2px 8px', borderRadius: 4, fontWeight: 650 }}>
+            <span style={{ background: '#f5f3ff', color: '#6d28d9', padding: '2px 8px', borderRadius: 4, fontWeight: 650 }}>
               ✓ TNGIS WFS Cadastral Auto-Resolution
             </span>
             <span style={{ background: '#fffbeb', color: '#92400e', padding: '2px 8px', borderRadius: 4, fontWeight: 650 }}>
@@ -515,7 +515,7 @@ export default function ImportRecords() {
                   }
                 }}
                 style={{
-                  border: `2px dashed ${gisDragOver ? '#dc2626' : '#cbd5e1'}`,
+                  border: `2px dashed ${gisDragOver ? '#fc602b' : '#cbd5e1'}`,
                   borderRadius: 14,
                   padding: '36px 20px',
                   textAlign: 'center',
@@ -613,7 +613,7 @@ export default function ImportRecords() {
                         width: 38,
                         height: 38,
                         borderRadius: 10,
-                        background: '#dc2626',
+                        background: '#fc602b',
                         color: '#ffffff',
                         display: 'flex',
                         alignItems: 'center',
@@ -916,8 +916,8 @@ export default function ImportRecords() {
                         justifyContent: 'center',
                         gap: 8,
                         fontWeight: 750,
-                        background: '#dc2626',
-                        borderColor: '#dc2626',
+                        background: '#fc602b',
+                        borderColor: '#fc602b',
                       }}
                     >
                       <Icon name={gisCommitting ? 'refresh' : 'check_circle'} size={18} className={gisCommitting ? 'fos-spin' : undefined} />
@@ -1102,7 +1102,7 @@ export default function ImportRecords() {
                   }
                 }}
                 style={{
-                  border: `2px dashed ${legacyDragOver ? '#dc2626' : '#cbd5e1'}`,
+                  border: `2px dashed ${legacyDragOver ? '#fc602b' : '#cbd5e1'}`,
                   borderRadius: 14,
                   padding: '36px 20px',
                   textAlign: 'center',
@@ -1168,14 +1168,14 @@ export default function ImportRecords() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>Streaming Task Import...</span>
-                    <span style={{ fontWeight: 800, color: '#dc2626' }}>{legacyLiveProgress.percent}%</span>
+                    <span style={{ fontWeight: 800, color: '#fc602b' }}>{legacyLiveProgress.percent}%</span>
                   </div>
                   <div style={{ width: '100%', height: 8, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
                     <div
                       style={{
                         width: `${legacyLiveProgress.percent}%`,
                         height: '100%',
-                        background: '#dc2626',
+                        background: '#fc602b',
                         transition: 'width 0.2s ease',
                       }}
                     />

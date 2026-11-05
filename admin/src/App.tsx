@@ -227,7 +227,7 @@ function AppShell() {
             {/* Auditor Portal Routes */}
             <Route path="/auditor" element={<Navigate to="/auditor/dashboard" replace />} />
             <Route path="/auditor/dashboard" element={user.role === 'AUDITOR' || user.role === 'ADMIN' ? <QaDashboard /> : <Navigate to="/" replace />} />
-            <Route path="/auditor/records" element={user.role === 'AUDITOR' || user.role === 'ADMIN' ? <Records key={`qa-${user.id}`} storageKey={`pc_qa_records_${user.id}`} canAdmin={false} auditOnly={true} canAudit={true} canRoute={false} pageTitle="QA Records" roleBadge="QA" currentUser={user} /> : <Navigate to="/" replace />} />
+            <Route path="/auditor/records" element={user.role === 'AUDITOR' || user.role === 'ADMIN' ? <Records key={`qa-${user.id}`} storageKey={`pc_qa_records_${user.id}`} canAdmin={false} auditOnly={true} canAudit={true} canRoute={false} pageTitle="QA Records" currentUser={user} /> : <Navigate to="/" replace />} />
             <Route path="/audit/dashboard" element={<Navigate to="/auditor/dashboard" replace />} />
             <Route path="/audit" element={<Navigate to="/auditor/records" replace />} />
 
@@ -285,27 +285,15 @@ function TopBar({ user }: { user: User; isCollapsed?: boolean; onToggleCollapse?
         )}
       </div>
       <div className="topbar-right">
-        {user.role === 'ADMIN' && (
+        {user.role === 'ADMIN' && !header.right && (
           <button
             type="button"
-            className={`btn btn-sm ${isImportActive ? 'btn-secondary is-active' : 'btn-primary'}`}
+            className={`btn btn-sm btn-secondary${isImportActive ? ' is-active' : ''}`}
             onClick={() => navigate('/records/import')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '0 12px',
-              fontSize: 12,
-              height: 32,
-              borderRadius: 8,
-              fontWeight: 600,
-              whiteSpace: 'nowrap',
-              boxShadow: isImportActive ? 'none' : '0 1px 2px rgba(0,0,0,0.06)',
-            }}
             title="Import Task Sheet from Excel"
           >
-            <Icon name="cloud_upload" size={14} />
-            <span className="btn-label">Import Task Sheet</span>
+            <Icon name="upload" size={15} />
+            <span className="btn-label">Import</span>
           </button>
         )}
         <NotificationBell />
@@ -405,9 +393,9 @@ function Sidebar({
         <div className="fos-side-brand">
           <div className="brand-id">
             {!isCollapsed ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                <img src="/kuri-icon.png" alt="Kuri" style={{ height: 32, width: 'auto', maxWidth: 160, objectFit: 'contain', display: 'block' }} />
-                <span className="brand-sub" style={{ fontSize: 9, fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Lead Management</span>
+              <div className="brand-lockup">
+                <img src="/kuri-logo.png" alt="Kuri" className="brand-logo-img" />
+                <span className="brand-sub">Lead Management</span>
               </div>
             ) : (
               <span className="brand-mark brand-mark-image-wrap" title="Kuri — Lead Management">
@@ -420,27 +408,10 @@ function Sidebar({
             className="sidebar-collapse-btn"
             onClick={onToggleCollapse}
             title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 28,
-              height: 28,
-              borderRadius: 6,
-              border: '1px solid #e2e8f0',
-              background: '#ffffff',
-              color: '#64748b',
-              cursor: 'pointer',
-              padding: 0,
-              flexShrink: 0,
-            }}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <Icon name={isCollapsed ? "chevron_right" : "chevron_left"} size={16} />
           </button>
-        </div>
-        {/* Role label — below app subheading, above main navigation */}
-        <div className="side-role-bar">
-          <span className="side-role">{user.role.replace(/_/g, ' ')}</span>
         </div>
 
         <nav className="fos-nav">
@@ -488,11 +459,8 @@ function Sidebar({
               <span className="user-online-dot" title="Online" />
             </div>
             <div className="fos-user-meta">
-              <div className="fos-user-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span>{user.full_name || 'Admin'}</span>
-                <Icon name="tune" size={13} style={{ opacity: 0.6 }} />
-              </div>
-              <div className="fos-user-sub">{user.email || user.role}</div>
+              <div className="fos-user-name">{user.full_name || 'Admin'}</div>
+              <div className="fos-user-sub">{user.role.replace(/_/g, ' ')}</div>
             </div>
             <button
               type="button"

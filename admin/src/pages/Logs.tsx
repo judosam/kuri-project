@@ -276,8 +276,10 @@ export default function Logs() {
     {
       left: (
         <div className="topbar-page-left">
-          <h1 className="topbar-page-title">Activities by Group</h1>
-          <span className="count-pill">{filteredItems.length.toLocaleString()}</span>
+          <h1 className="topbar-page-title">Activity log</h1>
+          <p className="topbar-page-sub">
+            {filteredItems.length.toLocaleString()} events — field visits, QC decisions, calls and assignments.
+          </p>
         </div>
       ),
       right: (
@@ -292,101 +294,26 @@ export default function Logs() {
 
   return (
     <PageShell>
-      {/* Group Metric Summary Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: 12,
-          marginBottom: 16,
-        }}
-      >
-        {GROUP_TABS.filter((t) => t.key !== 'ALL').map((tab) => {
-          const isSelected = activeGroup === tab.key;
-          const count = groupMetrics[tab.key] || 0;
-          return (
-            <div
-              key={tab.key}
-              onClick={() => setActiveGroup(isSelected ? 'ALL' : tab.key)}
-              style={{
-                background: isSelected ? tab.bg : '#ffffff',
-                border: `1.5px solid ${isSelected ? tab.color : '#e2e8f0'}`,
-                borderRadius: 10,
-                padding: '12px 14px',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                boxShadow: isSelected ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
-              }}
-            >
-              <div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: tab.color, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                  {tab.label}
-                </span>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-                  <span style={{ fontSize: 22, fontWeight: 800, color: '#0f172a' }}>
-                    {count}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#64748b' }}>today</span>
-                </div>
-              </div>
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  background: isSelected ? '#ffffff' : tab.bg,
-                  color: tab.color,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Icon name={tab.icon} size={19} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
       {/* Filter toolbar */}
       <div className="toolbar log-toolbar" style={{ flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
         {/* Group Tabs */}
-        <div className="log-toolbar-left" style={{ overflowX: 'auto', maxWidth: '100%' }}>
-          <div className="seg seg-ic" role="group" aria-label="Activity group">
-            {GROUP_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                className={`seg-btn ${activeGroup === tab.key ? 'active' : ''}`}
-                onClick={() => setActiveGroup(tab.key)}
-                style={
-                  activeGroup === tab.key
-                    ? { backgroundColor: tab.color, color: '#ffffff', borderColor: tab.color }
-                    : {}
-                }
-              >
-                <Icon name={tab.icon} size={15} />
-                <span>{tab.label}</span>
-                {activeGroup === 'ALL' && tab.key !== 'ALL' && groupMetrics[tab.key] > 0 && (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      background: 'rgba(0,0,0,0.06)',
-                      borderRadius: 10,
-                      padding: '0 5px',
-                      marginLeft: 3,
-                    }}
-                  >
-                    {groupMetrics[tab.key]}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+        <div className="log-toolbar-left log-tabs" role="tablist" aria-label="Activity group">
+          {GROUP_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={activeGroup === tab.key}
+              className={`log-tab ${activeGroup === tab.key ? 'is-active' : ''}`}
+              onClick={() => setActiveGroup(tab.key)}
+            >
+              <Icon name={tab.icon} size={15} />
+              <span>{tab.label}</span>
+              {tab.key !== 'ALL' && groupMetrics[tab.key] > 0 && (
+                <span className="log-tab-count">{groupMetrics[tab.key]}</span>
+              )}
+            </button>
+          ))}
         </div>
 
         {/* Search & User Filter */}

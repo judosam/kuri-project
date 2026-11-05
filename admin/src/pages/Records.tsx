@@ -116,6 +116,16 @@ export const QC_STATUS_OPTIONS: { value: UnifiedQcFilter; label: string }[] = [
   { value: 'PENDING', label: 'QC Pending' },
 ];
 
+/** Status tabs shown above the records table, mapped to the QC/audit filters. */
+const RECORD_TABS: { key: UnifiedQcFilter; label: string; tone: string }[] = [
+  { key: 'ALL', label: 'All records', tone: 'navy' },
+  { key: 'PENDING', label: 'QC pending', tone: 'amber' },
+  { key: 'DONE', label: 'QC done', tone: 'green' },
+  { key: 'APPROVAL', label: 'Approved', tone: 'green' },
+  { key: 'DISAPPROVAL', label: 'Rejected', tone: 'red' },
+  { key: 'COMMERCIAL_PROPERTY', label: 'Commercial', tone: 'violet' },
+];
+
 const AUDIT_CHIP_META: Record<AuditStatus, { label: string; icon: IconName; cls: string; fullTitle: string }> = {
   PENDING: { label: 'Pending', icon: 'pending_actions', cls: 'audit-chip-pending', fullTitle: 'Pending' },
   APPROVAL: { label: 'Approval', icon: 'check_circle', cls: 'audit-chip-approval', fullTitle: 'Approval' },
@@ -278,7 +288,6 @@ export default function Records({
   canAudit = false,
   canRoute = false,
   pageTitle,
-  roleBadge,
   storageKey = 'pc_record_filters',
   currentUser,
 }: {
@@ -287,7 +296,6 @@ export default function Records({
   canAudit?: boolean;
   canRoute?: boolean;
   pageTitle?: string;
-  roleBadge?: string;
   storageKey?: string;
   currentUser?: User | null;
 }) {
@@ -392,6 +400,7 @@ export default function Records({
   }, [records, proximityMode, spatialVillage, collapsedClusters]);
 
   const [total, setTotal] = useState(0);
+  const [tabCounts, setTabCounts] = useState<Record<string, number> | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'NOT_COMPLETED' | 'COMPLETED' | 'MANUALLY_ADDED' | 'NOT_INTERESTED' | 'DUPLICATE' | 'CONSTRUCTION_FINISHED' | 'CLOSED'>(saved.statusFilter as any);
@@ -1138,6 +1147,37 @@ export default function Records({
     }
   };
 
+  // Quick-filter counts: one lightweight count per status for the current filter context.
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      const base = listParams(1, 1);
+      void Promise.all(
+        RECORD_TABS.map(async (tab) => {
+          const res = await recordsApi.list({
+            ...base,
+            page: 1,
+            page_size: 1,
+            qc_status: tab.key === 'DONE' || tab.key === 'PENDING' ? tab.key : undefined,
+            audit_status: ['APPROVAL', 'DISAPPROVAL', 'COMMERCIAL_PROPERTY'].includes(tab.key) ? tab.key : undefined,
+          });
+          return [tab.key, res.total] as const;
+        })
+      )
+        .then((entries) => {
+          if (!cancelled) setTabCounts(Object.fromEntries(entries));
+        })
+        .catch(() => {
+          // Counts are optional chrome — the filter keeps working without them.
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, userId, auditorId, dateFrom, dateTo, columnFilterKey, isAuditorView, currentUser?.id]);
+
   // Infinite scroll on table-scroll container with concurrency lock to prevent hanging
   useEffect(() => {
     const el = tableScrollRef.current;
@@ -1467,29 +1507,13 @@ export default function Records({
     !!dateFrom || !!dateTo;
 
   const computedTitle = pageTitle || (isAuditorView ? 'QA Records' : 'Records');
-  const computedBadge = roleBadge || (isAuditorView ? 'Auditor' : canAdmin ? 'Admin' : undefined);
 
   useTopHeader({
     left: (
       <div className="topbar-page-left">
         <h1 className="topbar-page-title">{computedTitle}</h1>
         <span className="count-pill">{total.toLocaleString()}</span>
-        {computedBadge && (
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              padding: '3px 9px',
-              borderRadius: 6,
-              background: isAuditorView ? '#f3e8ff' : '#e0e7ff',
-              color: isAuditorView ? '#7c3aed' : '#3730a3',
-              letterSpacing: '0.02em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {computedBadge}
-          </span>
-        )}
+        <span className="k-sync-note"><span className="k-live-dot" aria-hidden="true" />Synced just now</span>
       </div>
     ),
     right: auditOnly ? (
@@ -1498,7 +1522,6 @@ export default function Records({
           type="button"
           className="btn btn-primary btn-sm"
           onClick={() => setShowQaCreateModal(true)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 12px', fontSize: 12, height: 32, borderRadius: 8, fontWeight: 600, background: '#7c3aed', color: '#fff', border: 'none' }}
           title="Create a new lead by picking a point on the map or pasting coordinates"
         >
           <Icon name="add" size={15} />
@@ -1508,14 +1531,13 @@ export default function Records({
           type="button"
           className="btn btn-secondary btn-sm"
           onClick={() => navigate('/audit/dashboard')}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 11px', fontSize: 12, height: 32, borderRadius: 8, fontWeight: 600 }}
           title="Open QC Analytics Dashboard"
         >
-          <Icon name="dashboard" size={14} style={{ color: '#059669' }} />
+          <Icon name="dashboard" size={15} />
           <span className="btn-label">QC Dashboard</span>
         </button>
         <span className="topbar-badge-pill" style={{ padding: '0 10px', fontSize: 11.5, height: 32, borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <Icon name="fact_check" size={14} style={{ color: '#7c3aed' }} />
+          <Icon name="fact_check" size={15} />
           <span className="btn-label">QA Queue</span>
         </span>
       </div>
@@ -1525,7 +1547,6 @@ export default function Records({
           type="button"
           className="btn btn-primary btn-sm"
           onClick={() => setShowQaCreateModal(true)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 12px', fontSize: 12, height: 32, borderRadius: 8, fontWeight: 600, background: '#7c3aed', color: '#fff', border: 'none' }}
           title="Create a new lead by picking a point on the map or pasting coordinates"
         >
           <Icon name="add" size={15} />
@@ -1535,7 +1556,6 @@ export default function Records({
           type="button"
           className="btn btn-secondary btn-sm"
           onClick={() => setShowBulkEditModal(true)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 11px', fontSize: 12, height: 32, borderRadius: 8, fontWeight: 600 }}
           title="Bulk update existing leads via Excel template"
         >
           <Icon name="edit_note" size={15} />
@@ -1546,14 +1566,13 @@ export default function Records({
           className="btn btn-secondary btn-sm"
           onClick={handleExportClick}
           disabled={exporting}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 11px', fontSize: 12, height: 32, borderRadius: 8, fontWeight: 600 }}
           title="Export records to Excel (.xlsx) with customizable sections and photos"
         >
           <Icon name="table_view" size={14} />
           <span className="btn-label">{exporting ? 'Exporting…' : 'Export Excel'}</span>
         </button>
         <span className="topbar-badge-pill" style={{ padding: '0 10px', fontSize: 11.5, height: 32, borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <Icon name="cloud_done" size={14} style={{ color: '#10b981' }} />
+          <Icon name="cloud_done" size={15} />
           <span className="btn-label">Sync Active</span>
         </span>
       </div>
@@ -1562,6 +1581,31 @@ export default function Records({
 
   return (
     <PageShell>
+
+      <div className="k-quickfilters" role="group" aria-label="Record status">
+        {RECORD_TABS.map((tab) => {
+          const active = qcStatusFilter === tab.key;
+          const count = active ? total : tabCounts?.[tab.key];
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              aria-pressed={active}
+              className={`k-qf${active ? ' is-active' : ''}`}
+              onClick={() => {
+                setQcStatusFilter(tab.key);
+                setColumnFilters({});
+                setStatusFilter('ALL');
+                setPage(1);
+              }}
+            >
+              <span className={`k-qf-dot is-${tab.tone}`} />
+              <span>{tab.label}</span>
+              {count !== undefined && <span className="k-qf-count">{count.toLocaleString()}</span>}
+            </button>
+          );
+        })}
+      </div>
       {loadError && <div role="alert" className="record-load-error">{loadError} <button type="button" className="btn btn-secondary btn-sm" onClick={() => loadRecords()}>Retry</button></div>}
       {/* Search and ordering stay above the compact record filters. */}
       <div className="toolbar records-toolbar compact-records-toolbar">
@@ -2045,23 +2089,16 @@ export default function Records({
       )}
 
       {Object.keys(columnFilters).length > 0 && (
-        <div
+        <div className="k-chipbar"
           style={{
             display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 12px',
-            background: '#f8fafc',
             border: '1px solid #e2e8f0',
             borderRadius: 8,
             marginBottom: 12,
             fontSize: 12,
           }}
         >
-          <span style={{ fontWeight: 700, color: '#475569', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <Icon name="filter_alt" size={14} /> Active column filters:
-          </span>
+          <span className="k-chipbar-label"><Icon name="filter_alt" size={15} /> Column filters:</span>
           {Object.entries(columnFilters).map(([field, vals]) => (
             <span
               key={field}
@@ -2069,12 +2106,10 @@ export default function Records({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 5,
-                background: '#e0e7ff',
-                color: '#3730a3',
-                padding: '2px 8px',
+                padding: '3px 9px',
                 borderRadius: 999,
-                fontWeight: 600,
-                fontSize: 11,
+                fontWeight: 500,
+                fontSize: 12,
               }}
             >
               <span>{field}: {vals.join(', ')}</span>
@@ -2094,7 +2129,7 @@ export default function Records({
                   cursor: 'pointer',
                   padding: 0,
                   display: 'inline-flex',
-                  color: '#4338ca',
+                  color: '#5A6880',
                 }}
                 title={`Remove ${field} filter`}
               >
@@ -2104,9 +2139,8 @@ export default function Records({
           ))}
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
+            className="k-chipbar-reset"
             onClick={handleReset}
-            style={{ fontSize: 11, height: 24, padding: '0 8px', marginLeft: 'auto', color: '#dc2626' }}
           >
             Reset all
           </button>

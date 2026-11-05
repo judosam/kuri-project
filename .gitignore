@@ -110,3 +110,5 @@ admin/.qa-*.ts
 user-web/.qa-*.ts
 crop_test.png
 admin/records-table-expanded.png
+
+design_admin_portal_tmp/
