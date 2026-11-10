@@ -511,11 +511,13 @@ async def create_record(
 
     record = record_service.get_record(record.id)
     place = record.location_name or ""
+    v_tag = f" ({record.village})" if record.village else ""
+    v_msg = f" in {record.village}" if record.village else ""
     create_notification(
         db=db,
         type="verifier_activity",
-        title=f"Field Inspection Submitted: {record.unique_id or record.name}",
-        message=f"Field verifier {user.full_name} submitted inspection data for {record.unique_id or record.name}.",
+        title=f"Field Inspection Submitted: {record.unique_id or record.name}{v_tag}",
+        message=f"Field verifier {user.full_name} submitted inspection data for {record.unique_id or record.name}{v_msg}.",
         recipient_role="ADMIN",
         record_id=record.id,
         unique_id=record.unique_id,
@@ -947,11 +949,13 @@ async def mark_record_status(
     db.commit()
     db.refresh(record)
 
+    v_tag = f" ({record.village})" if record.village else ""
+    v_msg = f" in {record.village}" if record.village else ""
     create_notification(
         db=db,
         type="verifier_activity",
-        title=f"Field Status Updated: {record.unique_id or record.name}",
-        message=f"Field verifier {user.full_name} marked status as '{canonical_status}' for {record.unique_id or record.name}.",
+        title=f"Field Status Updated: {record.unique_id or record.name}{v_tag}",
+        message=f"Field verifier {user.full_name} marked status as '{canonical_status}' for {record.unique_id or record.name}{v_msg}.",
         recipient_role="ADMIN",
         record_id=record.id,
         unique_id=record.unique_id,

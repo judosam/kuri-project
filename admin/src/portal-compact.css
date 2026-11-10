@@ -1577,3 +1577,188 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   font-size: 11.5px !important;
   border-radius: 7px !important;
 }
+
+
+/* ============================================================
+   Enhanced Mobile Responsive Layout for Admin Portal
+   Ensures bottom details, cards, tables and action footers
+   are 100% visible and accessible above mobile bottom nav
+   ============================================================ */
+@media (max-width: 900px) {
+  /* Use dynamic viewport height (dvh) to avoid mobile address bar cut-offs */
+  html, body, #root {
+    height: 100% !important;
+    min-height: 100% !important;
+  }
+
+  .fos-shell,
+  .fos-main,
+  .fos-shell-fixed,
+  .fos-main-fixed {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+  }
+
+  /* Full vertical scrolling with comfortable bottom clearance above mobile nav */
+  .fos-content,
+  .fos-content.fos-content-fixed {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    flex: 1 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 92px) !important;
+  }
+
+  .fos-page-shell {
+    min-height: 100% !important;
+    flex: none !important;
+    padding-bottom: 8px !important;
+  }
+
+  /* Mobile table card: flows naturally in vertical flow without scroll traps */
+  .table-card {
+    flex: none !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin-bottom: 24px !important;
+  }
+
+  .table-card .table-scroll {
+    flex: none !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Table footer (pagination / showing X of Y) must stay clear of bottom nav */
+  .table-foot {
+    position: relative !important;
+    z-index: 5 !important;
+    padding: 12px 14px !important;
+    background: #ffffff !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* Record Detail mobile screen: audit card, actions & telecaller section are fully visible */
+  .record-screen-container {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    flex: none !important;
+  }
+
+  .record-screen-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    gap: 14px !important;
+  }
+
+  .record-audit-card,
+  .record-media-card {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    flex: none !important;
+  }
+
+  /* Floating mobile bottom navigation with safe-area spacing and glassmorphism */
+  .admin-mobile-nav {
+    display: flex !important;
+    position: fixed !important;
+    left: 10px !important;
+    right: 10px !important;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
+    width: auto !important;
+    height: 58px !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(227, 232, 239, 0.9) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 8px 30px rgba(15, 31, 53, 0.14) !important;
+    z-index: 1000 !important;
+    padding: 2px 6px !important;
+  }
+}
+
+/* Animation for modals */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Bulk resolve button styling */
+.bulk-resolve-btn {
+  transition: all 0.15s ease !important;
+}
+.bulk-resolve-btn:hover:not(:disabled) {
+  background: #e0f2fe !important;
+  border-color: #7dd3fc !important;
+  color: #0284c7 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(2, 132, 199, 0.15);
+}
+
+/* Compact uniform action pair alignment */
+.compact-selection-bar .selection-action-groups {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px 12px !important;
+  padding: 8px 12px !important;
+  background: #f8fafc !important;
+  border-radius: 8px !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.compact-selection-bar .selection-action-pair {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+.compact-selection-bar .selection-action-pair .custom-select-wrap {
+  flex: none !important;
+  width: 175px !important;
+  min-width: 150px !important;
+}
+
+.compact-selection-bar .selection-action-pair .custom-select-trigger {
+  height: 30px !important;
+  min-height: 30px !important;
+  font-size: 11.5px !important;
+  padding: 0 8px !important;
+}
+
+.compact-selection-bar .selection-action-pair .btn {
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 10px !important;
+  font-size: 11.5px !important;
+  border-radius: 6px !important;
+  white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}

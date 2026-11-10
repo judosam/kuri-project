@@ -15,7 +15,7 @@ import { SourceBadge } from '../components/SourceBadge';
 import React, { useCallback, useEffect, useState, useRef, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { recordsApi, logsApi, SERVER_BASE } from '../services/api';
-import type { AuditStatus, CaptureRecord, ActivityEntry, User } from '../types';
+import type { AuditStatus, CaptureRecord, ActivityEntry } from '../types';
 import { AuditStatusChip, AUDIT_OPTIONS } from './Records';
 import {
   Icon,
@@ -329,7 +329,6 @@ export default function ImportedRecordDetail({
   const [showPinPicker, setShowPinPicker] = useState<boolean>(false);
   const [auditSaving, setAuditSaving] = useState<boolean>(false);
   const [assignedAuditorId, setAssignedAuditorId] = useState<string>('');
-  const [auditors, setAuditors] = useState<User[]>([]);
   const [auditNotice, setAuditNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [isEditingQc, setIsEditingQc] = useState(false);
   const [qcImageUploading, setQcImageUploading] = useState(false);
@@ -379,9 +378,6 @@ export default function ImportedRecordDetail({
   });
 
   useEffect(() => {
-    recordsApi.auditors()
-      .then((list) => setAuditors(list as User[]))
-      .catch(() => {});
     recordsApi.telecallers()
       .then((list) => setTelecallers(list))
       .catch(() => {});
@@ -734,6 +730,21 @@ export default function ImportedRecordDetail({
     }
   };
 
+  const [resolvingCadastral, setResolvingCadastral] = useState(false);
+  const handleResolveCadastral = async () => {
+    if (!record?.id) return;
+    setResolvingCadastral(true);
+    try {
+      const updated = await recordsApi.resolveCadastral(record.id, true);
+      setRecord(updated);
+      setAuditNotice({ ok: true, text: `Location resolved: ${updated.village || ''}, ${updated.taluk || ''}, Survey: ${updated.survey_no || '—'}` });
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Failed to resolve cadastral details.');
+    } finally {
+      setResolvingCadastral(false);
+    }
+  };
+
   /** Save the auditor's QC assessment + audit decision (in-place on this page). */
   const saveAuditAssessment = async () => {
     if (!record || auditSaving) return;
@@ -1017,7 +1028,39 @@ export default function ImportedRecordDetail({
             )}
 
             {hasPlanning && (
-              <Section icon="receipt_long" title="Imported Details">
+              <Section
+                icon="receipt_long"
+                title="Imported Details"
+                action={
+                  (canAdmin || canAudit) ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={resolvingCadastral}
+                      onClick={handleResolveCadastral}
+                      title="Resolve Village, Taluk, District, Survey No and Subdivision from WFS / Village Master"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        height: 26,
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        padding: '2px 9px',
+                        borderRadius: 6,
+                        border: '1px solid #bae6fd',
+                        background: '#f0f9ff',
+                        color: '#0369a1',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <Icon name={resolvingCadastral ? 'refresh' : 'auto_awesome'} size={13} className={resolvingCadastral ? 'fos-spin' : undefined} />
+                      <span>{resolvingCadastral ? 'Resolving…' : 'Resolve Village & Survey'}</span>
+                    </button>
+                  ) : undefined
+                }
+              >
                 <div className="rd-rows">
                   <Row label="Unique ID" value={record.unique_id} mono />
                   <Row label="Source" value={<SourceBadge source={record.source} isManual={record.is_manually_added} uploadedByName={record.uploaded_by_name} />} />
@@ -1068,15 +1111,30 @@ export default function ImportedRecordDetail({
                 </div>
               }
               action={
-                <div className="fancy-action-btn-group">
+                <div className="fancy-action-btn-group" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   <button
                     type="button"
                     className="fancy-btn-history"
                     onClick={() => setShowQcHistoryModal(true)}
                     title="View QC Assessment & Audit Decision history"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      height: 28,
+                      padding: '3px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: 600,
+                      borderRadius: 6,
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      color: '#334155',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
                   >
                     <Icon name="history" size={13} />
-                    <span>QC Audit Details History</span>
+                    <span>QC History</span>
                   </button>
                   <button
                     type="button"
@@ -1090,9 +1148,24 @@ export default function ImportedRecordDetail({
                       }
                     }}
                     title="Edit QC assessment and decision"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      height: 28,
+                      padding: '3px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: 600,
+                      borderRadius: 6,
+                      border: isEditingQc ? '1px solid #0284c7' : '1px solid #bae6fd',
+                      background: isEditingQc ? '#e0f2fe' : '#f0f9ff',
+                      color: '#0369a1',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
                   >
                     <Icon name={isEditingQc ? 'close' : 'edit'} size={13} />
-                    <span>{isEditingQc ? 'Close Edit' : 'Edit QC & Decision'}</span>
+                    <span>{isEditingQc ? 'Close' : 'Edit QC'}</span>
                   </button>
                 </div>
               }
@@ -1101,7 +1174,6 @@ export default function ImportedRecordDetail({
                 <>
                   <FourColumnTable
                     fields={[
-                      { key: 'auditor', label: 'Assigned QA / QC User', value: record.assigned_auditor_name || record.qc_by_name || 'Not assigned' },
                       { key: 'qc_done', label: 'QC Completed At', value: record.qc_completed_at ? formatDateTime(record.qc_completed_at) : '—' },
                       { key: 'by', label: 'Audited By', value: record.audited_by_name ?? 'Not audited yet' },
                       { key: 'qc_vhr', label: 'QC Comments (VHR Imagery)', value: record.qc_vhr_comment ?? 'No QC assessment recorded' },
@@ -1317,44 +1389,6 @@ export default function ImportedRecordDetail({
                       </div>
 
                       <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, gridColumn: '1 / -1' }}>
-                        <div style={{ display: 'grid', gap: 6 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Icon name="badge" size={14} style={{ color: '#0284c7' }} />
-                            <strong style={{ fontSize: '0.75rem', letterSpacing: '0.05em', color: '#0369a1', textTransform: 'uppercase' }}>
-                              Assigned QA / QC User
-                            </strong>
-                          </div>
-                          <div
-                            style={{
-                              minHeight: 38,
-                              padding: '8px 12px',
-                              background: '#f8fafc',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: 6,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 8,
-                              fontSize: '0.85rem',
-                              fontWeight: 500,
-                              color: '#0f172a',
-                            }}
-                          >
-                            <span>
-                              {(() => {
-                                const found = auditors.find((a) => String(a.id) === String(assignedAuditorId));
-                                if (found) {
-                                  return `${found.full_name || found.email}${found.role ? ` (${found.role})` : ''}`;
-                                }
-                                return (
-                                  record.assigned_auditor_name ||
-                                  record.qc_by_name ||
-                                  (assignedAuditorId ? `Auditor #${assignedAuditorId}` : 'Unassigned')
-                                );
-                              })()}
-                            </span>
-                          </div>
-                        </div>
-
                         <div style={{ display: 'grid', gap: 6 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <Icon name="fact_check" size={14} style={{ color: '#c2410c' }} />
@@ -3366,10 +3400,6 @@ export default function ImportedRecordDetail({
                     <strong style={{ color: '#0f172a' }}>{record.audited_at ? formatDateTime(record.audited_at) : '—'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Assigned QA User</span>
-                    <strong style={{ color: '#0f172a' }}>{record.assigned_auditor_name || record.qc_by_name || 'Not assigned'}</strong>
-                  </div>
-                  <div>
                     <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>QC Last Edited At</span>
                     <strong style={{ color: '#0f172a' }}>{record.qc_edited_at ? formatDateTime(record.qc_edited_at) : '—'}</strong>
                   </div>
@@ -3477,10 +3507,6 @@ export default function ImportedRecordDetail({
                   </span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px 14px', fontSize: 12 }}>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Initial Assigned Auditor</span>
-                    <strong style={{ color: '#0f172a' }}>{record.assigned_auditor_name || 'Not assigned'}</strong>
-                  </div>
                   <div>
                     <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Record Created / Staged At</span>
                     <strong style={{ color: '#0f172a' }}>{record.created_at ? formatDateTime(record.created_at) : '—'}</strong>

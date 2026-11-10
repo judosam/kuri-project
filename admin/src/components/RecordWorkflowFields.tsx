@@ -366,50 +366,39 @@ export function UniqueIdCell({ record: r }: { record: CaptureRecord }) {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 3.5,
-              padding: '1.5px 7px',
-              borderRadius: 6,
-              background: isVisited ? '#fff1f2' : '#fffbeb',
+              gap: 5,
+              padding: '2px 8px',
+              borderRadius: 20,
+              background: isVisited ? 'rgba(255, 241, 242, 0.95)' : 'rgba(254, 252, 232, 0.95)',
               color: isVisited ? '#be123c' : '#b45309',
-              border: `1px solid ${isVisited ? '#fecdd3' : '#fde68a'}`,
-              fontSize: 10,
-              fontWeight: 700,
-              lineHeight: 1.25,
-              whiteSpace: 'nowrap',
+              border: `1px solid ${isVisited ? 'rgba(251, 113, 133, 0.35)' : 'rgba(250, 204, 21, 0.35)'}`,
+              fontSize: '0.68rem',
+              fontWeight: 650,
               letterSpacing: '0.01em',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              boxShadow: isVisited ? '0 1px 3px rgba(225, 29, 72, 0.08)' : '0 1px 3px rgba(217, 119, 6, 0.08)',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease',
             }}
-            title={warningText || 'Duplicate / Proximity Warning'}
+            title={warningText || `Within ${dupDist || 0}m of ${dupMatchedId}`}
           >
-            <span style={{ fontSize: 9 }}>{isVisited ? '📍' : '⚠️'}</span>
-            <span>{dupDist != null ? `${dupDist}m` : 'Match'}</span>
-            {dupMatchedId && (
-              <span style={{ opacity: 0.85, fontWeight: 650 }}>· {dupMatchedId}</span>
+            <span
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: '50%',
+                backgroundColor: isVisited ? '#e11d48' : '#d97706',
+                display: 'inline-block',
+                boxShadow: isVisited ? '0 0 0 2px rgba(225, 29, 72, 0.2)' : '0 0 0 2px rgba(217, 119, 6, 0.2)',
+              }}
+            />
+            <span>{isVisited ? 'Visited' : 'Near'}</span>
+            <strong style={{ fontFamily: 'monospace', fontWeight: 700 }}>{dupMatchedId || 'Site'}</strong>
+            {dupDist != null && (
+              <span style={{ opacity: 0.75, fontSize: '0.65rem' }}>({dupDist}m)</span>
             )}
           </span>
         )}
       </div>
-      {isDup && warningText && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 3,
-            fontSize: 10,
-            color: isVisited ? '#9f1239' : '#92400e',
-            lineHeight: 1.2,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-          title={warningText}
-        >
-          <span style={{ opacity: 0.65 }}>↳</span>
-          <span>{isVisited ? 'Already visited near' : 'Duplicate near'}</span>
-          <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>{dupMatchedId || 'existing'}</span>
-          {dupDist != null && <span style={{ opacity: 0.85 }}>({dupDist}m)</span>}
-        </div>
-      )}
     </div>
   );
 }

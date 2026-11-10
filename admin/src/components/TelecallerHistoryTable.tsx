@@ -180,10 +180,11 @@ export function TelecallerHistoryTable({
               No prior call logs or follow-up notes recorded yet.
             </div>
           ) : (
-            <div style={{ maxHeight, overflowY: 'auto' }}>
+            <div style={{ maxHeight, overflowY: maxHeight === 'none' ? 'visible' : 'auto', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               <table
                 style={{
                   width: '100%',
+                  minWidth: 540,
                   borderCollapse: 'collapse',
                   fontSize: 12,
                   textAlign: 'left',

@@ -221,6 +221,29 @@ export const recordsApi = {
     const res = await api.post(`/admin/records/${id}/resolve-address`, null, { params: { force } });
     return res.data;
   },
+  resolveCadastral: async (id: number, force = true): Promise<CaptureRecord> => {
+    const res = await api.post(`/admin/records/${id}/resolve-cadastral`, null, { params: { force } });
+    return res.data;
+  },
+  bulkResolveCadastral: async (recordIds: number[], force = false): Promise<{
+    total: number;
+    resolved_count: number;
+    failed_count: number;
+    results: Array<{
+      record_id: number;
+      unique_id?: string;
+      success: boolean;
+      village?: string;
+      taluk?: string;
+      district?: string;
+      survey_no?: string;
+      subdivision_no?: string;
+      error?: string;
+    }>;
+  }> => {
+    const res = await api.post('/admin/records/bulk-resolve-cadastral', { record_ids: recordIds, force });
+    return res.data;
+  },
   update: async (
     id: number,
     data: Partial<

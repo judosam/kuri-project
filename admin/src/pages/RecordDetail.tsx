@@ -2,7 +2,7 @@ import { SourceBadge } from '../components/SourceBadge';
 import React, { useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { recordsApi, logsApi, SERVER_BASE } from '../services/api';
-import type { AuditStatus, CaptureRecord, ActivityEntry, User } from '../types';
+import type { AuditStatus, CaptureRecord, ActivityEntry } from '../types';
 import { AuditStatusChip, AUDIT_OPTIONS } from './Records';
 import { CustomSelect } from '../components/ui';
 import { CoordinateMap } from '../components/CoordinateMap';
@@ -227,7 +227,6 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
   const [showPinPicker, setShowPinPicker] = useState(false);
   const [auditSaving, setAuditSaving] = useState(false);
   const [assignedAuditorId, setAssignedAuditorId] = useState<string>('');
-  const [auditors, setAuditors] = useState<User[]>([]);
   const [auditNotice, setAuditNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [isEditingQc, setIsEditingQc] = useState(false);
   const [qcImageUploading, setQcImageUploading] = useState(false);
@@ -274,9 +273,6 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
   });
 
   useEffect(() => {
-    recordsApi.auditors()
-      .then((list) => setAuditors(list as User[]))
-      .catch(() => {});
     recordsApi.telecallers()
       .then((list) => setTelecallers(list))
       .catch(() => {});
@@ -318,6 +314,21 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
   const [editError, setEditError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [resolvingCadastral, setResolvingCadastral] = useState(false);
+
+  const handleResolveCadastral = async () => {
+    if (!record?.id) return;
+    setResolvingCadastral(true);
+    try {
+      const updated = await recordsApi.resolveCadastral(record.id, true);
+      setRecord(updated);
+      setAuditNotice({ ok: true, text: `Location resolved: ${updated.village || ''}, ${updated.taluk || ''}, Survey: ${updated.survey_no || '—'}` });
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Failed to resolve cadastral details.');
+    } finally {
+      setResolvingCadastral(false);
+    }
+  };
 
   // Fetch image with auth token → blob URL for <img> display
   const [imageBlobUrls, setImageBlobUrls] = useState<Record<number, string>>({});
@@ -885,7 +896,8 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
     record.taluk ||
     record.village ||
     record.district ||
-    record.site_address
+    record.site_address ||
+    record.coordinates
   );
 
   return (
@@ -894,51 +906,64 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
         <div className="record-screen-grid">
           {/* LEFT COLUMN — ordered record details */}
           <div className="record-audit-card">
-            {/* DUPLICATE WARNING BANNER (40m / 50m spatial deduplication warning) */}
+            {/* DUPLICATE WARNING BANNER (Modern glassmorphic deduplication pill card) */}
             {record.is_duplicate && (
               <div
                 style={{
                   marginBottom: 16,
-                  padding: '12px 16px',
-                  borderRadius: 10,
-                  background: '#fef2f2',
-                  border: '1.5px solid #f87171',
+                  padding: '10px 16px',
+                  borderRadius: 12,
+                  background: 'linear-gradient(135deg, rgba(254, 242, 242, 0.95) 0%, rgba(255, 241, 242, 0.75) 100%)',
+                  border: '1px solid rgba(244, 63, 94, 0.28)',
+                  boxShadow: '0 2px 10px -2px rgba(225, 29, 72, 0.08)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  flexWrap: 'wrap',
                   gap: 12,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 20 }}>⚠️</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 240, flex: '1 1 auto' }}>
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      backgroundColor: '#e11d48',
+                      boxShadow: '0 0 0 3px rgba(225, 29, 72, 0.2)',
+                      flexShrink: 0,
+                    }}
+                  />
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 700, fontSize: 13, color: '#991b1b' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.82rem', color: '#9f1239' }}>
                         {record.duplicate_warning || 'Site may be already visited'}
                       </span>
-                      <span
-                        style={{
-                          background: '#dc2626',
-                          color: '#ffffff',
-                          fontSize: 10,
-                          fontWeight: 800,
-                          padding: '2px 7px',
-                          borderRadius: 4,
-                          letterSpacing: '0.04em',
-                        }}
-                      >
-                        DUPLICATE
-                      </span>
-                    </div>
-                    <p style={{ margin: '3px 0 0', fontSize: 12, color: '#b91c1c' }}>
-                      Identified by 40m/50m spatial deduplication engine before verifiers travel.
                       {record.duplicate_site_id && (
-                        <span>
-                          {' '}Matched site: <strong>{record.duplicate_site_id}</strong>
-                          {record.duplicate_distance_m != null && ` (${record.duplicate_distance_m}m away)`}.
+                        <span
+                          style={{
+                            background: '#ffffff',
+                            color: '#be123c',
+                            fontSize: '0.70rem',
+                            fontWeight: 700,
+                            padding: '1px 8px',
+                            borderRadius: 9999,
+                            border: '1px solid rgba(244, 63, 94, 0.3)',
+                            fontFamily: 'monospace',
+                          }}
+                        >
+                          {record.duplicate_site_id}
                         </span>
                       )}
-                    </p>
+                      {record.duplicate_distance_m != null && (
+                        <span style={{ fontSize: '0.72rem', color: '#e11d48', fontWeight: 600 }}>
+                          ({Math.round(record.duplicate_distance_m)}m away)
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.73rem', color: '#be123c', opacity: 0.85, marginTop: 1 }}>
+                      40m/50m spatial deduplication engine verified near this location.
+                    </div>
                   </div>
                 </div>
                 {(record.duplicate_record_id || record.duplicate_site_id) && (
@@ -964,18 +989,24 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                       }
                     }}
                     style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
                       background: '#ffffff',
-                      color: '#991b1b',
-                      border: '1px solid #fca5a5',
-                      borderRadius: 6,
-                      padding: '6px 12px',
-                      fontSize: 11.5,
+                      color: '#be123c',
+                      border: '1px solid rgba(225, 29, 72, 0.35)',
+                      borderRadius: 8,
+                      padding: '4px 10px',
+                      fontSize: '0.75rem',
                       fontWeight: 700,
                       cursor: 'pointer',
                       whiteSpace: 'nowrap',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                      transition: 'all 0.15s ease',
                     }}
                   >
-                    View Matched Site {record.duplicate_site_id ? `(${record.duplicate_site_id})` : ''}
+                    <Icon name="visibility" size={13} />
+                    <span>View {record.duplicate_site_id || 'Matched Site'}</span>
                   </button>
                 )}
               </div>
@@ -1070,7 +1101,39 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
 
             {/* 3. Admin-given dispatch data */}
             {hasPlanning && (
-              <Section icon="receipt_long" title="Imported Details">
+              <Section
+                icon="receipt_long"
+                title="Imported Details"
+                action={
+                  (canAdmin || canAudit) ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={resolvingCadastral}
+                      onClick={handleResolveCadastral}
+                      title="Resolve Village, Taluk, District, Survey No and Subdivision from WFS / Village Master"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        height: 26,
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        padding: '2px 9px',
+                        borderRadius: 6,
+                        border: '1px solid #bae6fd',
+                        background: '#f0f9ff',
+                        color: '#0369a1',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <Icon name={resolvingCadastral ? 'refresh' : 'auto_awesome'} size={13} className={resolvingCadastral ? 'fos-spin' : undefined} />
+                      <span>{resolvingCadastral ? 'Resolving…' : 'Resolve Village & Survey'}</span>
+                    </button>
+                  ) : undefined
+                }
+              >
                 <FourColumnTable
                   fields={[
                     { key: 'uid', label: 'Unique ID', value: record.unique_id },
@@ -1146,15 +1209,30 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
               }
               action={
                 (canAdmin || canAudit) ? (
-                  <div className="fancy-action-btn-group">
+                  <div className="fancy-action-btn-group" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <button
                       type="button"
                       className="fancy-btn-history"
                       onClick={() => setShowQcHistoryModal(true)}
                       title="View QC Assessment & Audit Decision history"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        height: 28,
+                        padding: '3px 10px',
+                        fontSize: '0.74rem',
+                        fontWeight: 600,
+                        borderRadius: 6,
+                        border: '1px solid #cbd5e1',
+                        background: '#f8fafc',
+                        color: '#334155',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
                     >
                       <Icon name="history" size={13} />
-                      <span>QC Audit Details History</span>
+                      <span>QC History</span>
                     </button>
                     <button
                       type="button"
@@ -1168,9 +1246,24 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                         }
                       }}
                       title="Edit QC assessment and decision"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        height: 28,
+                        padding: '3px 10px',
+                        fontSize: '0.74rem',
+                        fontWeight: 600,
+                        borderRadius: 6,
+                        border: isEditingQc ? '1px solid #0284c7' : '1px solid #bae6fd',
+                        background: isEditingQc ? '#e0f2fe' : '#f0f9ff',
+                        color: '#0369a1',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
                     >
                       <Icon name={isEditingQc ? 'close' : 'edit'} size={13} />
-                      <span>{isEditingQc ? 'Close Edit' : 'Edit QC & Decision'}</span>
+                      <span>{isEditingQc ? 'Close' : 'Edit QC'}</span>
                     </button>
                   </div>
                 ) : undefined
@@ -1180,7 +1273,6 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                 <>
                   <FourColumnTable
                     fields={[
-                      { key: 'auditor', label: 'Assigned QA / QC User', value: record.assigned_auditor_name || record.qc_by_name || 'Not assigned' },
                       { key: 'qc_done', label: 'QC Completed At', value: record.qc_completed_at ? formatDateTime(record.qc_completed_at) : '—' },
                       { key: 'by', label: 'Audited By', value: record.audited_by_name ?? 'Not audited yet' },
                       { key: 'qc_vhr', label: 'QC Comments (VHR Imagery)', value: record.qc_vhr_comment ?? 'No QC assessment recorded' },
@@ -1396,44 +1488,6 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                         </div>
 
                         <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, gridColumn: '1 / -1' }}>
-                          <div style={{ display: 'grid', gap: 6 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <Icon name="badge" size={14} style={{ color: '#0284c7' }} />
-                              <strong style={{ fontSize: '0.75rem', letterSpacing: '0.05em', color: '#0369a1', textTransform: 'uppercase' }}>
-                                Assigned QA / QC User
-                              </strong>
-                            </div>
-                            <div
-                              style={{
-                                minHeight: 38,
-                                padding: '8px 12px',
-                                background: '#f8fafc',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: 6,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                fontSize: '0.85rem',
-                                fontWeight: 500,
-                                color: '#0f172a',
-                              }}
-                            >
-                              <span>
-                                {(() => {
-                                  const found = auditors.find((a) => String(a.id) === String(assignedAuditorId));
-                                  if (found) {
-                                    return `${found.full_name || found.email}${found.role ? ` (${found.role})` : ''}`;
-                                  }
-                                  return (
-                                    record.assigned_auditor_name ||
-                                    record.qc_by_name ||
-                                    (assignedAuditorId ? `Auditor #${assignedAuditorId}` : 'Unassigned')
-                                  );
-                                })()}
-                              </span>
-                            </div>
-                          </div>
-
                           <div style={{ display: 'grid', gap: 6 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <Icon name="fact_check" size={14} style={{ color: '#c2410c' }} />
@@ -3487,10 +3541,6 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                     <strong style={{ color: '#0f172a' }}>{record.audited_at ? formatDateTime(record.audited_at) : '—'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Assigned QA User</span>
-                    <strong style={{ color: '#0f172a' }}>{record.assigned_auditor_name || record.qc_by_name || 'Not assigned'}</strong>
-                  </div>
-                  <div>
                     <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>QC Last Edited At</span>
                     <strong style={{ color: '#0f172a' }}>{record.qc_edited_at ? formatDateTime(record.qc_edited_at) : '—'}</strong>
                   </div>
@@ -3598,10 +3648,6 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                   </span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px 14px', fontSize: 12 }}>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Initial Assigned Auditor</span>
-                    <strong style={{ color: '#0f172a' }}>{record.assigned_auditor_name || 'Not assigned'}</strong>
-                  </div>
                   <div>
                     <span style={{ color: '#64748b', fontSize: 11, display: 'block' }}>Record Created / Staged At</span>
                     <strong style={{ color: '#0f172a' }}>{record.created_at ? formatDateTime(record.created_at) : '—'}</strong>
@@ -3766,11 +3812,9 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                         </div>
                       )}
                       {rev.telecaller_comment && (
-                        <div style={{ gridColumn: '1 / -1', background: '#f8fafc', padding: '8px 12px', borderRadius: 6, border: '1px solid #e2e8f0', marginTop: 4 }}>
+                        <div style={{ gridColumn: '1 / -1', marginTop: 6 }}>
                           <span style={{ color: '#475569', fontWeight: 600, fontSize: 11, display: 'block', marginBottom: 4 }}>Conversation Notes / Call Log:</span>
-                          <div style={{ color: '#1e293b', fontSize: 12, whiteSpace: 'pre-wrap' }}>
-                            {rev.telecaller_comment}
-                          </div>
+                          <TelecallerHistoryTable comment={rev.telecaller_comment} isEditing={false} maxHeight="none" />
                         </div>
                       )}
                     </div>

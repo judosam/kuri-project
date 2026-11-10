@@ -879,3 +879,27 @@ class QaCreateRecordRequest(BaseModel):
     qc_street_details: Optional[str] = None
     qc_builder_contact: Optional[str] = None
     qc_sqfeet: Optional[str] = None
+
+class BulkResolveCadastralRequest(BaseModel):
+    record_ids: list[int] = Field(..., description="List of record IDs to resolve cadastral details for")
+    force: bool = Field(False, description="Whether to overwrite existing village/taluk/district/survey/subdivision")
+
+
+class BulkResolveCadastralItemResult(BaseModel):
+    record_id: int
+    unique_id: Optional[str] = None
+    success: bool
+    village: Optional[str] = None
+    taluk: Optional[str] = None
+    district: Optional[str] = None
+    survey_no: Optional[str] = None
+    subdivision_no: Optional[str] = None
+    error: Optional[str] = None
+
+
+class BulkResolveCadastralResponse(BaseModel):
+    total: int
+    resolved_count: int
+    failed_count: int
+    results: list[BulkResolveCadastralItemResult]
+

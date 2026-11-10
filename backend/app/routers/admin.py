@@ -48,6 +48,9 @@ from app.schemas.record import (
     RecordUpdateRequest,
     TaskDispatchBatchRequest,
     TelecallerAssignRequest,
+    BulkResolveCadastralRequest,
+    BulkResolveCadastralResponse,
+    BulkResolveCadastralItemResult,
 )
 from app.schemas.auth import AdminResetPasswordResponse, SimpleMessageResponse
 from app.schemas.user import UserCreate, UserDetail, UserListResponse, UserResetPasswordRequest, UserUpdate
@@ -3204,6 +3207,174 @@ async def admin_resolve_record_address(
     )
 
 
+
+
+
+def _resolve_single_record_cadastral(record, db: Session, force: bool = False) -> dict:
+    from app.services.record_service import _parse_coordinates, record_field_history
+    from app.services.tngis_wfs_service import get_tngis_wfs_service
+    from app.services.village_master_service import get_village_master_service
+
+    cand_coords = record.coordinates
+    if not cand_coords:
+        if record.field_latitude is not None and record.field_longitude is not None:
+            cand_coords = f"{record.field_latitude}, {record.field_longitude}"
+        elif record.images:
+            for img in record.images:
+                if img.latitude is not None and img.longitude is not None:
+                    cand_coords = f"{img.latitude}, {img.longitude}"
+                    break
+
+    parsed = _parse_coordinates(cand_coords)
+    if not parsed:
+        return {"success": False, "error": "No valid coordinates found on record"}
+
+    lat, lng = parsed
+    survey_no = None
+    subdivision_no = None
+    village = None
+    taluk = None
+    district = None
+    ulpin = None
+
+    # 1. TNGIS WFS
+    try:
+        wfs = get_tngis_wfs_service()
+        wfs_res = wfs.resolve_coordinates(lat, lng)
+        survey_no = wfs_res.get("survey_no") or None
+        subdivision_no = wfs_res.get("subdivision_no") or None
+        village = wfs_res.get("village") or None
+        taluk = wfs_res.get("taluk") or None
+        district = wfs_res.get("district") or None
+        ulpin = wfs_res.get("ulpin") or None
+        if wfs_res.get("formatted_address") and not record.formatted_address:
+            record.formatted_address = wfs_res["formatted_address"]
+    except Exception as e:
+        logger.warning(f"WFS resolve error for record #{record.id}: {e}")
+
+    # 2. Village Master fallback
+    if not (village and taluk and district):
+        try:
+            vms = get_village_master_service()
+            loc_match = vms.resolve_record_location(coordinates=f"{lat}, {lng}")
+            village = village or loc_match.get("village")
+            taluk = taluk or loc_match.get("taluk")
+            district = district or loc_match.get("district")
+            if not record.formatted_address and loc_match.get("formatted_address"):
+                record.formatted_address = loc_match["formatted_address"]
+        except Exception as e:
+            logger.warning(f"Village master resolve error for record #{record.id}: {e}")
+
+    changed = False
+    if survey_no and (force or not record.survey_no):
+        record.survey_no = survey_no
+        changed = True
+    if subdivision_no and (force or not record.subdivision_no):
+        record.subdivision_no = subdivision_no
+        changed = True
+    if village and (force or not record.village):
+        record.village = village
+        changed = True
+    if taluk and (force or not record.taluk):
+        record.taluk = taluk
+        changed = True
+    if district and (force or not record.district):
+        record.district = district
+        changed = True
+    if ulpin and (force or not record.ulpin):
+        record.ulpin = ulpin
+        changed = True
+
+    if changed:
+        record_field_history(record)
+        db.add(record)
+
+    return {
+        "success": True,
+        "changed": changed,
+        "village": record.village,
+        "taluk": record.taluk,
+        "district": record.district,
+        "survey_no": record.survey_no,
+        "subdivision_no": record.subdivision_no,
+    }
+
+
+@router.post("/records/{record_id}/resolve-cadastral", response_model=RecordDetail)
+async def admin_resolve_record_cadastral(
+    record_id: int,
+    force: bool = Query(True, description="Re-resolve even if fields already populated"),
+    admin: User = Depends(require_auditor),
+    db: Session = Depends(get_db),
+):
+    """Resolve Village, Taluk, District, Survey No, Subdivision No from coordinates for an existing record."""
+    record_service = RecordService(db)
+    record = record_service.get_record(record_id)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
+
+    res = _resolve_single_record_cadastral(record, db, force=force)
+    if not res.get("success"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=res.get("error", "Failed to resolve cadastral coordinates"))
+
+    db.commit()
+    db.refresh(record)
+    return _record_to_detail(record)
+
+
+@router.post("/records/bulk-resolve-cadastral", response_model=BulkResolveCadastralResponse)
+async def admin_bulk_resolve_cadastral(
+    payload: BulkResolveCadastralRequest,
+    admin: User = Depends(require_auditor),
+    db: Session = Depends(get_db),
+):
+    """Bulk resolve Village, Taluk, District, Survey No, Subdivision No for a list of record IDs."""
+    record_service = RecordService(db)
+    results = []
+    resolved_count = 0
+    failed_count = 0
+
+    for rid in payload.record_ids:
+        record = record_service.get_record(rid)
+        if not record:
+            results.append(BulkResolveCadastralItemResult(
+                record_id=rid,
+                unique_id=None,
+                success=False,
+                error="Record not found"
+            ))
+            failed_count += 1
+            continue
+
+        res = _resolve_single_record_cadastral(record, db, force=payload.force)
+        if res.get("success"):
+            resolved_count += 1
+            results.append(BulkResolveCadastralItemResult(
+                record_id=rid,
+                unique_id=record.unique_id or record.name,
+                success=True,
+                village=record.village,
+                taluk=record.taluk,
+                district=record.district,
+                survey_no=record.survey_no,
+                subdivision_no=record.subdivision_no,
+            ))
+        else:
+            failed_count += 1
+            results.append(BulkResolveCadastralItemResult(
+                record_id=rid,
+                unique_id=record.unique_id or record.name,
+                success=False,
+                error=res.get("error", "Resolution failed")
+            ))
+
+    db.commit()
+    return BulkResolveCadastralResponse(
+        total=len(payload.record_ids),
+        resolved_count=resolved_count,
+        failed_count=failed_count,
+        results=results,
+    )
 
 
 @router.post("/records/resolve-coords", response_model=ResolveCoordsResponse)

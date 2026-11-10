@@ -116,16 +116,6 @@ export const QC_STATUS_OPTIONS: { value: UnifiedQcFilter; label: string }[] = [
   { value: 'PENDING', label: 'QC Pending' },
 ];
 
-/** Status tabs shown above the records table, mapped to the QC/audit filters. */
-const RECORD_TABS: { key: UnifiedQcFilter; label: string; tone: string }[] = [
-  { key: 'ALL', label: 'All records', tone: 'navy' },
-  { key: 'PENDING', label: 'QC pending', tone: 'amber' },
-  { key: 'DONE', label: 'QC done', tone: 'green' },
-  { key: 'APPROVAL', label: 'Approved', tone: 'green' },
-  { key: 'DISAPPROVAL', label: 'Rejected', tone: 'red' },
-  { key: 'COMMERCIAL_PROPERTY', label: 'Commercial', tone: 'violet' },
-];
-
 const AUDIT_CHIP_META: Record<AuditStatus, { label: string; icon: IconName; cls: string; fullTitle: string }> = {
   PENDING: { label: 'Pending', icon: 'pending_actions', cls: 'audit-chip-pending', fullTitle: 'Pending' },
   APPROVAL: { label: 'Approval', icon: 'check_circle', cls: 'audit-chip-approval', fullTitle: 'Approval' },
@@ -325,7 +315,11 @@ export default function Records({
 
   const [records, setRecords] = useState<CaptureRecord[]>([]);
   const [proximityMode, setProximityMode] = useState<'none' | 'village'>('none');
-  const [filtersExpanded, setFiltersExpanded] = useState<boolean>(() => localStorage.getItem('kuri_admin_filters_expanded') !== 'false');
+  const [filtersExpanded, setFiltersExpanded] = useState<boolean>(() => {
+    const saved = localStorage.getItem('kuri_admin_filters_expanded');
+    if (saved !== null) return saved !== 'false';
+    return typeof window !== 'undefined' ? window.innerWidth > 768 : true;
+  });
 
   const spatialVillage = useMemo(() => {
     const groups: { [key: string]: CaptureRecord[] } = {};
@@ -400,7 +394,6 @@ export default function Records({
   }, [records, proximityMode, spatialVillage, collapsedClusters]);
 
   const [total, setTotal] = useState(0);
-  const [tabCounts, setTabCounts] = useState<Record<string, number> | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'NOT_COMPLETED' | 'COMPLETED' | 'MANUALLY_ADDED' | 'NOT_INTERESTED' | 'DUPLICATE' | 'CONSTRUCTION_FINISHED' | 'CLOSED'>(saved.statusFilter as any);
@@ -510,6 +503,65 @@ export default function Records({
   const [targetUserId, setTargetUserId] = useState('');
   const [reassigning, setReassigning] = useState(false);
   const [bulkAuditDecision, setBulkAuditDecision] = useState<string>('');
+  const [showBulkResolveModal, setShowBulkResolveModal] = useState(false);
+  const [bulkResolveForce, setBulkResolveForce] = useState(false);
+  const [bulkResolving, setBulkResolving] = useState(false);
+  const [bulkResolveDone, setBulkResolveDone] = useState(false);
+  const [bulkResolveStats, setBulkResolveStats] = useState({
+    total: 0,
+    processed: 0,
+    resolved: 0,
+    failed: 0,
+    percent: 0,
+  });
+
+  const handleOpenBulkResolve = () => {
+    setShowBulkResolveModal(true);
+    setBulkResolveDone(false);
+    setBulkResolving(false);
+    setBulkResolveStats({
+      total: selectedIds.size,
+      processed: 0,
+      resolved: 0,
+      failed: 0,
+      percent: 0,
+    });
+  };
+
+  const executeBulkResolve = async () => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    setBulkResolving(true);
+    setBulkResolveDone(false);
+
+    const BATCH_SIZE = 15;
+    let resolvedAcc = 0;
+    let failedAcc = 0;
+    let processedAcc = 0;
+
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const chunk = ids.slice(i, i + BATCH_SIZE);
+      try {
+        const res = await recordsApi.bulkResolveCadastral(chunk, bulkResolveForce);
+        resolvedAcc += res.resolved_count;
+        failedAcc += res.failed_count;
+      } catch (err) {
+        failedAcc += chunk.length;
+      }
+      processedAcc += chunk.length;
+      const pct = Math.round((processedAcc / ids.length) * 100);
+      setBulkResolveStats({
+        total: ids.length,
+        processed: processedAcc,
+        resolved: resolvedAcc,
+        failed: failedAcc,
+        percent: pct,
+      });
+    }
+
+    setBulkResolving(false);
+    setBulkResolveDone(true);
+  };
   const [bulkAuditing, setBulkAuditing] = useState(false);
   const [bulkVerificationStatus, setBulkVerificationStatus] = useState<string>('COMPLETED');
   const [bulkUpdatingStatus, setBulkUpdatingStatus] = useState(false);
@@ -525,7 +577,6 @@ export default function Records({
   // Record Assigner workflow — route staged rows to an auditor, then release
   // auditor-approved rows to a field verifier.
   const [auditors, setAuditors] = useState<User[]>([]);
-  const [routeTo, setRouteTo] = useState('');
   const [verifierTo, setVerifierTo] = useState('');
   const [assigning, setAssigning] = useState(false);
 
@@ -917,40 +968,7 @@ export default function Records({
   };
 
 
-  /** Bulk-route the selected staged rows to an auditor for review. */
-  const routeSelectedToAuditor = async () => {
-    if (!routeTo || !selectedIds.size) return;
-    setAssigning(true);
-    setDeleteNotice(null);
-    try {
-      const result = await recordsApi.assignAuditor([...selectedIds], Number(routeTo));
-      setDeleteNotice({ tone: 'ok', text: result.message });
-      setRouteTo('');
-      setSelectedIds(new Set());
-      await loadRecords();
-    } catch (err: any) {
-      setDeleteNotice({ tone: 'error', text: err.response?.data?.detail || 'Could not route records to the auditor. Please retry.' });
-    } finally {
-      setAssigning(false);
-    }
-  };
 
-  /** Bulk unassign the selected rows from their auditor. */
-  const unassignSelectedAuditor = async () => {
-    if (!selectedIds.size) return;
-    setAssigning(true);
-    setDeleteNotice(null);
-    try {
-      const result = await recordsApi.unassignAuditor([...selectedIds]);
-      setDeleteNotice({ tone: 'ok', text: result.message });
-      setSelectedIds(new Set());
-      await loadRecords();
-    } catch (err: any) {
-      setDeleteNotice({ tone: 'error', text: err.response?.data?.detail || 'Could not unassign auditors. Please retry.' });
-    } finally {
-      setAssigning(false);
-    }
-  };
 
   /** Bulk-release the selected rows to a field verifier. */
   const assignSelectedVerifier = async () => {
@@ -1146,37 +1164,6 @@ export default function Records({
       }
     }
   };
-
-  // Quick-filter counts: one lightweight count per status for the current filter context.
-  useEffect(() => {
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      const base = listParams(1, 1);
-      void Promise.all(
-        RECORD_TABS.map(async (tab) => {
-          const res = await recordsApi.list({
-            ...base,
-            page: 1,
-            page_size: 1,
-            qc_status: tab.key === 'DONE' || tab.key === 'PENDING' ? tab.key : undefined,
-            audit_status: ['APPROVAL', 'DISAPPROVAL', 'COMMERCIAL_PROPERTY'].includes(tab.key) ? tab.key : undefined,
-          });
-          return [tab.key, res.total] as const;
-        })
-      )
-        .then((entries) => {
-          if (!cancelled) setTabCounts(Object.fromEntries(entries));
-        })
-        .catch(() => {
-          // Counts are optional chrome — the filter keeps working without them.
-        });
-    }, 250);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, userId, auditorId, dateFrom, dateTo, columnFilterKey, isAuditorView, currentUser?.id]);
 
   // Infinite scroll on table-scroll container with concurrency lock to prevent hanging
   useEffect(() => {
@@ -1582,30 +1569,7 @@ export default function Records({
   return (
     <PageShell>
 
-      <div className="k-quickfilters" role="group" aria-label="Record status">
-        {RECORD_TABS.map((tab) => {
-          const active = qcStatusFilter === tab.key;
-          const count = active ? total : tabCounts?.[tab.key];
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              aria-pressed={active}
-              className={`k-qf${active ? ' is-active' : ''}`}
-              onClick={() => {
-                setQcStatusFilter(tab.key);
-                setColumnFilters({});
-                setStatusFilter('ALL');
-                setPage(1);
-              }}
-            >
-              <span className={`k-qf-dot is-${tab.tone}`} />
-              <span>{tab.label}</span>
-              {count !== undefined && <span className="k-qf-count">{count.toLocaleString()}</span>}
-            </button>
-          );
-        })}
-      </div>
+
       {loadError && <div role="alert" className="record-load-error">{loadError} <button type="button" className="btn btn-secondary btn-sm" onClick={() => loadRecords()}>Retry</button></div>}
       {/* Search and ordering stay above the compact record filters. */}
       <div className="toolbar records-toolbar compact-records-toolbar">
@@ -1750,13 +1714,6 @@ export default function Records({
         </div>
         {filtersExpanded && (
         <div className="toolbar-row records-filter-bar">
-          {!isAuditorView && (
-            <div className="filter-bar-group filter-assignment">
-              <span className="filter-bar-label">Auditor</span>
-              <CustomSelect value={auditorId} onChange={value => { setAuditorId(value); setPage(1); }} ariaLabel="Filter by auditor"
-                options={[{ value: '', label: 'All auditors' }, { value: 'UNASSIGNED', label: 'Unassigned' }, ...auditors.map(user => ({ value: String(user.id), label: user.full_name || user.email }))]} />
-            </div>
-          )}
           {canRoute && <div className="filter-bar-group filter-assignment">
             <span className="filter-bar-label">Field verifier</span>
             <CustomSelect value={userId} onChange={value => { setUserId(value); setPage(1); }} ariaLabel="Filter by field verifier"
@@ -1840,6 +1797,28 @@ export default function Records({
               {selectingAll ? 'Selecting…' : `Select all ${total.toLocaleString()} matching`}
             </button>}
             <span className="selection-page-count">{selectedOnPage} of {pageIds.length} on this page</span>
+            {(canAdmin || canAudit || isAuditorView) && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm bulk-resolve-btn"
+                onClick={handleOpenBulkResolve}
+                disabled={assigning || selectingAll || bulkAuditing}
+                title="Bulk resolve Village, Taluk, District, Survey No & Subdivision from WFS / Village Master"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: '0.74rem',
+                  fontWeight: 650,
+                  color: '#0369a1',
+                  borderColor: '#bae6fd',
+                  background: '#f0f9ff',
+                }}
+              >
+                <Icon name="auto_awesome" size={13} />
+                <span>Bulk Resolve Cadastral</span>
+              </button>
+            )}
             <div className="selection-clear-actions">
               {canAdmin && <button type="button" className="btn btn-danger btn-sm" onClick={() => { setDeleteNotice(null); setShowDeleteModal(true); }}
                 disabled={assigning || bulkAuditing || reassigning} title="Permanently delete the selected records"><Icon name="delete" size={14} />Delete</button>}
@@ -1847,45 +1826,6 @@ export default function Records({
             </div>
           </div>
           <div className="selection-action-groups">
-            {/* 1. QC / Auditor assignment: available to Admin, QA, or when canRoute */}
-            {(canRoute || canAudit || isAuditorView) && (
-              <div className="selection-action-pair">
-                <CustomSelect
-                  value={routeTo}
-                  onChange={setRouteTo}
-                  ariaLabel="Assign or reassign selected records to QC user"
-                  options={[
-                    { value: '', label: 'Choose QC user…' },
-                    ...auditors.map((user) => ({
-                      value: String(user.id),
-                      label: `${user.full_name || user.email}${user.role ? ` (${user.role})` : ''}`,
-                    })),
-                  ]}
-                />
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  disabled={!routeTo || assigning || selectingAll || bulkAuditing}
-                  onClick={routeSelectedToAuditor}
-                  aria-label="Reassign QC user"
-                  title="Assign or reassign selected records to the chosen QC user"
-                >
-                  <Icon name="badge" size={14} />
-                  {assigning ? 'Assigning…' : 'Reassign QC'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  disabled={assigning || selectingAll || bulkAuditing}
-                  onClick={unassignSelectedAuditor}
-                  aria-label="Unassign QC user"
-                  title="Remove QC user assignment from selected records"
-                >
-                  <Icon name="person_off" size={14} />
-                  Unassign QC
-                </button>
-              </div>
-            )}
 
             {/* 2. Bulk audit decision: available in Auditor view or when canAudit / canAdmin */}
             {(isAuditorView || canAudit || canAdmin) && (
@@ -2406,9 +2346,9 @@ export default function Records({
                               alignItems: 'center',
                               justifyContent: 'space-between',
                               gap: 16,
-                              width: 'calc(100vw - 340px)',
-                              maxWidth: 1200,
-                              minWidth: 480,
+                              maxWidth: '100%',
+                              minWidth: 260,
+                              flexWrap: 'wrap',
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -4523,6 +4463,150 @@ export default function Records({
           record={qaModalRecord}
           onClose={() => setQaModalRecord(null)}
         />
+      )}
+
+      {showBulkResolveModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="modal-backdrop"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 16,
+          }}
+          onClick={() => { if (!bulkResolving) setShowBulkResolveModal(false); }}
+        >
+          <div
+            className="card"
+            style={{
+              width: '100%',
+              maxWidth: 480,
+              padding: 24,
+              borderRadius: 14,
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+              background: '#ffffff',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: '#f0f9ff', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="auto_awesome" size={18} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>Bulk Cadastral Resolution</h3>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>Resolve Village, Taluk, District & Survey Numbers</p>
+                </div>
+              </div>
+              {!bulkResolving && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setShowBulkResolveModal(false)}
+                  style={{ padding: 4, height: 28, width: 28, borderRadius: 6 }}
+                >
+                  <Icon name="close" size={16} />
+                </button>
+              )}
+            </div>
+
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: '0.82rem', color: '#334155' }}>
+              <strong>{selectedIds.size.toLocaleString()} record(s) selected</strong>
+              <div style={{ marginTop: 4, fontSize: '0.75rem', color: '#64748b', lineHeight: 1.4 }}>
+                Queries TNGIS WFS boundary layers and Village Master reference to automatically fill Village, Taluk, District, Survey No and Subdivision No from GPS coordinates.
+              </div>
+              {!bulkResolving && !bulkResolveDone && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600, color: '#0f172a' }}>
+                  <input
+                    type="checkbox"
+                    checked={bulkResolveForce}
+                    onChange={(e) => setBulkResolveForce(e.target.checked)}
+                  />
+                  <span>Re-resolve even if fields already populated (Overwrite)</span>
+                </label>
+              )}
+            </div>
+
+            {/* Progress Bar & Live Status */}
+            {(bulkResolving || bulkResolveDone) && (
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, fontSize: '0.78rem', fontWeight: 600 }}>
+                  <span style={{ color: bulkResolveDone ? '#15803d' : '#0284c7', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {bulkResolving && <span className="fos-spin" style={{ display: 'inline-block' }}>⟳</span>}
+                    {bulkResolveDone ? 'Resolution Completed!' : 'Resolving records…'}
+                  </span>
+                  <span style={{ color: '#0f172a', fontFamily: 'monospace' }}>
+                    {bulkResolveStats.processed} / {bulkResolveStats.total} ({bulkResolveStats.percent}%)
+                  </span>
+                </div>
+                <div style={{ height: 10, background: '#e2e8f0', borderRadius: 9999, overflow: 'hidden', position: 'relative' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${bulkResolveStats.percent}%`,
+                      background: 'linear-gradient(90deg, #3b82f6, #06b6d4, #10b981)',
+                      borderRadius: 9999,
+                      transition: 'width 0.25s ease-out',
+                      boxShadow: '0 0 8px rgba(6, 182, 212, 0.4)',
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: '0.74rem' }}>
+                  <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ Resolved: {bulkResolveStats.resolved}</span>
+                  <span style={{ color: '#dc2626', fontWeight: 600 }}>✕ Unmatched / No GPS: {bulkResolveStats.failed}</span>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+              {!bulkResolving && !bulkResolveDone ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setShowBulkResolveModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={executeBulkResolve}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <Icon name="auto_awesome" size={14} />
+                    <span>Start Resolution</span>
+                  </button>
+                </>
+              ) : bulkResolveDone ? (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={async () => {
+                    setShowBulkResolveModal(false);
+                    clearSelection();
+                    await loadRecords();
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Icon name="check" size={14} />
+                  <span>Done & Refresh Records</span>
+                </button>
+              ) : (
+                <button type="button" className="btn btn-secondary btn-sm" disabled>
+                  Processing in background…
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
     </PageShell>

@@ -568,37 +568,34 @@ export default function RecordDetailScreen({
         {(record.is_duplicate || record.duplicate_site_id || record.duplicate_warning) && (
           <div
             style={{
-              margin: '8px 0',
-              padding: '8px 12px',
-              borderRadius: 8,
-              background: '#fef2f2',
-              border: '1.5px solid #fecaca',
-              color: '#991b1b',
-              fontSize: '0.80rem',
-              fontWeight: 600,
+              margin: '10px 0',
+              padding: '10px 14px',
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, rgba(254, 242, 242, 0.95) 0%, rgba(255, 241, 242, 0.75) 100%)',
+              border: '1px solid rgba(244, 63, 94, 0.28)',
+              boxShadow: '0 2px 10px -2px rgba(225, 29, 72, 0.08)',
               display: 'flex',
               alignItems: 'flex-start',
-              gap: 8,
+              gap: 10,
             }}
           >
-            <Icon name="warning" size={17} color="#dc2626" />
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: '#e11d48',
+                boxShadow: '0 0 0 3px rgba(225, 29, 72, 0.2)',
+                marginTop: 5,
+                flexShrink: 0,
+              }}
+            />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 800, color: '#b91c1c' }}>
-                ⚠️ Proximity Match / Duplicate Site Alert
-              </div>
-              {record.duplicate_site_id && (
-                <div style={{ marginTop: 2 }}>
-                  Matched site: <strong>{record.duplicate_site_id}</strong>
-                  {record.duplicate_distance_m != null && ` (${Math.round(record.duplicate_distance_m)}m away)`}.
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap' }}>
+                <div style={{ fontWeight: 750, color: '#9f1239', fontSize: '0.80rem' }}>
+                  Proximity / Duplicate Alert
                 </div>
-              )}
-              {record.duplicate_warning && (
-                <div style={{ marginTop: 2, fontSize: '0.74rem', color: '#7f1d1d' }}>
-                  {record.duplicate_warning}
-                </div>
-              )}
-              {(record.duplicate_record_id || record.duplicate_site_id) && onOpenRecord && (
-                <div style={{ marginTop: 8 }}>
+                {(record.duplicate_record_id || record.duplicate_site_id) && onOpenRecord && (
                   <button
                     type="button"
                     onClick={handleViewDuplicateRecord}
@@ -606,25 +603,38 @@ export default function RecordDetailScreen({
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: 6,
+                      gap: 4,
                       background: '#ffffff',
-                      color: '#b91c1c',
-                      border: '1.5px solid #f87171',
-                      borderRadius: 6,
-                      padding: '6px 12px',
-                      fontSize: '0.78rem',
+                      color: '#be123c',
+                      border: '1px solid rgba(225, 29, 72, 0.35)',
+                      borderRadius: 20,
+                      padding: '2px 9px',
+                      height: 24,
+                      fontSize: '0.70rem',
                       fontWeight: 700,
                       cursor: 'pointer',
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    <Icon name="visibility" size={15} color="#b91c1c" />
+                    <Icon name="visibility" size={12} color="#be123c" />
                     <span>
                       {findingDuplicate
-                        ? 'Opening duplicate record…'
-                        : `View Duplicate Record (${record.duplicate_site_id || `#${record.duplicate_record_id}`})`}
+                        ? 'Opening…'
+                        : `View ${record.duplicate_site_id || `#${record.duplicate_record_id}`}`}
                     </span>
                   </button>
+                )}
+              </div>
+              {record.duplicate_site_id && (
+                <div style={{ marginTop: 2, fontSize: '0.76rem', color: '#881337' }}>
+                  Matched site: <strong style={{ fontFamily: 'monospace' }}>{record.duplicate_site_id}</strong>
+                  {record.duplicate_distance_m != null && ` (${Math.round(record.duplicate_distance_m)}m away)`}.
+                </div>
+              )}
+              {record.duplicate_warning && (
+                <div style={{ marginTop: 2, fontSize: '0.72rem', color: '#9f1239', opacity: 0.85 }}>
+                  {record.duplicate_warning}
                 </div>
               )}
             </div>
