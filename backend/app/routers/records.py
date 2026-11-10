@@ -568,7 +568,7 @@ async def upload_record_images(
 
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
-    if not record_service.can_access(user, record):
+    if not record_service.can_access(user, record, for_write=True):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
     image_service = ImageService()
@@ -896,7 +896,7 @@ async def mark_record_status(
     record = record_service.get_record(record_id)
     if not record:
         raise HTTPException(status_code=404, detail="Record not found")
-    if not record_service.can_access(user, record):
+    if not record_service.can_access(user, record, for_write=True):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     status_map = {

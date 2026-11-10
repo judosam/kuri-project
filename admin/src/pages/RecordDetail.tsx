@@ -664,15 +664,6 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
   const saveAuditAssessment = async () => {
     if (!record || auditSaving) return;
     const coordsChanged = editCoordinates.trim() !== (record.coordinates || '').trim();
-    const auditorChanged = (assignedAuditorId ? Number(assignedAuditorId) : null) !== (record.assigned_auditor_id || null);
-    const commentChanged = auditComment.trim() !== (record.audit_comment || '').trim();
-    const qcChanged =
-      qcVhr.trim() !== (record.qc_vhr_comment || '').trim() ||
-      qcStreet.trim() !== (record.qc_street_details || '').trim() ||
-      qcBuilder.trim() !== (record.qc_builder_contact || '').trim() ||
-      qcSqfeet.trim() !== (record.qc_sqfeet || '').trim() ||
-      commentChanged ||
-      auditorChanged;
 
     // Mandatory validation: Audit Decision, QC Comments (VHR Imagery), Street view comments
     if (!auditStatus?.trim()) {
@@ -688,10 +679,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
       return;
     }
 
-    const effectiveAuditStatus =
-      auditStatus === 'RE_AUDITED' || coordsChanged || qcChanged
-        ? 'RE_AUDITED'
-        : (auditStatus || 'APPROVAL');
+    const effectiveAuditStatus = auditStatus || 'APPROVAL';
 
     setAuditSaving(true);
     try {

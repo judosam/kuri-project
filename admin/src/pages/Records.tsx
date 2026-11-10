@@ -723,7 +723,7 @@ export default function Records({
     try {
       const coordsChanged = qcDraft.coordinates.trim() !== (detailRecord.coordinates || '').trim();
       const auditorChanged = (qcDraft.assignedAuditorId ? Number(qcDraft.assignedAuditorId) : null) !== (detailRecord.assigned_auditor_id || null);
-      const effectiveAuditStatus = (qcDraft.auditStatus as AuditStatus) || ((coordsChanged || auditorChanged) ? 'RE_AUDITED' : ((detailRecord.audit_status as AuditStatus) || 'APPROVAL'));
+      const effectiveAuditStatus = (qcDraft.auditStatus as AuditStatus) || 'APPROVAL';
 
       await recordsApi.audit(
         detailRecord.id,

@@ -749,20 +749,8 @@ export default function ImportedRecordDetail({
   const saveAuditAssessment = async () => {
     if (!record || auditSaving) return;
     const coordsChanged = editQcCoordinates.trim() !== (record.coordinates || '').trim();
-    const auditorChanged = (assignedAuditorId ? Number(assignedAuditorId) : null) !== (record.assigned_auditor_id || null);
-    const commentChanged = auditComment.trim() !== (record.audit_comment || '').trim();
-    const qcChanged =
-      qcVhr.trim() !== (record.qc_vhr_comment || '').trim() ||
-      qcStreet.trim() !== (record.qc_street_details || '').trim() ||
-      qcBuilder.trim() !== (record.qc_builder_contact || '').trim() ||
-      qcSqfeet.trim() !== (record.qc_sqfeet || '').trim() ||
-      commentChanged ||
-      auditorChanged;
 
-    const effectiveAuditStatus =
-      auditStatus === 'RE_AUDITED' || coordsChanged || qcChanged
-        ? 'RE_AUDITED'
-        : (auditStatus || 'APPROVAL');
+    const effectiveAuditStatus = auditStatus || 'APPROVAL';
 
     setAuditSaving(true);
     try {

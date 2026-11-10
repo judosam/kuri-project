@@ -564,6 +564,7 @@ export default function App() {
             onStartInspection={handleStartInspection}
             onEditRecord={handleEditRecord}
             onOpenRecord={(id) => handleOpenRecord(id, true)}
+            currentUser={currentUser}
           />
         )}
 

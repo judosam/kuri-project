@@ -413,9 +413,9 @@ def test_auditor_role_can_save_qc_and_bulk_audit(client, db):
         )
         assert res.status_code == 200, f"Auditor got {res.status_code}: {res.text}"
         data = res.json()
-        assert data["audit_status"] == "RE_AUDITED"
+        assert data["audit_status"] == "APPROVAL"
         db.refresh(rec)
-        assert rec.audit_status == "RE_AUDITED"
+        assert rec.audit_status == "APPROVAL"
         assert rec.audited_by_id == auditor.id
 
         # 3. Auditor calls POST /api/admin/records/bulk-audit

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, type ReactNode } from 'react';
-import type { CaptureRecord } from '../types';
+import type { CaptureRecord, User } from '../types';
 import { api } from '../services/api';
 import Icon from '../components/common/Icon';
 import Lightbox from '../components/common/Lightbox';
@@ -201,6 +201,7 @@ interface RecordDetailScreenProps {
   onEditRecord: (record: CaptureRecord) => void;
   /** Navigate to another record (e.g. matched duplicate). */
   onOpenRecord?: (recordId: number) => void;
+  currentUser?: User | null;
 }
 
 /** Titled block header used by every detail section. */
@@ -294,6 +295,7 @@ export default function RecordDetailScreen({
   onStartInspection,
   onEditRecord,
   onOpenRecord,
+  currentUser,
 }: RecordDetailScreenProps) {
   const [record, setRecord] = useState<CaptureRecord | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -532,6 +534,33 @@ export default function RecordDetailScreen({
     <div className="record-detail-split">
       <div className="record-detail-information">
 
+      {/* Reference banner for duplicate/proximity viewing */}
+      {currentUser && record.user_id !== currentUser.id && record.reassigned_to_id !== currentUser.id && (
+        <div
+          style={{
+            margin: '0 0 16px 0',
+            padding: '12px 14px',
+            borderRadius: 8,
+            backgroundColor: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            color: '#1e40af',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            fontSize: '0.85rem',
+            fontWeight: 500,
+          }}
+        >
+          <Icon name="visibility" size={20} color="#2563eb" />
+          <div>
+            <strong>Viewing Duplicate / Reference Site (Read Only)</strong>
+            <div style={{ fontSize: '0.78rem', opacity: 0.9, marginTop: 2 }}>
+              This record is from another inspection task shown for proximity comparison.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── 1. Record identity ─── */}
       <div className="rd-identity">
         <div className="rd-identity-top">
@@ -658,39 +687,41 @@ export default function RecordDetailScreen({
           </span>
         </div>
 
-        <div className="rd-identity-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {isCompleted ? (
+        {(!currentUser || record.user_id === currentUser.id || record.reassigned_to_id === currentUser.id) && (
+          <div className="rd-identity-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {isCompleted ? (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => onEditRecord(record)}
+                title="Edit the inspection details saved for this record"
+              >
+                <Icon name="edit_note" size={16} />
+                Edit Details
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => onStartInspection(record)}
+              >
+                <Icon name="photo_camera" size={16} color="#ffffff" />
+                {record.revisit_status === 'PENDING_REVISIT' || record.revisit_status === 'REASSIGNED' ? 'Start Revisit Inspection' : 'Start Inspection'}
+              </button>
+            )}
+
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={() => onEditRecord(record)}
-              title="Edit the inspection details saved for this record"
+              onClick={() => setShowMarkStatusModal(true)}
+              title="Mark status as Not Interested, Duplicate, Construction Finished"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
             >
-              <Icon name="edit_note" size={16} />
-              Edit Details
+              <Icon name="label" size={16} />
+              Mark Status
             </button>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => onStartInspection(record)}
-            >
-              <Icon name="photo_camera" size={16} color="#ffffff" />
-              {record.revisit_status === 'PENDING_REVISIT' || record.revisit_status === 'REASSIGNED' ? 'Start Revisit Inspection' : 'Start Inspection'}
-            </button>
-          )}
-
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => setShowMarkStatusModal(true)}
-            title="Mark status as Not Interested, Duplicate, Construction Finished"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-          >
-            <Icon name="label" size={16} />
-            Mark Status
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* ─── 2. Site location ─── */}

@@ -451,7 +451,40 @@ class RecordService:
     def delete_record(self, record: CaptureRecord) -> None:
         self.record_repo.delete(record)
 
-    def can_access(self, user: User, record: CaptureRecord) -> bool:
+    def is_duplicate_or_proximity_match(self, user_id: int, target_record: CaptureRecord) -> bool:
+        """Check if target_record is within proximity or coordinate match of any active record assigned to user."""
+        from sqlalchemy import or_
+        if target_record.unique_id:
+            assigned_with_same_uid = self.db.query(CaptureRecord.id).filter(
+                or_(CaptureRecord.user_id == user_id, CaptureRecord.reassigned_to_id == user_id),
+                CaptureRecord.unique_id == target_record.unique_id,
+            ).first()
+            if assigned_with_same_uid:
+                return True
+
+        if not target_record.coordinates:
+            return False
+        from app.services.duplicate_detection_service import parse_coords_pair, haversine_distance_m
+        target_coords = parse_coords_pair(target_record.coordinates)
+        if not target_coords:
+            return False
+        t_lat, t_lng = target_coords
+
+        assigned_records = self.db.query(CaptureRecord.coordinates).filter(
+            or_(CaptureRecord.user_id == user_id, CaptureRecord.reassigned_to_id == user_id),
+            CaptureRecord.coordinates.isnot(None),
+            or_(CaptureRecord.audit_status.is_(None), CaptureRecord.audit_status != "DISAPPROVAL"),
+        ).all()
+
+        for (u_coords,) in assigned_records:
+            u_parsed = parse_coords_pair(u_coords)
+            if u_parsed:
+                dist = haversine_distance_m(t_lat, t_lng, u_parsed[0], u_parsed[1])
+                if dist <= 250:
+                    return True
+        return False
+
+    def can_access(self, user: User, record: CaptureRecord, for_write: bool = False) -> bool:
         if user.role.value in ("ADMIN", "MANAGER"):
             return True
         if user.role.value == "AUDITOR":
@@ -460,7 +493,13 @@ class RecordService:
         if user.role.value == "TELECALLER":
             return record.assigned_telecaller_id == user.id or record.assigned_telecaller_id is None
         # Field workers (USER operators and FIELD_VERIFIERs) see their own records.
-        return (record.user_id == user.id or record.reassigned_to_id == user.id) and record.audit_status != "DISAPPROVAL"
+        is_assigned = (record.user_id == user.id or record.reassigned_to_id == user.id) and record.audit_status != "DISAPPROVAL"
+        if is_assigned:
+            return True
+        if for_write:
+            return False
+        # Read-only reference viewing: allow field verifiers to view nearby / duplicate reference records
+        return self.is_duplicate_or_proximity_match(user.id, record)
 
     def audit_record(
         self,
@@ -500,11 +539,13 @@ class RecordService:
         if qc_sqfeet is not None and (qc_sqfeet.strip() or None) != record.qc_sqfeet:
             qc_changed = True
 
-        if (coords_changed or qc_changed) and audit_status in ("APPROVAL", "PENDING", "", None):
-            audit_status = "RE_AUDITED"
         if auditor.role.value == "AUDITOR" and record.assigned_auditor_id not in (None, auditor.id):
             raise PermissionError("This record is assigned to another auditor")
-        record.audit_status = audit_status
+        # Honor the auditor's explicit decision (APPROVAL, DISAPPROVAL, COMMERCIAL_PROPERTY, etc.)
+        if audit_status:
+            record.audit_status = audit_status
+        elif coords_changed or qc_changed:
+            record.audit_status = "RE_AUDITED"
         record.audit_comment = (audit_comment or "").strip() or None
         now = datetime.now(timezone.utc)
         is_already_done = bool(record.qc_completed_at)
@@ -529,6 +570,7 @@ class RecordService:
             has_qc = any((value or '').strip() for value in (record.qc_vhr_comment, record.qc_street_details, record.qc_builder_contact, record.qc_sqfeet))
             if has_qc:
                 record.qc_by_id = auditor.id
+                record.qc_status = "QC Done"
                 if is_already_done:
                     record.qc_edited_at = now
                 else:
@@ -538,6 +580,7 @@ class RecordService:
                 record.qc_completed_at = None
                 record.qc_edited_at = None
                 record.qc_by_id = None
+                record.qc_status = "QC Pending"
 
         if record.status not in ("COMPLETED", "Updated Revisited", "UPDATED_REVISITED") and audit_status in ("DISAPPROVAL", "COMMERCIAL_PROPERTY"):
             # Blocked / unassigned outcomes: clear user assignment.
