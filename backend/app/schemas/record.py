@@ -654,6 +654,8 @@ class InspectorStat(BaseModel):
     pending: int
     today_completed: int
     completion_rate: float
+    confirmed_construction: int = 0
+    phones_obtained: int = 0
 
 
 class QaUserStat(BaseModel):

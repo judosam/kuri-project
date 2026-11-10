@@ -1085,15 +1085,20 @@ class RecordService:
                 scoped['completion_rate'],
             )
             u_today_comp = scoped['today_completed_records']
-            u_const = self.db.query(CaptureRecord).filter(
-                CaptureRecord.user_id == u.id,
+            u_base = self.db.query(CaptureRecord).filter(CaptureRecord.user_id == u.id)
+            if eff_from:
+                u_base = u_base.filter(func.coalesce(CaptureRecord.captured_at, CaptureRecord.created_at) >= eff_from)
+            if eff_to:
+                u_base = u_base.filter(func.coalesce(CaptureRecord.captured_at, CaptureRecord.created_at) <= eff_to)
+
+            u_const = u_base.filter(
                 func.lower(func.trim(CaptureRecord.construction_happening)) == "yes",
             ).count()
-            u_phones = self.db.query(CaptureRecord).filter(
-                CaptureRecord.user_id == u.id,
+            u_phones = u_base.filter(
                 or_(
                     func.coalesce(func.trim(CaptureRecord.contact_number), "") != "",
                     func.coalesce(func.trim(CaptureRecord.site_contractor_architect_number), "") != "",
+                    func.coalesce(func.trim(CaptureRecord.qc_builder_contact), "") != "",
                 ),
             ).count()
 

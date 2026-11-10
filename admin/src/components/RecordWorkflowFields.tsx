@@ -356,27 +356,30 @@ export function UniqueIdCell({ record: r }: { record: CaptureRecord }) {
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 150, maxWidth: 290 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap' }}>
-        <span className="mono-sm rec-unique-id" style={{ fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>
-          {r.unique_id || '—'}
-        </span>
-        {isDup && (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
+      <span className="mono-sm rec-unique-id" style={{ fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>
+        {r.unique_id || '—'}
+      </span>
+      {isDup && (
+        <div style={{ display: 'flex', alignItems: 'center', marginTop: 1 }}>
           <span
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 5,
-              padding: '2px 8px',
+              gap: 4,
+              padding: '1.5px 7px',
               borderRadius: 20,
               background: isVisited ? 'rgba(255, 241, 242, 0.95)' : 'rgba(254, 252, 232, 0.95)',
               color: isVisited ? '#be123c' : '#b45309',
               border: `1px solid ${isVisited ? 'rgba(251, 113, 133, 0.35)' : 'rgba(250, 204, 21, 0.35)'}`,
-              fontSize: '0.68rem',
+              fontSize: '0.67rem',
               fontWeight: 650,
               letterSpacing: '0.01em',
               boxShadow: isVisited ? '0 1px 3px rgba(225, 29, 72, 0.08)' : '0 1px 3px rgba(217, 119, 6, 0.08)',
               whiteSpace: 'nowrap',
+              maxWidth: '100%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
               transition: 'all 0.15s ease',
             }}
             title={warningText || `Within ${dupDist || 0}m of ${dupMatchedId}`}
@@ -389,16 +392,17 @@ export function UniqueIdCell({ record: r }: { record: CaptureRecord }) {
                 backgroundColor: isVisited ? '#e11d48' : '#d97706',
                 display: 'inline-block',
                 boxShadow: isVisited ? '0 0 0 2px rgba(225, 29, 72, 0.2)' : '0 0 0 2px rgba(217, 119, 6, 0.2)',
+                flexShrink: 0,
               }}
             />
             <span>{isVisited ? 'Visited' : 'Near'}</span>
             <strong style={{ fontFamily: 'monospace', fontWeight: 700 }}>{dupMatchedId || 'Site'}</strong>
             {dupDist != null && (
-              <span style={{ opacity: 0.75, fontSize: '0.65rem' }}>({dupDist}m)</span>
+              <span style={{ opacity: 0.8, fontSize: '0.65rem' }}>({dupDist}m)</span>
             )}
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
