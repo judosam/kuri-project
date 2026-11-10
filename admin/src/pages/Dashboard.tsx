@@ -742,6 +742,7 @@ export default function Dashboard() {
                       <th className="num">Assigned</th>
                       <th className="num">Pending</th>
                       <th className="num">Done</th>
+                      <th className="num">Marked</th>
                       <th className="num">Confirmed</th>
                       <th className="num">Phones</th>
                       <th className="k-col-progress">Completion</th>
@@ -750,7 +751,7 @@ export default function Dashboard() {
                   <tbody>
                     {operators.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="k-table-empty">
+                        <td colSpan={8} className="k-table-empty">
                           No field verifiers in this period.
                         </td>
                       </tr>
@@ -769,6 +770,7 @@ export default function Dashboard() {
                         <td className="num">{formatter.format(op.total_assigned)}</td>
                         <td className="num">{formatter.format(op.pending)}</td>
                         <td className="num">{formatter.format(op.completed)}</td>
+                        <td className="num is-muted">{formatter.format(op.marked ?? op.closed ?? 0)}</td>
                         <td className="num is-green">{formatter.format(op.confirmed_construction ?? 0)}</td>
                         <td className="num">{formatter.format(op.phones_obtained ?? 0)}</td>
                         <td className="k-col-progress">

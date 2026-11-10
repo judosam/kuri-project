@@ -1110,6 +1110,7 @@ class RecordService:
                 "total_assigned": assigned,
                 "completed": completed,
                 "closed": u_closed,
+                "marked": u_closed,
                 "pending": u_pending,
                 "today_completed": u_today_comp,
                 "completion_rate": rate,

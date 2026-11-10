@@ -496,6 +496,10 @@
   color: #15803d;
   font-weight: 600;
 }
+.k-table td.is-muted {
+  color: #64748b;
+  font-weight: 600;
+}
 .k-table td.is-red {
   color: #b91c1c;
   font-weight: 600;

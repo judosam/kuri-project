@@ -259,6 +259,7 @@ export interface InspectorStat {
   total_assigned: number;
   completed: number;
   closed?: number;
+  marked?: number;
   pending: number;
   today_completed: number;
   completion_rate: number;
