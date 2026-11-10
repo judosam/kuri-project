@@ -162,6 +162,11 @@ export const NotificationBell: React.FC = () => {
     }
   };
 
+  // Filter out redundant "Site Photos Uploaded" notifications (only show Field Inspection Submitted)
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter((item) => !item.title?.startsWith('Site Photos Uploaded'));
+  }, [notifications]);
+
   // Group notifications by unique_id (or "general")
   const groupedNotifications = useMemo(() => {
     const map = new Map<string, {
@@ -173,7 +178,7 @@ export const NotificationBell: React.FC = () => {
       hasUnread: boolean;
     }>();
 
-    for (const item of notifications) {
+    for (const item of filteredNotifications) {
       const key = item.unique_id ? `uid-${item.unique_id}` : 'general';
       const existing = map.get(key);
       if (!existing) {

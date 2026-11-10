@@ -53,7 +53,7 @@ def _user_notification_filter(user: User):
     role_val = user.role.value if hasattr(user.role, "value") else str(user.role)
     if role_val == "ADMIN":
         # Admins see notifications directly sent to them, role ADMIN, or system-wide due reminders
-        return or_(
+        role_cond = or_(
             Notification.recipient_id == user.id,
             Notification.recipient_role == "ADMIN",
             and_(
@@ -64,7 +64,7 @@ def _user_notification_filter(user: User):
     elif role_val in ("FIELD_VERIFIER", "USER"):
         # Field verifiers see notifications targeted to their user ID, or broadcast to FIELD_VERIFIER/USER,
         # or due reminders for field verifications
-        return or_(
+        role_cond = or_(
             Notification.recipient_id == user.id,
             and_(
                 Notification.recipient_id.is_(None),
@@ -78,7 +78,7 @@ def _user_notification_filter(user: User):
     elif role_val == "AUDITOR":
         # QA / Auditors ONLY see notifications associated with their account:
         # direct assignments (recipient_id == user.id) or AUDITOR-specific announcements
-        return or_(
+        role_cond = or_(
             Notification.recipient_id == user.id,
             and_(
                 Notification.recipient_id.is_(None),
@@ -88,7 +88,7 @@ def _user_notification_filter(user: User):
     elif role_val == "TELECALLER":
         # Telecallers ONLY see notifications associated with their account:
         # direct assignments (recipient_id == user.id) or TELECALLER-specific announcements
-        return or_(
+        role_cond = or_(
             Notification.recipient_id == user.id,
             and_(
                 Notification.recipient_id.is_(None),
@@ -97,13 +97,19 @@ def _user_notification_filter(user: User):
         )
     else:
         # Non-admins see notifications targeted to their user ID or their specific role
-        return or_(
+        role_cond = or_(
             Notification.recipient_id == user.id,
             and_(
                 Notification.recipient_id.is_(None),
                 Notification.recipient_role == role_val,
             ),
         )
+
+    # Exclude redundant photo upload notifications (only show Field Inspection Submitted)
+    return and_(
+        role_cond,
+        or_(Notification.title.is_(None), ~Notification.title.like("Site Photos Uploaded%")),
+    )
 
 
 def check_and_create_overdue_reminders(db: Session, user: User) -> None:

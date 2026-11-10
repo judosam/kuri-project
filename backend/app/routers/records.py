@@ -718,16 +718,6 @@ async def upload_record_images(
 
         db.commit()
         db.refresh(record)
-        create_notification(
-            db=db,
-            type="verifier_activity",
-            title=f"Site Photos Uploaded: {record.unique_id or record.name}",
-            message=f"Field verifier {user.full_name} uploaded {len(files)} photo(s) for {record.unique_id or record.name}.",
-            recipient_role="ADMIN",
-            record_id=record.id,
-            unique_id=record.unique_id,
-            with_sound=False,
-        )
 
         log_activity(
             db=db,
