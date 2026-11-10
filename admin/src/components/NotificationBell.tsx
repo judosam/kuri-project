@@ -81,9 +81,25 @@ export const NotificationBell: React.FC = () => {
     }
   };
 
+  const parseUtcDate = (dateStr: string): Date => {
+    if (!dateStr) return new Date();
+    let cleanStr = String(dateStr).trim();
+    if (cleanStr.includes(' ') && !cleanStr.includes('T')) {
+      cleanStr = cleanStr.replace(' ', 'T');
+    }
+    // If no timezone suffix (no 'Z' and no offset like +05:30), treat as UTC
+    if (!cleanStr.endsWith('Z') && !/[+-]\d{2}(:\d{2})?$/.test(cleanStr)) {
+      cleanStr = `${cleanStr}Z`;
+    }
+    const d = new Date(cleanStr);
+    return isNaN(d.getTime()) ? new Date(dateStr) : d;
+  };
+
   const formatRelativeTime = (isoString: string): string => {
     try {
-      const diffSec = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+      if (!isoString) return '';
+      const dt = parseUtcDate(isoString);
+      const diffSec = Math.floor((Date.now() - dt.getTime()) / 1000);
       if (diffSec < 45) return 'Just now';
       if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
       if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;

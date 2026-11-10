@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, field_serializer
 
@@ -6,7 +6,9 @@ from pydantic import BaseModel, ConfigDict, field_serializer
 def _utc_iso(dt_val: Optional[datetime]) -> Optional[str]:
     if dt_val is None:
         return None
-    return dt_val.isoformat()
+    if dt_val.tzinfo is None:
+        dt_val = dt_val.replace(tzinfo=timezone.utc)
+    return dt_val.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 class NotificationDetail(BaseModel):

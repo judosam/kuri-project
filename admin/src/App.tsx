@@ -437,9 +437,10 @@ function Sidebar({
                 to={item.to}
                 end={item.to === '/'}
                 className={() => (active ? 'fos-navlink active' : 'fos-navlink')}
+                title={isCollapsed ? item.label : undefined}
               >
                 <Icon name={item.icon} />
-                <span>{item.label}</span>
+                <span className="nav-text">{item.label}</span>
               </NavLink>
             );
           })}
@@ -451,7 +452,7 @@ function Sidebar({
           className="fos-user-card"
           onClick={handleOpenSettings}
           style={{ cursor: 'pointer' }}
-          title="Account settings & change password"
+          title={isCollapsed ? `${user.full_name || 'Admin'} (${user.role.replace(/_/g, ' ')}) — Click for settings` : "Account settings & change password"}
         >
           <div className="fos-user-row">
             <div className="user-avatar-wrap">

@@ -6309,13 +6309,17 @@ a.btn:focus,
 }
 .fos-side.collapsed {
   width: 68px !important;
+  overflow: visible !important;
 }
 .fos-side.collapsed .brand-title-wrap,
+.fos-side.collapsed .brand-lockup,
 .fos-side.collapsed .brand-sub,
 .fos-side.collapsed .side-role-bar,
 .fos-side.collapsed .fos-nav-label,
 .fos-side.collapsed .fos-navlink .nav-text,
+.fos-side.collapsed .fos-navlink span:not(.ms),
 .fos-side.collapsed .fos-navlink .role-badge,
+.fos-side.collapsed .fos-user-meta,
 .fos-side.collapsed .fos-user-info,
 .fos-side.collapsed .fos-user-actions,
 .fos-side.collapsed .side-portal-link .portal-text,
@@ -6323,38 +6327,122 @@ a.btn:focus,
   display: none !important;
 }
 .fos-side.collapsed .fos-side-brand {
-  padding: 0 10px;
-  justify-content: center;
-  gap: 0;
+  position: relative !important;
+  height: 76px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
 }
 .fos-side.collapsed .brand-id {
-  justify-content: center;
-  flex: none;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 auto !important;
+  flex: none !important;
 }
 .fos-side.collapsed .brand-mark,
 .fos-side.collapsed .brand-mark-image-wrap {
-  width: 38px;
-  height: 38px;
-  min-width: 38px;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  padding: 2px !important;
+  margin: 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.fos-side.collapsed .brand-mark-image {
+  width: 32px !important;
+  height: 32px !important;
+  max-width: 32px !important;
+  max-height: 32px !important;
+  margin: 0 auto !important;
 }
 .fos-side.collapsed .sidebar-collapse-btn {
-  position: absolute;
-  top: 14px;
-  right: -14px;
+  position: absolute !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  right: -13px !important;
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 50% !important;
   background: #ffffff !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-  z-index: 70;
+  border: 1px solid #DDE3EB !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12) !important;
+  color: #3A4B60 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 75 !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  transition: all 0.15s ease !important;
+}
+.fos-side.collapsed .sidebar-collapse-btn:hover {
+  background: #F8FAFC !important;
+  color: #0F1F35 !important;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.18) !important;
+  transform: translateY(-50%) scale(1.08) !important;
+}
+.fos-side.collapsed .fos-nav {
+  padding: 4px 8px 12px !important;
+  gap: 4px !important;
 }
 .fos-side.collapsed .fos-navlink {
-  justify-content: center;
-  padding: 10px 0;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 10px 0 !important;
+  width: 100% !important;
+  border-radius: 10px !important;
+}
+.fos-side.collapsed .fos-navlink .ms {
+  margin: 0 auto !important;
+  font-size: 20px !important;
+}
+.fos-side.collapsed .fos-navlink.active::before {
+  left: -8px !important;
+  top: 6px !important;
+  bottom: 6px !important;
+  width: 3px !important;
+  border-radius: 0 3px 3px 0 !important;
+}
+.fos-side.collapsed .fos-side-foot {
+  padding: 12px 6px 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 .fos-side.collapsed .fos-user-card {
-  padding: 6px;
-  justify-content: center;
+  padding: 6px 0 !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+}
+.fos-side.collapsed .fos-user-card:hover {
+  background: transparent !important;
 }
 .fos-side.collapsed .fos-user-row {
-  justify-content: center;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+}
+.fos-side.collapsed .user-avatar-wrap {
+  margin: 0 auto !important;
+}
+.fos-side.collapsed .fos-logout-icon-btn {
+  width: 32px !important;
+  min-width: 32px !important;
+  height: 32px !important;
+  margin: 0 auto !important;
 }
 .fos-main.collapsed {
   margin-left: 68px !important;
