@@ -42,6 +42,7 @@ export default function App() {
       return null;
     }
   });
+  const [recordHistory, setRecordHistory] = useState<number[]>([]);
   const [inspectingRecord, setInspectingRecord] = useState<CaptureRecord | null>(null);
   // A submitted record reopened in the form to correct its inspection details.
   const [editingRecord, setEditingRecord] = useState<CaptureRecord | null>(null);
@@ -287,7 +288,12 @@ export default function App() {
     try { localStorage.setItem('pc_active_screen', 'manual-capture'); } catch { /* ignore */ }
   };
 
-  const handleOpenRecord = (id: number) => {
+  const handleOpenRecord = (id: number, pushHistory = false) => {
+    if (pushHistory && selectedRecordId !== null && selectedRecordId !== id) {
+      setRecordHistory((prev) => [...prev, selectedRecordId]);
+    } else if (!pushHistory) {
+      setRecordHistory([]);
+    }
     setSelectedRecordId(id);
     setActiveScreen('detail');
     try {
@@ -299,6 +305,17 @@ export default function App() {
   };
 
   const handleBackFromDetail = () => {
+    if (recordHistory.length > 0) {
+      const prevId = recordHistory[recordHistory.length - 1];
+      setRecordHistory((prev) => prev.slice(0, -1));
+      setSelectedRecordId(prevId);
+      try {
+        localStorage.setItem('pc_selected_record_id', prevId.toString());
+      } catch {
+        // ignore
+      }
+      return;
+    }
     const returnTo = (localStorage.getItem('pc_detail_return_to') as ScreenName) || 'records';
     setActiveScreen(returnTo);
     try {
@@ -546,6 +563,7 @@ export default function App() {
             onBack={handleBackFromDetail}
             onStartInspection={handleStartInspection}
             onEditRecord={handleEditRecord}
+            onOpenRecord={(id) => handleOpenRecord(id, true)}
           />
         )}
 

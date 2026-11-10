@@ -224,10 +224,23 @@ export default function DuplicateProximityAlertModal({
             </button>
 
             {/* View Matched Site */}
-            {matchedRecordId && onViewMatched && (
+            {onViewMatched && (matchedRecordId || matchedSiteId) && (
               <button
                 type="button"
-                onClick={() => onViewMatched(matchedRecordId)}
+                onClick={() => {
+                  if (matchedRecordId) {
+                    onViewMatched(matchedRecordId);
+                  } else if (matchedSiteId) {
+                    import('../services/api').then(({ api }) => {
+                      api.listRecords({ search: matchedSiteId, pageSize: 5 }).then((res) => {
+                        const m = res.records.find(
+                          (r) => r.unique_id === matchedSiteId || r.name === matchedSiteId
+                        ) || res.records[0];
+                        if (m) onViewMatched(m.id);
+                      });
+                    });
+                  }
+                }}
                 style={{
                   width: '100%',
                   padding: '9px 16px',
@@ -245,7 +258,7 @@ export default function DuplicateProximityAlertModal({
                 }}
               >
                 <Icon name="visibility" size={17} color="#0284c7" />
-                <span>View Existing Record ({matchedSiteId})</span>
+                <span>View Existing Record {matchedSiteId ? `(${matchedSiteId})` : ''}</span>
               </button>
             )}
 

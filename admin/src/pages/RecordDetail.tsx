@@ -941,10 +941,28 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                     </p>
                   </div>
                 </div>
-                {record.duplicate_record_id && (
+                {(record.duplicate_record_id || record.duplicate_site_id) && (
                   <button
                     type="button"
-                    onClick={() => navigate(`/records/${record.duplicate_record_id}`)}
+                    onClick={async () => {
+                      if (record.duplicate_record_id) {
+                        navigate(`/records/${record.duplicate_record_id}`);
+                      } else if (record.duplicate_site_id) {
+                        try {
+                          const res = await recordsApi.list({ search: record.duplicate_site_id, page_size: 5 });
+                          const matched = (res.records || []).find(
+                            (r: any) => r.unique_id === record.duplicate_site_id || r.name === record.duplicate_site_id
+                          ) || (res.records || [])[0];
+                          if (matched) {
+                            navigate(`/records/${matched.id}`);
+                          } else {
+                            alert(`Could not find record for ${record.duplicate_site_id}`);
+                          }
+                        } catch (e) {
+                          console.error('Failed to resolve duplicate record:', e);
+                        }
+                      }
+                    }}
                     style={{
                       background: '#ffffff',
                       color: '#991b1b',
@@ -957,7 +975,7 @@ export default function RecordDetail({ canAdmin = true, canAudit = false }: { ca
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    View Matched Site
+                    View Matched Site {record.duplicate_site_id ? `(${record.duplicate_site_id})` : ''}
                   </button>
                 )}
               </div>

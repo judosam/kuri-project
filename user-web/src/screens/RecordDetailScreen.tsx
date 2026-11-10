@@ -199,6 +199,8 @@ interface RecordDetailScreenProps {
   onStartInspection: (record: CaptureRecord) => void;
   /** Reopen the submitted inspection form for this record. */
   onEditRecord: (record: CaptureRecord) => void;
+  /** Navigate to another record (e.g. matched duplicate). */
+  onOpenRecord?: (recordId: number) => void;
 }
 
 /** Titled block header used by every detail section. */
@@ -291,6 +293,7 @@ export default function RecordDetailScreen({
   onBack,
   onStartInspection,
   onEditRecord,
+  onOpenRecord,
 }: RecordDetailScreenProps) {
   const [record, setRecord] = useState<CaptureRecord | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -304,6 +307,33 @@ export default function RecordDetailScreen({
   const [addressResolving, setAddressResolving] = useState(false);
   const [addressError, setAddressError] = useState<string | null>(null);
   const [googleVariance, setGoogleVariance] = useState<CoordVarianceResult | null>(null);
+  const [findingDuplicate, setFindingDuplicate] = useState(false);
+
+  const handleViewDuplicateRecord = async () => {
+    if (!record || !onOpenRecord) return;
+    if (record.duplicate_record_id) {
+      onOpenRecord(record.duplicate_record_id);
+      return;
+    }
+    if (record.duplicate_site_id) {
+      setFindingDuplicate(true);
+      try {
+        const res = await api.listRecords({ search: record.duplicate_site_id, pageSize: 5 });
+        const matched = res.records.find(
+          (r) => r.unique_id === record.duplicate_site_id || r.name === record.duplicate_site_id
+        ) || res.records[0];
+        if (matched) {
+          onOpenRecord(matched.id);
+        } else {
+          alert(`Could not find record for ${record.duplicate_site_id}`);
+        }
+      } catch (err) {
+        console.error('Failed to lookup duplicate record:', err);
+      } finally {
+        setFindingDuplicate(false);
+      }
+    }
+  };
 
   const images = record?.images || [];
   const fieldCoords = getFieldCoordinates(images)
@@ -552,7 +582,7 @@ export default function RecordDetailScreen({
             }}
           >
             <Icon name="warning" size={17} color="#dc2626" />
-            <div>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 800, color: '#b91c1c' }}>
                 ⚠️ Proximity Match / Duplicate Site Alert
               </div>
@@ -565,6 +595,36 @@ export default function RecordDetailScreen({
               {record.duplicate_warning && (
                 <div style={{ marginTop: 2, fontSize: '0.74rem', color: '#7f1d1d' }}>
                   {record.duplicate_warning}
+                </div>
+              )}
+              {(record.duplicate_record_id || record.duplicate_site_id) && onOpenRecord && (
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={handleViewDuplicateRecord}
+                    disabled={findingDuplicate}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: '#ffffff',
+                      color: '#b91c1c',
+                      border: '1.5px solid #f87171',
+                      borderRadius: 6,
+                      padding: '6px 12px',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                    }}
+                  >
+                    <Icon name="visibility" size={15} color="#b91c1c" />
+                    <span>
+                      {findingDuplicate
+                        ? 'Opening duplicate record…'
+                        : `View Duplicate Record (${record.duplicate_site_id || `#${record.duplicate_record_id}`})`}
+                    </span>
+                  </button>
                 </div>
               )}
             </div>
