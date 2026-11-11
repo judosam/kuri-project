@@ -55,6 +55,9 @@ class CaptureRecord(Base):
     #   "imported" — old field work uploaded/imported by an admin from Excel
     source: Mapped[str] = mapped_column(String(20), nullable=False, default="captured", index=True)
 
+    # Set categorization (e.g. "CBE Corporation", "CBE District", "Manually Added by QA", "Manually Added by Field User")
+    set_name: Mapped[str | None] = mapped_column(String(100), nullable=True, default=None, index=True)
+
     # GPS fix and submission time for inspections completed WITHOUT photos.
     # Photo records carry this on their CapturedImage rows; a no-photo
     # inspection still deserves a capture time and field coordinates.

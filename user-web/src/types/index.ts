@@ -23,6 +23,7 @@ export interface ImageData {
 export interface CaptureRecord {
   is_manually_added?: boolean;
   source?: string;
+  set_name?: string | null;
   id: number;
   name: string;
   description: string;

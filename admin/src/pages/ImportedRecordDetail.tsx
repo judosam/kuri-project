@@ -1,4 +1,4 @@
-import { SourceBadge } from '../components/SourceBadge';
+import { SetBadge } from '../components/SetBadge';
 /**
  * Imported Record — the dedicated detail page for old field records that an
  * admin backfilled from Excel (source === "imported").
@@ -1051,7 +1051,7 @@ export default function ImportedRecordDetail({
               >
                 <div className="rd-rows">
                   <Row label="Unique ID" value={record.unique_id} mono />
-                  <Row label="Source" value={<SourceBadge source={record.source} isManual={record.is_manually_added} uploadedByName={record.uploaded_by_name} />} />
+                  <Row label="SET" value={<SetBadge name={record.set_name} />} />
                   <Row label="Survey No" value={record.survey_no || record.survey_number} />
                   <Row label="Subdivision No" value={record.subdivision_no || record.sub_division} />
                   

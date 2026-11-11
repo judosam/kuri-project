@@ -4,6 +4,7 @@ import type { CaptureRecord } from '../types';
 import { telecallerApi } from '../services/api';
 import { Icon, AuthThumbnail, formatDateTime, formatCapturedDateOrTime } from './ui';
 import { capturedTime } from './RecordWorkflowFields';
+import { SetBadge } from './SetBadge';
 import { TelecallerHistoryTable } from './TelecallerHistoryTable';
 import { extractPhoneNumbers, extractContactLabel, formatPhoneNumber } from '../utils/phoneUtils';
 
@@ -524,6 +525,11 @@ export function TelecallerRecordModal({ record, onClose, onUpdated }: Telecaller
 
                 <span style={{ color: '#64748b' }}>Site Address:</span>
                 <span style={{ color: '#0f172a' }}>{record.site_address || record.street_address || '—'}</span>
+
+                <span style={{ color: '#64748b' }}>SET:</span>
+                <span style={{ color: '#0f172a' }}>
+                  <SetBadge name={record.set_name} />
+                </span>
 
                 <span style={{ color: '#64748b' }}>Village / Taluk:</span>
                 <span style={{ color: '#0f172a' }}>

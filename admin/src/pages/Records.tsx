@@ -1,4 +1,4 @@
-import { SourceBadge } from '../components/SourceBadge';
+import { SetBadge } from '../components/SetBadge';
 import { TelecallingInfoModal, FieldVerifierInfoModal, QaInfoModal } from '../components/LeadInfoModals';
 import BulkEditModal from '../components/BulkEditModal';
 import QaCreateRecordModal from '../components/QaCreateRecordModal';
@@ -474,6 +474,7 @@ export default function Records({
 
   // Sheet Upload Modal State
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadSetName, setUploadSetName] = useState<string>('CBE Corporation');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -894,7 +895,7 @@ export default function Records({
 
   const ALLOWED_HEADER_FILTER_COLUMNS = new Set([
     'assigned_at',
-    'source',
+    'set_name',
     'audit_status',
     'audit_comment',
     'audited_by',
@@ -1419,11 +1420,15 @@ export default function Records({
 
   const handleUploadSubmit = async () => {
     if (!uploadFile) return;
+    if (!uploadSetName.trim()) {
+      setUploadClientError('SET Name is required before uploading records.');
+      return;
+    }
     setUploading(true);
     setUploadClientError(null);
     setUploadResult(null);
     try {
-      const res = await recordsApi.uploadSheet(uploadFile);
+      const res = await recordsApi.uploadSheet(uploadFile, 'dispatch', uploadSetName.trim());
       setUploadResult(res);
       if (res.success) {
         setUploadFile(null);
@@ -1660,8 +1665,8 @@ export default function Records({
                   { value: 'created_at:asc', label: 'Oldest first' },
                   { value: 'audit_status:asc', label: 'QC Status (A–Z)' },
                   { value: 'audit_status:desc', label: 'QC Status (Z–A)' },
-                  { value: 'source:asc', label: 'Source (A–Z)' },
-                  { value: 'source:desc', label: 'Source (Z–A)' },
+                  { value: 'set_name:asc', label: 'SET (A–Z)' },
+                  { value: 'set_name:desc', label: 'SET (Z–A)' },
                   { value: 'name:asc', label: 'Name A–Z' },
                   { value: 'name:desc', label: 'Name Z–A' },
                   { value: 'status:desc', label: 'Inspection (Completed first)' },
@@ -1747,26 +1752,26 @@ export default function Records({
                 ]} />
             </div>
           )}
-          <div className="filter-bar-group filter-source">
-            <span className="filter-bar-label">Source</span>
+          <div className="filter-bar-group filter-set">
+            <span className="filter-bar-label">SET</span>
             <CustomSelect
-              value={columnFilters.source?.[0] || ''}
+              value={columnFilters.set_name?.[0] || ''}
               onChange={(value) => {
                 setColumnFilters((prev) => {
                   const copy = { ...prev };
-                  if (value) copy.source = [value];
-                  else delete copy.source;
+                  if (value) copy.set_name = [value];
+                  else delete copy.set_name;
                   return copy;
                 });
                 setPage(1);
               }}
-              ariaLabel="Filter by record source"
+              ariaLabel="Filter by SET name"
               options={[
-                { value: '', label: 'All sources' },
-                { value: 'imported', label: 'Imported' },
-                { value: 'qa_portal', label: 'QA User Added' },
-                { value: 'manual', label: 'Field User Added' },
-                { value: 'captured', label: 'Imported by Admin' },
+                { value: '', label: 'All Sets' },
+                { value: 'CBE Corporation', label: 'CBE Corporation' },
+                { value: 'CBE District', label: 'CBE District' },
+                { value: 'Manually Added by QA', label: 'Manually Added by QA' },
+                { value: 'Manually Added by Field User', label: 'Manually Added by Field User' },
               ]}
             />
           </div>
@@ -2267,7 +2272,7 @@ export default function Records({
   : <th key={item.key}>{item.label}</th>) : isAuditorView ? (
   <>
     {sortHeader('Unique ID', 'unique_id', 225, false, 260, 210)}
-    {sortHeader('Source', 'source', 140, true, 160)}
+    {sortHeader('SET', 'set_name', 140, true, 160, 120)}
     {sortHeader('Last Modified Date', 'last_modified_at', 172, true, 185, 165)}
     {sortHeader('QA Done at', 'qc_completed_at', 145, true, 155)}
     {sortHeader('QC Status', 'qc_status', 125, true, 135, 115)}
@@ -2286,7 +2291,7 @@ export default function Records({
 ) : (
   <>
     {sortHeader('Unique ID', 'unique_id', 225, false, 260, 210)}
-    {sortHeader('Source', 'source', 140, true, 160)}
+    {sortHeader('SET', 'set_name', 140, true, 160, 120)}
     {sortHeader('Last Modified Date', 'last_modified_at', 172, true, 185, 165)}
     {sortHeader('QC Status', 'qc_status', 125, true, 135, 115)}
     {sortHeader('Audit Status', 'audit_status', 160, true, 180, 150)}
@@ -2486,7 +2491,7 @@ export default function Records({
     <td className="col-unique-id" style={{ minWidth: 220, width: 250, maxWidth: 300 }}>
       <UniqueIdCell record={r} />
     </td>
-    <td><SourceBadge source={r.source} isManual={r.is_manually_added} uploadedByName={r.uploaded_by_name} /></td>
+    <td><SetBadge name={r.set_name} /></td>
     <td className="rec-last-modified col-last-modified" style={{ whiteSpace: 'nowrap' }} title="When lead was assigned or reassigned">
       {(() => {
         const t = r.last_modified_at || r.reassigned_at || r.assigned_at || r.created_at;
@@ -2526,7 +2531,7 @@ export default function Records({
 <td className="col-unique-id" style={{ minWidth: 220, width: 250, maxWidth: 300 }}>
   <UniqueIdCell record={r} />
 </td>
-<td><SourceBadge source={r.source} isManual={r.is_manually_added} uploadedByName={r.uploaded_by_name} /></td>
+<td><SetBadge name={r.set_name} /></td>
 {/* 2. Last Modified Date — when lead was assigned or reassigned */}
 <td className="rec-last-modified col-last-modified" style={{ whiteSpace: 'nowrap' }} title="When lead was assigned or reassigned">
   {(() => {
@@ -3177,6 +3182,82 @@ export default function Records({
                     File → Download → Microsoft Excel (.xlsx)
                   </span>
                   , then upload the downloaded file below. CSV format is not supported.
+                </div>
+              </div>
+
+              {/* SET Name Selection (Required) */}
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: '12px 14px',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 12,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label htmlFor="upload-set-name-input" style={{ fontSize: '0.825rem', fontWeight: 700, color: '#1e293b' }}>
+                    SET Name <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Required for categorizing imported sites</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  <input
+                    id="upload-set-name-input"
+                    type="text"
+                    className="fld"
+                    value={uploadSetName}
+                    onChange={(e) => {
+                      setUploadSetName(e.target.value);
+                      if (uploadClientError) setUploadClientError(null);
+                    }}
+                    placeholder="e.g. CBE Corporation, CBE District..."
+                    style={{ flex: 1, padding: '7px 11px', fontSize: '0.875rem', backgroundColor: '#ffffff' }}
+                    required
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Quick Select:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUploadSetName('CBE Corporation');
+                      if (uploadClientError) setUploadClientError(null);
+                    }}
+                    style={{
+                      padding: '3px 10px',
+                      fontSize: '0.75rem',
+                      borderRadius: 9999,
+                      border: '1px solid ' + (uploadSetName === 'CBE Corporation' ? '#16a34a' : '#cbd5e1'),
+                      background: uploadSetName === 'CBE Corporation' ? '#f0fdf4' : '#ffffff',
+                      color: uploadSetName === 'CBE Corporation' ? '#15803d' : '#475569',
+                      fontWeight: uploadSetName === 'CBE Corporation' ? 700 : 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    CBE Corporation
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUploadSetName('CBE District');
+                      if (uploadClientError) setUploadClientError(null);
+                    }}
+                    style={{
+                      padding: '3px 10px',
+                      fontSize: '0.75rem',
+                      borderRadius: 9999,
+                      border: '1px solid ' + (uploadSetName === 'CBE District' ? '#2563eb' : '#cbd5e1'),
+                      background: uploadSetName === 'CBE District' ? '#eff6ff' : '#ffffff',
+                      color: uploadSetName === 'CBE District' ? '#1d4ed8' : '#475569',
+                      fontWeight: uploadSetName === 'CBE District' ? 700 : 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    CBE District
+                  </button>
                 </div>
               </div>
 

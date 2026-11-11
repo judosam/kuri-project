@@ -459,7 +459,7 @@ REPORT_LABELS = {
     "id": "Record ID",
     "unique_id": "Unique ID",
     "old_unique_id": "Old Unique ID",
-    "source": "Record Source",
+    "set_name": "SET",
     "last_modified_at": "Last Modified Date",
     "name": "Record Name",
     "created_at": "Created Date",
@@ -558,7 +558,7 @@ def build_records_report(
         "id",
         "unique_id",
         "old_unique_id",
-        "source",
+        "set_name",
         "last_modified_at",
         "name",
         "created_at",
@@ -664,6 +664,7 @@ def build_records_report(
             or "—"
         )
         detail["old_unique_id"] = old_uid
+        detail["set_name"] = detail.get("set_name") or getattr(record, "set_name", None) or "CBE Corporation"
 
         if "reassigned_to_name" not in detail or not detail["reassigned_to_name"]:
             detail["reassigned_to_name"] = record.reassigned_to.full_name if getattr(record, "reassigned_to", None) else None

@@ -67,6 +67,7 @@ class RecordCreateRequest(BaseModel):
     district: Optional[str] = None
     area: Optional[str] = None
     coordinates: Optional[str] = None
+    set_name: Optional[str] = None
 
     @field_validator("name")
     @classmethod
@@ -148,6 +149,7 @@ class TaskDispatchItem(BaseModel):
     dtcp_permit_date: Optional[str] = None
     dtcp_application_no: Optional[str] = None
     property_type: Optional[str] = None
+    set_name: Optional[str] = None
 
 
 class TaskDispatchBatchRequest(BaseModel):
@@ -216,6 +218,7 @@ class RecordDetail(BaseModel):
     # "imported" (old field work uploaded by an admin from Excel).
     source: str = "captured"
     is_manually_added: bool = False
+    set_name: Optional[str] = None
 
     # 12 GIS Signals & Auto-Derived Cadastral Fields
     latitude: Optional[float] = None
@@ -256,6 +259,7 @@ class RecordDetail(BaseModel):
     dtcp_permit_date: Optional[str] = None
     dtcp_application_no: Optional[str] = None
     property_type: Optional[str] = None
+    set_name: Optional[str] = None
 
     # 9 Field Inspection Result Fields
     date_of_visit: Optional[str] = None
@@ -292,6 +296,7 @@ class RecordDetail(BaseModel):
     qc_street_details: Optional[str] = None
     qc_builder_contact: Optional[str] = None
     qc_sqfeet: Optional[str] = None
+    set_name: Optional[str] = None
     qc_reference_image_key: Optional[str] = None
     qc_reference_image_url: Optional[str] = None
     # When the QC assessment was first recorded.
@@ -553,6 +558,7 @@ class RecordUpdateRequest(BaseModel):
     qc_street_details: Optional[str] = None
     qc_builder_contact: Optional[str] = None
     qc_sqfeet: Optional[str] = None
+    set_name: Optional[str] = None
     qc_reference_image_key: Optional[str] = None
     qc_reference_image_url: Optional[str] = None
 
@@ -882,6 +888,7 @@ class QaCreateRecordRequest(BaseModel):
     qc_street_details: Optional[str] = None
     qc_builder_contact: Optional[str] = None
     qc_sqfeet: Optional[str] = None
+    set_name: Optional[str] = None
 
 class BulkResolveCadastralRequest(BaseModel):
     record_ids: list[int] = Field(..., description="List of record IDs to resolve cadastral details for")

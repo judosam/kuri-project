@@ -1360,6 +1360,7 @@ async def upload_tasks_sheet(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     mode: str = Form("dispatch"),
+    set_name: Optional[str] = Form(None),
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
@@ -1790,6 +1791,8 @@ async def upload_tasks_sheet(
             except Exception:
                 pass
 
+        eff_set_name = (row_dict.get("set_name") or row_dict.get("set") or set_name or "CBE Corporation").strip()
+
         rec = record_service.create_record(
             user_id=assigned_user_id,
             name=record_name,
@@ -1798,6 +1801,7 @@ async def upload_tasks_sheet(
             description=record_desc,
             status=record_status,
             source="imported" if mode == "history" else "captured",
+            set_name=eff_set_name,
             unique_id=unique_id,
             old_unique_id=old_unique_id,
             priority_tier=priority_tier,
@@ -1876,6 +1880,7 @@ async def upload_tasks_sheet(
 async def upload_tasks_sheet_stream(
     file: UploadFile = File(...),
     mode: str = Form("dispatch"),
+    set_name: Optional[str] = Form(None),
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
@@ -2432,6 +2437,8 @@ async def upload_tasks_sheet_stream(
                 except Exception:
                     pass
 
+            eff_set_name = (row_dict.get("set_name") or row_dict.get("set") or set_name or "CBE Corporation").strip()
+
             rec = record_service.create_record(
                 user_id=assigned_user_id,
                 name=record_name,
@@ -2440,6 +2447,7 @@ async def upload_tasks_sheet_stream(
                 description=record_desc,
                 status=record_status,
                 source="imported" if mode == "history" else "captured",
+                set_name=eff_set_name,
                 unique_id=unique_id,
                 old_unique_id=old_unique_id,
                 priority_tier=priority_tier,
@@ -2729,6 +2737,7 @@ async def import_previous_records_sheet(
 async def import_gis_records(
     file: UploadFile = File(...),
     dry_run: bool = Query(False),
+    set_name: Optional[str] = Form(None),
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
@@ -2752,7 +2761,7 @@ async def import_gis_records(
 
     # Commit import transaction
     try:
-        report = service.commit_batch(validation_result, admin)
+        report = service.commit_batch(validation_result, admin, set_name=set_name)
         return {
             "valid": True,
             "committed": True,
@@ -3602,6 +3611,7 @@ async def admin_qa_create_record(
         admin_formatted_address=address,
         status="NOT_COMPLETED",
         source="qa_portal",
+        set_name=(payload.set_name or "").strip() or "Manually Added by QA",
         unique_id=unique_id,
         old_unique_id=old_unique_id,
         coordinates=formatted_coords,

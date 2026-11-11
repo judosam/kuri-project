@@ -435,7 +435,8 @@ export const recordsApi = {
   },
   uploadSheet: async (
     file: File,
-    mode: 'dispatch' | 'history' = 'dispatch'
+    mode: 'dispatch' | 'history' = 'dispatch',
+    setName?: string
   ): Promise<{
     success: boolean;
     total_rows: number;
@@ -456,6 +457,9 @@ export const recordsApi = {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('mode', mode);
+    if (setName && setName.trim()) {
+      formData.append('set_name', setName.trim());
+    }
     // Note: Do NOT set 'Content-Type': 'multipart/form-data' manually.
     // Axios will automatically attach the correct boundary string.
     const res = await api.post('/admin/records/upload-sheet', formData, {
@@ -464,9 +468,12 @@ export const recordsApi = {
     return res.data;
   },
   /** Authoritative Kuri GIS Upload Specification (supports ?dry_run=true inspection and commit). */
-  importGisRecords: async (file: File, dryRun = false): Promise<any> => {
+  importGisRecords: async (file: File, dryRun = false, setName?: string): Promise<any> => {
     const formData = new FormData();
     formData.append('file', file);
+    if (setName && setName.trim()) {
+      formData.append('set_name', setName.trim());
+    }
     const res = await api.post('/admin/records/import', formData, {
       params: { dry_run: dryRun },
       timeout: 180000,
@@ -498,11 +505,15 @@ export const recordsApi = {
       filename?: string;
       error?: { row: number; column: string; message: string };
       result?: any;
-    }) => void
+    }) => void,
+    setName?: string
   ): Promise<any> => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('mode', mode);
+    if (setName && setName.trim()) {
+      formData.append('set_name', setName.trim());
+    }
 
     const token = localStorage.getItem('token') || '';
     const endpoint = `${API_BASE}/admin/records/upload-sheet-stream`;

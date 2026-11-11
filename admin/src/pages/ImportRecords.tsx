@@ -163,6 +163,7 @@ export default function ImportRecords() {
   const [gisError, setGisError] = useState('');
   const [gisValidation, setGisValidation] = useState<GisValidationResponse | null>(null);
   const [gisCommitResult, setGisCommitResult] = useState<GisCommitResponse | null>(null);
+  const [gisSetName, setGisSetName] = useState<string>('CBE Corporation');
   const gisInputRef = useRef<HTMLInputElement>(null);
 
   // Legacy Task Sheet State
@@ -174,6 +175,7 @@ export default function ImportRecords() {
   const [legacyError, setLegacyError] = useState('');
   const [legacyResult, setLegacyResult] = useState<DispatchResult | null>(null);
   const [legacyLiveProgress, setLegacyLiveProgress] = useState<ImportLiveProgress | null>(null);
+  const [legacySetName, setLegacySetName] = useState<string>('CBE Corporation');
   const legacyInputRef = useRef<HTMLInputElement>(null);
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -206,7 +208,7 @@ export default function ImportRecords() {
     setGisInspecting(true);
     setGisError('');
     try {
-      const res = await recordsApi.importGisRecords(fileToInspect, true);
+      const res = await recordsApi.importGisRecords(fileToInspect, true, gisSetName.trim());
       setGisValidation(res);
       setGisStep('inspect');
     } catch (err: any) {
@@ -218,10 +220,14 @@ export default function ImportRecords() {
 
   const commitGisBatch = async () => {
     if (!gisFile || !gisValidation || !gisValidation.valid) return;
+    if (!gisSetName.trim()) {
+      setGisError('SET Name is required before importing.');
+      return;
+    }
     setGisCommitting(true);
     setGisError('');
     try {
-      const res = await recordsApi.importGisRecords(gisFile, false);
+      const res = await recordsApi.importGisRecords(gisFile, false, gisSetName.trim());
       setGisCommitResult(res);
       setGisStep('committed');
     } catch (err: any) {
@@ -264,6 +270,10 @@ export default function ImportRecords() {
 
   const runLegacyImport = async () => {
     if (!legacyFile) return;
+    if (!legacySetName.trim()) {
+      setLegacyError('SET Name is required before importing.');
+      return;
+    }
     setLegacyImporting(true);
     setLegacyError('');
     setLegacyLiveProgress({
@@ -314,7 +324,7 @@ export default function ImportRecords() {
             };
           });
         }
-      });
+      }, legacySetName.trim());
 
       setLegacyResult({
         ...res,
@@ -496,6 +506,79 @@ export default function ImportRecords() {
           {/* STEP 1: PICK FILE */}
           {gisStep === 'pick' && (
             <div className="card" style={{ padding: 24 }}>
+              {/* SET Name Selection (Required) */}
+              <div
+                style={{
+                  marginBottom: 18,
+                  padding: '12px 16px',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 12,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label htmlFor="gis-set-name-input" style={{ fontSize: '0.825rem', fontWeight: 700, color: '#1e293b' }}>
+                    SET Name <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Required for categorizing imported GIS sites</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  <input
+                    id="gis-set-name-input"
+                    type="text"
+                    className="fld"
+                    value={gisSetName}
+                    onChange={(e) => {
+                      setGisSetName(e.target.value);
+                      if (gisError) setGisError('');
+                    }}
+                    placeholder="e.g. CBE Corporation, CBE District..."
+                    style={{ flex: 1, padding: '7px 11px', fontSize: '0.875rem', backgroundColor: '#ffffff' }}
+                    required
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Quick Select:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGisSetName('CBE Corporation');
+                      if (gisError) setGisError('');
+                    }}
+                    style={{
+                      padding: '3px 10px',
+                      fontSize: '0.75rem',
+                      borderRadius: 9999,
+                      border: '1px solid ' + (gisSetName === 'CBE Corporation' ? '#16a34a' : '#cbd5e1'),
+                      background: gisSetName === 'CBE Corporation' ? '#f0fdf4' : '#ffffff',
+                      color: gisSetName === 'CBE Corporation' ? '#15803d' : '#475569',
+                      fontWeight: gisSetName === 'CBE Corporation' ? 700 : 500,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    CBE Corporation
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGisSetName('CBE District');
+                      if (gisError) setGisError('');
+                    }}
+                    style={{
+                      padding: '3px 10px',
+                      fontSize: '0.75rem',
+                      borderRadius: 9999,
+                      border: '1px solid ' + (gisSetName === 'CBE District' ? '#2563eb' : '#cbd5e1'),
+                      background: gisSetName === 'CBE District' ? '#eff6ff' : '#ffffff',
+                      color: gisSetName === 'CBE District' ? '#1d4ed8' : '#475569',
+                      fontWeight: gisSetName === 'CBE District' ? 700 : 500,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    CBE District
+                  </button>
+                </div>
+              </div>
               <div
                 role="button"
                 tabIndex={0}
@@ -1083,6 +1166,79 @@ export default function ImportRecords() {
         <>
           {legacyStep === 'pick' && (
             <div className="card" style={{ padding: 24 }}>
+              {/* SET Name Selection (Required) */}
+              <div
+                style={{
+                  marginBottom: 18,
+                  padding: '12px 16px',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 12,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label htmlFor="legacy-set-name-input" style={{ fontSize: '0.825rem', fontWeight: 700, color: '#1e293b' }}>
+                    SET Name <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Required for categorizing dispatched tasks</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  <input
+                    id="legacy-set-name-input"
+                    type="text"
+                    className="fld"
+                    value={legacySetName}
+                    onChange={(e) => {
+                      setLegacySetName(e.target.value);
+                      if (legacyError) setLegacyError('');
+                    }}
+                    placeholder="e.g. CBE Corporation, CBE District..."
+                    style={{ flex: 1, padding: '7px 11px', fontSize: '0.875rem', backgroundColor: '#ffffff' }}
+                    required
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Quick Select:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLegacySetName('CBE Corporation');
+                      if (legacyError) setLegacyError('');
+                    }}
+                    style={{
+                      padding: '3px 10px',
+                      fontSize: '0.75rem',
+                      borderRadius: 9999,
+                      border: '1px solid ' + (legacySetName === 'CBE Corporation' ? '#16a34a' : '#cbd5e1'),
+                      background: legacySetName === 'CBE Corporation' ? '#f0fdf4' : '#ffffff',
+                      color: legacySetName === 'CBE Corporation' ? '#15803d' : '#475569',
+                      fontWeight: legacySetName === 'CBE Corporation' ? 700 : 500,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    CBE Corporation
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLegacySetName('CBE District');
+                      if (legacyError) setLegacyError('');
+                    }}
+                    style={{
+                      padding: '3px 10px',
+                      fontSize: '0.75rem',
+                      borderRadius: 9999,
+                      border: '1px solid ' + (legacySetName === 'CBE District' ? '#2563eb' : '#cbd5e1'),
+                      background: legacySetName === 'CBE District' ? '#eff6ff' : '#ffffff',
+                      color: legacySetName === 'CBE District' ? '#1d4ed8' : '#475569',
+                      fontWeight: legacySetName === 'CBE District' ? 700 : 500,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    CBE District
+                  </button>
+                </div>
+              </div>
               <div
                 role="button"
                 tabIndex={0}

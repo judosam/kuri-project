@@ -1,4 +1,4 @@
-import { SourceBadge } from './SourceBadge';
+import { SetBadge } from './SetBadge';
 import React, { useState, useRef, useEffect } from 'react';
 import type { CaptureRecord } from '../types';
 import { AuthThumbnail, formatDate, formatDateTime, parseUtcDate, Icon } from './ui';
@@ -64,7 +64,7 @@ export const RECORD_GROUPS: { key: 'imported' | 'audit' | 'field'; label: string
       sort: 'unique_id',
       value: (r) => <UniqueIdCell record={r} />,
     },
-    { key: 'source', label: 'Source', sort: 'source', value: r => <SourceBadge source={r.source} isManual={r.is_manually_added} uploadedByName={r.uploaded_by_name} /> },
+    { key: 'set_name', label: 'SET', sort: 'set_name', value: r => <SetBadge name={r.set_name} /> },
     { key: 'last_modified_at', label: 'Last Modified Date', sort: 'last_modified_at', value: r => { const t = lastModifiedTime(r); return t ? formatDateTime(String(t)) : '—'; } },
     field('name', 'Record Name', 'name'),
     field('is_manually_added', 'Manually Added'), field('uploaded_by_name', 'Imported By', 'uploaded_by'),
@@ -331,7 +331,7 @@ export function RecordWorkflowDetails({ record }: { record: CaptureRecord }) {
 
 export function RecordFieldValue({ record, item }: { record: CaptureRecord; item: Field }) {
   if (item.key === 'photos') return <div className="workflow-photos">{record.images?.[0]?.image_url && <AuthThumbnail imageUrl={record.images[0].image_url} alt="Field verification photo" size={34} />}<span>{item.value(record)}</span></div>;
-  if (item.key === 'source') return <SourceBadge source={record.source} isManual={record.is_manually_added} uploadedByName={record.uploaded_by_name} />;
+  if (item.key === 'set_name') return <SetBadge name={record.set_name} />;
   return <span className="workflow-value" title={typeof item.value(record) === 'string' ? item.value(record) : undefined}>{item.value(record)}</span>;
 }
 

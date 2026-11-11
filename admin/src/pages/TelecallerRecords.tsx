@@ -67,6 +67,7 @@ import {
 import { capturedTime } from '../components/RecordWorkflowFields';
 import { useTopHeader } from '../context/HeaderContext';
 import { TelecallerRecordModal, TELECALLER_STATUS_OPTIONS } from '../components/TelecallerRecordModal';
+import { SetBadge } from '../components/SetBadge';
 import { ExpandableCellText } from '../components/ExpandableCellText';
 import { getLatestCommentSummary } from '../utils/telecallerHistory';
 import { extractPhoneNumbers, extractContactLabel, formatPhoneNumber } from '../utils/phoneUtils';
@@ -341,6 +342,7 @@ export default function TelecallerRecords() {
               <thead>
                 <tr>
                   <th style={{ width: 145, minWidth: 140, maxWidth: 155, textAlign: 'left' }}>Unique ID</th>
+                  <th style={{ width: 130, minWidth: 115, maxWidth: 145, textAlign: 'left' }}>SET</th>
                   <th style={{ width: 170, minWidth: 150, maxWidth: 200, textAlign: 'left' }}>Owner / Client</th>
                   <th style={{ width: 65, minWidth: 60, maxWidth: 75, textAlign: 'left' }} className="col-photos">Photos</th>
                   <th style={{ width: 125, minWidth: 115, maxWidth: 135, textAlign: 'left' }}>Contact Number</th>
@@ -372,6 +374,11 @@ export default function TelecallerRecords() {
                         style={{ whiteSpace: 'nowrap', textAlign: 'left', fontWeight: 700, color: '#0f172a' }}
                       >
                         {r.unique_id || `#${r.id}`}
+                      </td>
+
+                      {/* SET */}
+                      <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>
+                        <SetBadge name={r.set_name} />
                       </td>
 
                       {/* 2. Owner / Client */}

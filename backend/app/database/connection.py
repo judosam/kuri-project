@@ -98,6 +98,7 @@ CREATE TABLE capture_records_new (
     assigned_at TIMESTAMP,
     status VARCHAR(50) NOT NULL,
     source VARCHAR(20) NOT NULL,
+    set_name VARCHAR(100),
     field_latitude FLOAT,
     field_longitude FLOAT,
     field_location_accuracy FLOAT,
@@ -155,6 +156,7 @@ _CAPTURE_RECORDS_AUDIT_INDEX_DDL = [
     "CREATE INDEX IF NOT EXISTS ix_capture_records_assigned_at ON capture_records (assigned_at)",
     "CREATE INDEX IF NOT EXISTS ix_capture_records_status ON capture_records (status)",
     "CREATE INDEX IF NOT EXISTS ix_capture_records_source ON capture_records (source)",
+    "CREATE INDEX IF NOT EXISTS ix_capture_records_set_name ON capture_records (set_name)",
     "CREATE INDEX IF NOT EXISTS ix_capture_records_unique_id ON capture_records (unique_id)",
     "CREATE INDEX IF NOT EXISTS ix_capture_records_old_unique_id ON capture_records (old_unique_id)",
     "CREATE INDEX IF NOT EXISTS ix_capture_records_audit_status ON capture_records (audit_status)",
@@ -311,10 +313,13 @@ def _add_assigned_auditor_column(engine) -> None:
                 ("ALTER TABLE capture_records ADD COLUMN qc_history JSON", "qc_history"),
                 ("ALTER TABLE capture_records ADD COLUMN field_history JSON", "field_history"),
                 ("ALTER TABLE capture_records ADD COLUMN telecaller_history JSON", "telecaller_history"),
+                ("ALTER TABLE capture_records ADD COLUMN set_name VARCHAR(100)", "set_name"),
             ):
                 if name not in cols:
                     conn.execute(text(stmt))
                     logger.info("capture_records: added %s column", name)
+                    if name == "set_name":
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_capture_records_set_name ON capture_records (set_name)"))
                     if name == "qc_completed_at":
                         # Backfill rows that already carry a QC assessment: prefer
                         # the audit timestamp, else the import time.

@@ -795,6 +795,7 @@ export default function RecordDetailScreen({
           <FourColumnTable
             fields={[
               { key: 'unique_id', label: 'Unique ID', value: record.unique_id },
+              { key: 'set_name', label: 'SET', value: record.set_name },
               { key: 'survey_no', label: 'Survey No', value: record.survey_no || record.survey_number },
               { key: 'subdivision_no', label: 'Subdivision No', value: record.subdivision_no || record.sub_division },
               { key: 'land_use', label: 'Land Use', value: record.land_use },
@@ -818,10 +819,9 @@ export default function RecordDetailScreen({
           />
           <FourColumnTable
             fields={[
-              { key: 'assigned_auditor', label: 'Assigned Auditor', value: record.qc_by_name || record.assigned_auditor_name },
-              { key: 'audit_comment', label: 'Audit Comment', value: record.audit_comment },
-              { key: 'qc_completed_at', label: 'QC Completed At', value: record.qc_completed_at ? formatDateTime(record.qc_completed_at) : undefined },
               { key: 'audited_by', label: 'Audited By', value: record.audited_by_name },
+              { key: 'qc_completed_at', label: 'QC Completed At', value: record.qc_completed_at ? formatDateTime(record.qc_completed_at) : undefined },
+              { key: 'audit_comment', label: 'Audit Comment', value: record.audit_comment },
               { key: 'qc_vhr_comment', label: 'QC (VHR)', value: record.qc_vhr_comment },
               { key: 'qc_street_details', label: 'QC (Street View)', value: record.qc_street_details },
               ...(record.qc_builder_contact ? [{ key: 'qc_builder_contact', label: 'Builder / Contact', value: record.qc_builder_contact }] : []),

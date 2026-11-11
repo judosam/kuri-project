@@ -428,7 +428,7 @@ class UploadSpecificationService:
         }
 
     def commit_batch(
-        self, validation_result: Dict[str, Any], current_user: User
+        self, validation_result: Dict[str, Any], current_user: User, set_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Commits valid parsed rows inside a single atomic database transaction.
@@ -541,6 +541,7 @@ class UploadSpecificationService:
                 status="NOT_COMPLETED",
                 audit_status="PENDING",
                 source="imported",
+                set_name=(set_name or "").strip() or "CBE Corporation",
                 created_at=now_utc,
                 uploaded_by_id=current_user.id,
                 cadastral_lookup_status=cadastral_status,

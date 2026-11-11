@@ -124,6 +124,7 @@ export interface CaptureRecord {
   /** 'captured' = collected on location by a field operator, 'imported' = old
    *  field work uploaded by an admin. */
   source?: 'captured' | 'imported' | string;
+  set_name?: string | null;
 
   // 15 Task Dispatch Planning Fields
   unique_id?: string;
