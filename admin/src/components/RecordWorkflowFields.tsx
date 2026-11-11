@@ -553,11 +553,11 @@ export function AuditStatusCell({ record }: { record: CaptureRecord }) {
     <td className="col-audit-status" style={{ whiteSpace: 'nowrap' }}>
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap', maxWidth: '100%' }}>
         {chip}
-        {record.qc_edited_at && (
+        {(record.qc_edited_at || record.audit_status === 'RE_AUDITED') && (
           <span
             className="audit-chip audit-chip-approval qc-edit-chip"
             style={{ padding: '1px 6px', fontSize: '0.68rem', height: 18, lineHeight: 1, display: 'inline-flex', alignItems: 'center', gap: 2.5, flexShrink: 0, whiteSpace: 'nowrap' }}
-            title={`QC Edited on ${formatDateTime(record.qc_edited_at)}`}
+            title={`QC Edited on ${formatDateTime(record.qc_edited_at || record.last_modified_at || record.updated_at)}`}
           >
             <Icon name="edit_note" size={11} />
             <span style={{ overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' }}>Edited</span>

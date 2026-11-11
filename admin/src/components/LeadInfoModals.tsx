@@ -367,10 +367,16 @@ export function QaInfoModal({ record, onClose }: ModalProps) {
             </div>
             <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, color: '#64748b', marginBottom: 4 }}>Audit Status</div>
-              <div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <span className={`status-pill ${record.audit_status === 'APPROVAL' ? 'success' : record.audit_status === 'DISAPPROVAL' ? 'danger' : 'warning'}`} style={{ fontSize: 12, padding: '3px 8px' }}>
                   {record.audit_status || 'PENDING'}
                 </span>
+                {(record.qc_edited_at || record.audit_status === 'RE_AUDITED') && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', fontSize: '0.72rem', fontWeight: 700, padding: '2px 7px', borderRadius: 9999 }}>
+                    <Icon name="edit_note" size={12} />
+                    Edited
+                  </span>
+                )}
               </div>
             </div>
             <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>

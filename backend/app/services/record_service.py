@@ -539,6 +539,12 @@ class RecordService:
         if qc_sqfeet is not None and (qc_sqfeet.strip() or None) != record.qc_sqfeet:
             qc_changed = True
 
+        decision_changed = bool(audit_status and audit_status != record.audit_status)
+        now = datetime.now(timezone.utc)
+        was_already_audited = bool(record.audited_at or record.qc_completed_at or (record.audit_status and record.audit_status != "PENDING"))
+        is_edited = was_already_audited and (decision_changed or coords_changed or qc_changed or bool(audit_comment and audit_comment.strip() != (record.audit_comment or "").strip()))
+        is_already_done = bool(record.qc_completed_at)
+
         if auditor.role.value == "AUDITOR" and record.assigned_auditor_id not in (None, auditor.id):
             raise PermissionError("This record is assigned to another auditor")
         # Honor the auditor's explicit decision (APPROVAL, DISAPPROVAL, COMMERCIAL_PROPERTY, etc.)
@@ -547,8 +553,6 @@ class RecordService:
         elif coords_changed or qc_changed:
             record.audit_status = "RE_AUDITED"
         record.audit_comment = (audit_comment or "").strip() or None
-        now = datetime.now(timezone.utc)
-        is_already_done = bool(record.qc_completed_at)
 
         record.audited_by_id = auditor.id
         record.audited_at = now
@@ -567,11 +571,11 @@ class RecordService:
             record.qc_sqfeet = qc_sqfeet.strip() or None
 
         if any(value is not None for value in (qc_vhr_comment, qc_street_details, qc_builder_contact, qc_sqfeet)):
-            has_qc = any((value or '').strip() for value in (record.qc_vhr_comment, record.qc_street_details, record.qc_builder_contact, record.qc_sqfeet))
+            has_qc = any((value or "").strip() for value in (record.qc_vhr_comment, record.qc_street_details, record.qc_builder_contact, record.qc_sqfeet))
             if has_qc:
                 record.qc_by_id = auditor.id
                 record.qc_status = "QC Done"
-                if is_already_done:
+                if is_already_done or is_edited:
                     record.qc_edited_at = now
                 else:
                     record.qc_completed_at = now
@@ -581,6 +585,10 @@ class RecordService:
                 record.qc_edited_at = None
                 record.qc_by_id = None
                 record.qc_status = "QC Pending"
+        elif is_edited:
+            record.qc_edited_at = now
+            if record.audit_status in ("APPROVAL", "COMMERCIAL_PROPERTY") and not record.qc_status:
+                record.qc_status = "QC Done"
 
         if record.status not in ("COMPLETED", "Updated Revisited", "UPDATED_REVISITED") and audit_status in ("DISAPPROVAL", "COMMERCIAL_PROPERTY"):
             # Blocked / unassigned outcomes: clear user assignment.

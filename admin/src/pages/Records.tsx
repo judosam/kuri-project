@@ -126,7 +126,7 @@ const AUDIT_CHIP_META: Record<AuditStatus, { label: string; icon: IconName; cls:
 };
 
 /** Compact audit badge used in read-only contexts. */
-export function AuditStatusChip({ status }: { status?: AuditStatus | null }) {
+export function AuditStatusChip({ status, edited }: { status?: AuditStatus | null; edited?: boolean | string | null }) {
   if (!status) {
     return (
       <span className="audit-chip audit-chip-unset" title="No audit decision recorded">
@@ -137,10 +137,22 @@ export function AuditStatusChip({ status }: { status?: AuditStatus | null }) {
   }
   const meta = AUDIT_CHIP_META[status] ?? AUDIT_CHIP_META.PENDING;
   return (
-    <span className={`audit-chip ${meta.cls}`} title={`Audit status: ${meta.fullTitle || meta.label}`}>
-      <Icon name={meta.icon} size={13} />
-      <span>{meta.label}</span>
-    </span>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexWrap: 'nowrap' }}>
+      <span className={`audit-chip ${meta.cls}`} title={`Audit status: ${meta.fullTitle || meta.label}`}>
+        <Icon name={meta.icon} size={13} />
+        <span>{meta.label}</span>
+      </span>
+      {Boolean(edited || status === 'RE_AUDITED') && (
+        <span
+          className="audit-chip audit-chip-approval qc-edit-chip"
+          style={{ padding: '1px 6px', fontSize: '0.68rem', height: 18, lineHeight: 1, display: 'inline-flex', alignItems: 'center', gap: 2.5, flexShrink: 0, whiteSpace: 'nowrap' }}
+          title={typeof edited === 'string' ? `QC Edited on ${edited}` : 'QC Edited'}
+        >
+          <Icon name="edit_note" size={11} />
+          <span>Edited</span>
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -3856,7 +3868,7 @@ export default function Records({
                     <h2 className="auditor-popup-title">
                       {detailRecord.unique_id || `Record #${detailRecord.id}`}
                     </h2>
-                    {!isAuditorView && <AuditStatusChip status={detailRecord.audit_status} />}
+                    <AuditStatusChip status={detailRecord.audit_status} edited={detailRecord.qc_edited_at} />
                     <span className="auditor-role-pill">QA Review</span>
                   </div>
                   {detailRecord.name && detailRecord.name !== detailRecord.unique_id && (
