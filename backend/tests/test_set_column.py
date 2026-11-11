@@ -43,3 +43,37 @@ def test_excel_export_replaces_source_with_set(db_session):
             assert val is not None and len(str(val).strip()) > 0
     finally:
         db.close()
+
+
+def test_set_name_in_filter_fields_and_options(client, admin_token, test_admin, db_session):
+    """Verify that set_name is allowed in FILTER_FIELDS and filter-options endpoint succeeds."""
+    from app.services.record_filter_service import FILTER_FIELDS, parse_column_filters
+    
+    assert "set_name" in FILTER_FIELDS
+    parsed = parse_column_filters('{"set_name": ["CBE District"]}')
+    assert parsed == {"set_name": ["CBE District"]}
+
+    # Create a test record in db_session
+    rec = CaptureRecord(
+        user_id=test_admin.id,
+        name="Test Set Record",
+        latitude=11.0,
+        longitude=77.0,
+        status="PENDING",
+        set_name="CBE District",
+    )
+    db_session.add(rec)
+    db_session.commit()
+
+    # Test the API endpoint directly
+    response = client.get(
+        "/api/admin/records/filter-options?field=set_name",
+        headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "options" in data
+    assert isinstance(data["options"], list)
+    option_values = [opt["value"] for opt in data["options"]]
+    assert "CBE District" in option_values
+
