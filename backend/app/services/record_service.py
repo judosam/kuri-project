@@ -454,33 +454,42 @@ class RecordService:
     def is_duplicate_or_proximity_match(self, user_id: int, target_record: CaptureRecord) -> bool:
         """Check if target_record is within proximity or coordinate match of any active record assigned to user."""
         from sqlalchemy import or_
-        if target_record.unique_id:
+        uids = [u for u in (target_record.unique_id, target_record.name, getattr(target_record, "old_unique_id", None)) if u]
+        if uids:
             assigned_with_same_uid = self.db.query(CaptureRecord.id).filter(
                 or_(CaptureRecord.user_id == user_id, CaptureRecord.reassigned_to_id == user_id),
-                CaptureRecord.unique_id == target_record.unique_id,
+                or_(
+                    CaptureRecord.unique_id.in_(uids),
+                    CaptureRecord.name.in_(uids),
+                    CaptureRecord.old_unique_id.in_(uids),
+                ),
             ).first()
             if assigned_with_same_uid:
                 return True
 
-        if not target_record.coordinates:
-            return False
         from app.services.duplicate_detection_service import parse_coords_pair, haversine_distance_m
-        target_coords = parse_coords_pair(target_record.coordinates)
+        target_coords = parse_coords_pair(target_record.coordinates) if target_record.coordinates else None
+        if not target_coords and target_record.field_latitude is not None and target_record.field_longitude is not None:
+            target_coords = (target_record.field_latitude, target_record.field_longitude)
         if not target_coords:
             return False
         t_lat, t_lng = target_coords
 
-        assigned_records = self.db.query(CaptureRecord.coordinates).filter(
+        assigned_records = self.db.query(
+            CaptureRecord.coordinates, CaptureRecord.field_latitude, CaptureRecord.field_longitude
+        ).filter(
             or_(CaptureRecord.user_id == user_id, CaptureRecord.reassigned_to_id == user_id),
-            CaptureRecord.coordinates.isnot(None),
+            or_(CaptureRecord.coordinates.isnot(None), CaptureRecord.field_latitude.isnot(None)),
             or_(CaptureRecord.audit_status.is_(None), CaptureRecord.audit_status != "DISAPPROVAL"),
         ).all()
 
-        for (u_coords,) in assigned_records:
-            u_parsed = parse_coords_pair(u_coords)
+        for (u_coords, u_flat, u_flng) in assigned_records:
+            u_parsed = parse_coords_pair(u_coords) if u_coords else None
+            if not u_parsed and u_flat is not None and u_flng is not None:
+                u_parsed = (u_flat, u_flng)
             if u_parsed:
                 dist = haversine_distance_m(t_lat, t_lng, u_parsed[0], u_parsed[1])
-                if dist <= 250:
+                if dist <= 300:
                     return True
         return False
 
@@ -692,7 +701,7 @@ class RecordService:
         self.db.refresh(record)
         return record
 
-    def period_metrics(self, date_from=None, date_to=None, status=None, user_id=None):
+    def period_metrics(self, date_from=None, date_to=None, status=None, user_id=None, district=None, set_name=None):
         """Counts for one filtered set, using actual photo / field capture time."""
         import re
         from sqlalchemy import func, case, or_, and_, not_
@@ -700,6 +709,10 @@ class RecordService:
         from app.repositories.record_repository import record_date_column, local_day_bounds, BUSINESS_TZ
         from datetime import datetime, timedelta, timezone
         query = self.db.query(CaptureRecord)
+        if district:
+            query = query.filter(CaptureRecord.district == district)
+        if set_name:
+            query = query.filter(CaptureRecord.set_name == set_name)
         is_completed = or_(CaptureRecord.status.in_(('COMPLETED', 'Updated Revisited', 'UPDATED_REVISITED')), func.coalesce(CaptureRecord.revisit_status, '') == 'COMPLETED')
         is_closed = or_(
             CaptureRecord.status.in_(["NOT_INTERESTED", "Not Interested", "DUPLICATE", "Duplicate", "CONSTRUCTION_FINISHED", "Construction Finished"]),
@@ -764,7 +777,7 @@ class RecordService:
                 'construction_yes_records': construction or 0, 'mobile_numbers_collected': len(numbers),
                 'completion_rate': round((completed or 0) / total * 100, 1) if total else 0.0}
 
-    def daily_activity(self, date_from=None, date_to=None, status=None, user_id=None):
+    def daily_activity(self, date_from=None, date_to=None, status=None, user_id=None, district=None, set_name=None):
         from datetime import datetime, timedelta, timezone
         from sqlalchemy import func, case, or_, and_, not_
         from app.repositories.record_repository import record_date_column, BUSINESS_TZ
@@ -793,6 +806,10 @@ class RecordService:
             func.sum(case((and_(not_(is_completed), not_(is_closed)), 1), else_=0)),
             func.sum(case((func.lower(func.trim(CaptureRecord.construction_happening)) == 'yes', 1), else_=0)),
         ).filter(day >= first.isoformat(), day <= last.isoformat())
+        if district:
+            query = query.filter(CaptureRecord.district == district)
+        if set_name:
+            query = query.filter(CaptureRecord.set_name == set_name)
         if user_id is not None:
             query = query.filter(
                 CaptureRecord.user_id == user_id,
@@ -821,6 +838,8 @@ class RecordService:
         custom_from=None,
         custom_to=None,
         district=None,
+        user_id=None,
+        set_name=None,
     ) -> dict:
         from app.models.activity_log import ActivityLog
         from app.repositories.record_repository import record_date_column, BUSINESS_TZ
@@ -884,12 +903,30 @@ class RecordService:
             "date_from": eff_from.isoformat() if eff_from else None,
             "date_to": eff_to.isoformat() if eff_to else None,
             "label": period_label,
+            "district": district,
+            "user_id": user_id,
+            "set_name": set_name,
         }
 
         # 2. Base query filtered by scope, status, and dates
         q_base = self.db.query(CaptureRecord)
         if district:
             q_base = q_base.filter(CaptureRecord.district == district)
+        if set_name:
+            q_base = q_base.filter(CaptureRecord.set_name == set_name)
+        if user_id:
+            q_base = q_base.filter(
+                or_(
+                    CaptureRecord.user_id == user_id,
+                    CaptureRecord.reassigned_to_id == user_id,
+                    CaptureRecord.assigned_auditor_id == user_id,
+                    CaptureRecord.qc_by_id == user_id,
+                    CaptureRecord.audited_by_id == user_id,
+                    CaptureRecord.assigned_telecaller_id == user_id,
+                    CaptureRecord.telecaller_by_id == user_id,
+                    CaptureRecord.uploaded_by_id == user_id,
+                )
+            )
         is_completed = or_(
             CaptureRecord.status.in_(("COMPLETED", "Updated Revisited", "UPDATED_REVISITED")),
             func.coalesce(CaptureRecord.revisit_status, "") == "COMPLETED",
@@ -1127,7 +1164,9 @@ class RecordService:
         for u in users:
             if u.role.value not in ("USER", "FIELD_VERIFIER"):
                 continue
-            scoped = self.period_metrics(eff_from, eff_to, status, u.id)
+            if user_id and u.id != user_id:
+                continue
+            scoped = self.period_metrics(eff_from, eff_to, status, u.id, district=district, set_name=set_name)
             assigned, completed, u_closed, u_pending, rate = (
                 scoped['total_records'],
                 scoped['total_completed_records'],
@@ -1137,6 +1176,10 @@ class RecordService:
             )
             u_today_comp = scoped['today_completed_records']
             u_base = self.db.query(CaptureRecord).filter(CaptureRecord.user_id == u.id)
+            if district:
+                u_base = u_base.filter(CaptureRecord.district == district)
+            if set_name:
+                u_base = u_base.filter(CaptureRecord.set_name == set_name)
             if eff_from:
                 u_base = u_base.filter(func.coalesce(CaptureRecord.captured_at, CaptureRecord.created_at) >= eff_from)
             if eff_to:
@@ -1181,35 +1224,42 @@ class RecordService:
             )
             today_str = today_start.strftime("%Y-%m-%d")
             for aud in auditor_users:
-                assigned = self.db.query(CaptureRecord).filter(CaptureRecord.assigned_auditor_id == aud.id).count()
-                qc_done = self.db.query(CaptureRecord).filter(
+                if user_id and aud.id != user_id:
+                    continue
+                q_assigned = self.db.query(CaptureRecord).filter(CaptureRecord.assigned_auditor_id == aud.id)
+                q_qc = self.db.query(CaptureRecord).filter(
                     or_(CaptureRecord.qc_by_id == aud.id, CaptureRecord.audited_by_id == aud.id)
-                ).count()
+                )
+                if district:
+                    q_assigned = q_assigned.filter(CaptureRecord.district == district)
+                    q_qc = q_qc.filter(CaptureRecord.district == district)
+                if set_name:
+                    q_assigned = q_assigned.filter(CaptureRecord.set_name == set_name)
+                    q_qc = q_qc.filter(CaptureRecord.set_name == set_name)
+
+                assigned = q_assigned.count()
+                qc_done = q_qc.count()
                 if assigned == 0 and qc_done == 0:
                     continue
 
-                aud_approved = self.db.query(CaptureRecord).filter(
-                    or_(CaptureRecord.qc_by_id == aud.id, CaptureRecord.audited_by_id == aud.id),
-                    CaptureRecord.audit_status == "APPROVAL",
+                aud_approved = q_qc.filter(CaptureRecord.audit_status == "APPROVAL").count()
+                aud_disapproved = q_qc.filter(CaptureRecord.audit_status == "DISAPPROVAL").count()
+                aud_commercial = q_qc.filter(CaptureRecord.audit_status == "COMMERCIAL_PROPERTY").count()
+                aud_pending = q_assigned.filter(
+                    or_(CaptureRecord.audit_status.is_(None), CaptureRecord.audit_status == "PENDING")
                 ).count()
-                aud_disapproved = self.db.query(CaptureRecord).filter(
-                    or_(CaptureRecord.qc_by_id == aud.id, CaptureRecord.audited_by_id == aud.id),
-                    CaptureRecord.audit_status == "DISAPPROVAL",
-                ).count()
-                aud_commercial = self.db.query(CaptureRecord).filter(
-                    or_(CaptureRecord.qc_by_id == aud.id, CaptureRecord.audited_by_id == aud.id),
-                    CaptureRecord.audit_status == "COMMERCIAL_PROPERTY",
-                ).count()
-                aud_pending = self.db.query(CaptureRecord).filter(
-                    CaptureRecord.assigned_auditor_id == aud.id,
-                    or_(CaptureRecord.audit_status.is_(None), CaptureRecord.audit_status == "PENDING"),
-                ).count()
-                aud_created = self.db.query(CaptureRecord).filter(
+                
+                q_upload = self.db.query(CaptureRecord).filter(
                     CaptureRecord.uploaded_by_id == aud.id,
                     CaptureRecord.source == "qa_portal",
-                ).count()
-                aud_today = self.db.query(CaptureRecord).filter(
-                    or_(CaptureRecord.qc_by_id == aud.id, CaptureRecord.audited_by_id == aud.id),
+                )
+                if district:
+                    q_upload = q_upload.filter(CaptureRecord.district == district)
+                if set_name:
+                    q_upload = q_upload.filter(CaptureRecord.set_name == set_name)
+                aud_created = q_upload.count()
+
+                aud_today = q_qc.filter(
                     func.substr(cast(func.coalesce(CaptureRecord.qc_completed_at, CaptureRecord.audited_at), String), 1, 10) == today_str,
                 ).count()
                 rate = round((qc_done / assigned * 100), 1) if assigned else (100.0 if qc_done else 0.0)
@@ -1249,7 +1299,7 @@ class RecordService:
         except Exception:
             pass
 
-        legacy_metrics = self.period_metrics(eff_from, eff_to, status)
+        legacy_metrics = self.period_metrics(eff_from, eff_to, status, user_id=user_id, district=district, set_name=set_name)
 
         return {
             "period_info": period_info,
@@ -1265,7 +1315,7 @@ class RecordService:
             "eligible_for_field": eligible_for_field,
             "unassigned_properties": unassigned_properties,
             "qa_new_records": qa_new_records,
-            "daily_activity": self.daily_activity(eff_from, eff_to, status),
+            "daily_activity": self.daily_activity(eff_from, eff_to, status, user_id=user_id, district=district, set_name=set_name),
             **legacy_metrics,
             "recent_records": self.record_repo.get_recent(limit=10),
         }

@@ -92,6 +92,8 @@ export const dashboardApi = {
     custom_from?: string;
     custom_to?: string;
     district?: string;
+    user_id?: number;
+    set_name?: string;
   } = {}): Promise<DashboardData> => {
     const res = await api.get('/admin/dashboard', { params });
     return res.data;

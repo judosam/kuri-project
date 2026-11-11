@@ -89,4 +89,16 @@ def test_set_name_in_filter_fields_and_options(client, admin_token, test_admin, 
     assert len(found) == 1
     assert found[0]["set_name"] == "CBE District"
 
+    # Test that /api/admin/dashboard accepts set_name and user_id
+    res_dash = client.get(
+        f"/api/admin/dashboard?set_name=CBE+District&user_id={test_admin.id}",
+        headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert res_dash.status_code == 200
+    dash_data = res_dash.json()
+    assert dash_data["total_records"] >= 1
+    assert dash_data["period_info"]["set_name"] == "CBE District"
+    assert dash_data["period_info"]["user_id"] == test_admin.id
+
+
 

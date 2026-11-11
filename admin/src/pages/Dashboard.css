@@ -43,11 +43,22 @@
 
 /* ── Period / city filter row ───────────────────────────────────────── */
 .k-filterbar {
+  position: sticky;
+  top: 0;
+  z-index: 45;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 4px 18px -2px rgba(15, 23, 42, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
+  transition: all 0.2s ease;
 }
 .k-presets {
   display: inline-flex;
@@ -97,6 +108,142 @@
   height: 34px;
   font-size: 12.5px;
 }
+.k-filter-select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #3a4b60;
+}
+.k-select-label {
+  font-weight: 700;
+  color: #64748b;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.k-filter-select-wrap select {
+  height: 34px !important;
+  font-size: 12.5px !important;
+  padding: 4px 28px 4px 10px;
+  background-color: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #0f172a;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.k-filter-select-wrap select:hover {
+  border-color: #94a3b8;
+  background-color: #ffffff;
+}
+.k-filter-select-wrap select:focus {
+  border-color: #3b82f6;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+.k-clear-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #dc2626 !important;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.k-clear-filter-btn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+.k-instant-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 4px 10px;
+  border-radius: 999px;
+  animation: kPulse 1.2s infinite ease-in-out;
+}
+@keyframes kPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.75; transform: scale(0.98); }
+}
+
+/* ── Section-level Quick Filter Strips ───────────────────────── */
+.k-section-filter-strip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 8px 14px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #eef2f6;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.k-sec-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.k-sec-filter-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-right: 2px;
+}
+.k-sec-pill {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.k-sec-pill:hover {
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+.k-sec-pill.is-active {
+  background: #041b37;
+  color: #ffffff;
+  border-color: #041b37;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(4, 27, 55, 0.15);
+}
+.k-sec-select {
+  height: 28px !important;
+  font-size: 12px !important;
+  padding: 2px 24px 2px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #334155;
+  font-weight: 500;
+  cursor: pointer;
+}
+.k-table tr.is-selected-row {
+  background-color: #f0f7ff !important;
+}
 .k-city {
   display: inline-flex;
   align-items: center;
@@ -106,7 +253,7 @@
 }
 .k-city select {
   height: 34px !important;
-  min-width: 150px;
+  min-width: 130px;
   font-size: 12.5px !important;
 }
 

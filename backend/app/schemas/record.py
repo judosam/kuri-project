@@ -693,6 +693,9 @@ class DashboardPeriodInfo(BaseModel):
     date_from: Optional[str] = None
     date_to: Optional[str] = None
     label: str = "All Time"
+    district: Optional[str] = None
+    user_id: Optional[int] = None
+    set_name: Optional[str] = None
 
 
 class DashboardOverview(BaseModel):

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardApi } from '../services/api';
-import type { DashboardData, InspectorStat, QaUserStat } from '../types';
+import { dashboardApi, recordsApi } from '../services/api';
+import type { DashboardData, InspectorStat, QaUserStat, User } from '../types';
 import {
   Icon,
   Avatar,
@@ -153,6 +153,9 @@ export default function Dashboard() {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [district, setDistrict] = useState('');
+  const [userId, setUserId] = useState<string>('');
+  const [setName, setSetName] = useState<string>('');
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -160,33 +163,66 @@ export default function Dashboard() {
   const [modalStat, setModalStat] = useState<StatDetailModalData | null>(null);
   const [activityFilter, setActivityFilter] = useState<'all' | 'qc' | 'field' | 'telecalling'>('all');
 
+  const reqSeq = useRef(0);
+
+  // Load team members directory once
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      recordsApi.assignmentOperators().catch(() => []),
+      recordsApi.auditors().catch(() => []),
+      recordsApi.telecallers().catch(() => []),
+    ]).then(([ops, auds, teles]) => {
+      if (!active) return;
+      const map = new Map<number, User>();
+      [...ops, ...auds, ...teles].forEach((u) => {
+        if (u && u.id) map.set(u.id, u as User);
+      });
+      setAllUsers(Array.from(map.values()));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const fetchData = (showSpinner = false) => {
+    const seq = ++reqSeq.current;
     if (showSpinner) setIsRefreshing(true);
     dashboardApi
       .get({
         preset,
         district: district || undefined,
+        user_id: userId ? Number(userId) : undefined,
+        set_name: setName || undefined,
         custom_from: preset === 'custom' && customFrom ? customFrom : undefined,
         custom_to: preset === 'custom' && customTo ? customTo : undefined,
       })
       .then((result) => {
+        if (seq !== reqSeq.current) return;
         setData(result);
         setUpdatedAt(Date.now());
       })
       .catch((err) => {
+        if (seq !== reqSeq.current) return;
         console.error('Failed to load analytics dashboard:', err);
       })
       .finally(() => {
-        setLoading(false);
-        setIsRefreshing(false);
+        if (seq === reqSeq.current) {
+          setLoading(false);
+          setIsRefreshing(false);
+        }
       });
   };
 
   useEffect(() => {
-    setLoading(true);
+    if (!data) {
+      setLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset, district]);
+  }, [preset, district, userId, setName]);
 
   const overview = data?.overview;
   const funnel = data?.funnel;
@@ -239,6 +275,50 @@ export default function Dashboard() {
     [data?.distribution]
   );
 
+  const fieldVerifierUsers = useMemo(() => {
+    const fromDirectory = allUsers.filter((u) => u.role === 'USER' || u.role === 'FIELD_VERIFIER');
+    if (fromDirectory.length > 0) return fromDirectory;
+    return (data?.inspector_stats ?? []).map((ins) => ({
+      id: ins.user_id,
+      email: ins.email || '',
+      full_name: ins.user_name,
+      role: 'FIELD_VERIFIER' as const,
+      is_active: true,
+      created_at: '',
+    }));
+  }, [allUsers, data?.inspector_stats]);
+
+  const qaReviewerUsers = useMemo(() => {
+    const fromDirectory = allUsers.filter((u) => u.role === 'AUDITOR' || u.role === 'ADMIN');
+    if (fromDirectory.length > 0) return fromDirectory;
+    return (data?.qa_user_stats ?? []).map((aud) => ({
+      id: aud.user_id,
+      email: aud.email || '',
+      full_name: aud.user_name,
+      role: (aud.role as any) || 'AUDITOR',
+      is_active: true,
+      created_at: '',
+    }));
+  }, [allUsers, data?.qa_user_stats]);
+
+  const SET_OPTIONS = [
+    { value: '', label: 'All Sets' },
+    { value: 'CBE Corporation', label: 'CBE Corporation' },
+    { value: 'CBE District', label: 'CBE District' },
+    { value: 'Manually Added by QA', label: 'Manually Added by QA' },
+    { value: 'Manually Added by Field User', label: 'Manually Added by Field User' },
+  ];
+
+  const hasActiveFilters = preset !== 'allTime' || !!userId || !!setName || !!district || !!customFrom || !!customTo;
+  const clearFilters = () => {
+    setPreset('allTime');
+    setCustomFrom('');
+    setCustomTo('');
+    setDistrict('');
+    setUserId('');
+    setSetName('');
+  };
+
   useTopHeader(
     {
       left: (
@@ -275,7 +355,10 @@ export default function Dashboard() {
 
   const recordLink = (params: Record<string, string>) => {
     const search = new URLSearchParams(params);
-    search.set('preset', preset);
+    if (preset) search.set('preset', preset);
+    if (district) search.set('district', district);
+    if (userId) search.set('user_id', userId);
+    if (setName) search.set('set_name', setName);
     return `/admin/records?${search.toString()}`;
   };
 
@@ -424,8 +507,52 @@ export default function Dashboard() {
                   </button>
                 </div>
               )}
-              <label className="k-city">
-                <span>City</span>
+              <label className="k-filter-select-wrap">
+                <span className="k-select-label">SET</span>
+                <select
+                  value={setName}
+                  onChange={(e) => setSetName(e.target.value)}
+                  aria-label="Filter by SET"
+                  className="k-filter-select"
+                >
+                  {SET_OPTIONS.map((opt) => (
+                    <option key={opt.value || 'all'} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="k-filter-select-wrap">
+                <span className="k-select-label">User</span>
+                <select
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
+                  aria-label="Filter by user"
+                  className="k-filter-select"
+                >
+                  <option value="">All team members</option>
+                  {fieldVerifierUsers.length > 0 && (
+                    <optgroup label="Field Verifiers">
+                      {fieldVerifierUsers.map((u) => (
+                        <option key={`fv-${u.id}`} value={String(u.id)}>
+                          {u.full_name || u.email}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {qaReviewerUsers.length > 0 && (
+                    <optgroup label="QA Reviewers">
+                      {qaReviewerUsers.map((u) => (
+                        <option key={`qa-${u.id}`} value={String(u.id)}>
+                          {u.full_name || u.email}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </label>
+              <label className="k-filter-select-wrap k-city">
+                <span className="k-select-label">City</span>
                 <select value={district} onChange={(e) => setDistrict(e.target.value)} aria-label="Filter by city">
                   <option value="">All cities</option>
                   {districts.map((d) => (
@@ -435,6 +562,23 @@ export default function Dashboard() {
                   ))}
                 </select>
               </label>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  className="k-clear-filter-btn"
+                  onClick={clearFilters}
+                  title="Reset all filters to All time"
+                >
+                  <Icon name="close" size={13} />
+                  <span>Reset</span>
+                </button>
+              )}
+              {isRefreshing && (
+                <span className="k-instant-badge" title="Updating analytics instantly">
+                  <span className="spinner" style={{ width: 11, height: 11, borderWidth: 2 }} />
+                  <span>Updating…</span>
+                </span>
+              )}
             </div>
           </div>
 
@@ -618,6 +762,43 @@ export default function Dashboard() {
               </div>
             </div>
 
+            <div className="k-section-filter-strip">
+              <div className="k-sec-filter-group">
+                <span className="k-sec-filter-label">Quick SET:</span>
+                {[
+                  { value: '', label: 'All Sets' },
+                  { value: 'CBE Corporation', label: 'CBE Corporation' },
+                  { value: 'CBE District', label: 'CBE District' },
+                  { value: 'Manually Added by QA', label: 'QA Added' },
+                ].map((s) => (
+                  <button
+                    key={s.value || 'all'}
+                    type="button"
+                    className={`k-sec-pill${setName === s.value ? ' is-active' : ''}`}
+                    onClick={() => setSetName(setName === s.value ? '' : s.value)}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              <div className="k-sec-filter-group" style={{ marginLeft: 'auto' }}>
+                <span className="k-sec-filter-label">Reviewer:</span>
+                <select
+                  className="k-sec-select"
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
+                  aria-label="Filter QC section by reviewer"
+                >
+                  <option value="">All reviewers</option>
+                  {qaReviewerUsers.map((u) => (
+                    <option key={`qa-sec-${u.id}`} value={String(u.id)}>
+                      {u.full_name || u.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             <div className="k-strip">
               {qcStats.map((s) => (
                 <div className={`k-mini is-${s.tone}`} key={s.label}>
@@ -651,29 +832,38 @@ export default function Dashboard() {
                       </td>
                     </tr>
                   )}
-                  {qaUsers.map((user: QaUserStat) => (
-                    <tr key={user.user_id}>
-                      <td>
-                        <div className="k-person">
-                          <Avatar name={user.user_name} size="sm" />
-                          <div>
-                            <span className="k-person-name">{user.user_name}</span>
-                            <span className="k-person-role">{roleLabel(user.role)}</span>
+                  {qaUsers.map((user: QaUserStat) => {
+                    const isSelected = userId === String(user.user_id);
+                    return (
+                      <tr
+                        key={user.user_id}
+                        className={isSelected ? 'is-selected-row' : ''}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setUserId(isSelected ? '' : String(user.user_id))}
+                        title={isSelected ? 'Click to clear reviewer filter' : `Filter dashboard by ${user.user_name}`}
+                      >
+                        <td>
+                          <div className="k-person">
+                            <Avatar name={user.user_name} size="sm" />
+                            <div>
+                              <span className="k-person-name">{user.user_name}</span>
+                              <span className="k-person-role">{roleLabel(user.role)}</span>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="num">{formatter.format(user.total_assigned)}</td>
-                      <td className="num">{formatter.format(user.qc_done)}</td>
-                      <td className="num is-green">{formatter.format(user.approved)}</td>
-                      <td className="num is-red">{formatter.format(user.disapproved)}</td>
-                      <td className="num">{formatter.format(user.commercial)}</td>
-                      <td className="num">{formatter.format(user.pending)}</td>
-                      <td className="num">{formatter.format(user.qa_created || 0)}</td>
-                      <td className="k-col-progress">
-                        <ProgressCell value={user.completion_rate} tone="green" />
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="num">{formatter.format(user.total_assigned)}</td>
+                        <td className="num">{formatter.format(user.qc_done)}</td>
+                        <td className="num is-green">{formatter.format(user.approved)}</td>
+                        <td className="num is-red">{formatter.format(user.disapproved)}</td>
+                        <td className="num">{formatter.format(user.commercial)}</td>
+                        <td className="num">{formatter.format(user.pending)}</td>
+                        <td className="num">{formatter.format(user.qa_created || 0)}</td>
+                        <td className="k-col-progress">
+                          <ProgressCell value={user.completion_rate} tone="green" />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -703,6 +893,43 @@ export default function Dashboard() {
                 >
                   Assign pending records
                 </button>
+              </div>
+            </div>
+
+            <div className="k-section-filter-strip">
+              <div className="k-sec-filter-group">
+                <span className="k-sec-filter-label">Quick SET:</span>
+                {[
+                  { value: '', label: 'All Sets' },
+                  { value: 'CBE Corporation', label: 'CBE Corporation' },
+                  { value: 'CBE District', label: 'CBE District' },
+                  { value: 'Manually Added by Field User', label: 'Field Added' },
+                ].map((s) => (
+                  <button
+                    key={s.value || 'all'}
+                    type="button"
+                    className={`k-sec-pill${setName === s.value ? ' is-active' : ''}`}
+                    onClick={() => setSetName(setName === s.value ? '' : s.value)}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              <div className="k-sec-filter-group" style={{ marginLeft: 'auto' }}>
+                <span className="k-sec-filter-label">Verifier:</span>
+                <select
+                  className="k-sec-select"
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
+                  aria-label="Filter field section by verifier"
+                >
+                  <option value="">All verifiers</option>
+                  {fieldVerifierUsers.map((u) => (
+                    <option key={`fv-sec-${u.id}`} value={String(u.id)}>
+                      {u.full_name || u.email}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -756,28 +983,37 @@ export default function Dashboard() {
                         </td>
                       </tr>
                     )}
-                    {operators.slice(0, 5).map((op: InspectorStat) => (
-                      <tr key={op.user_id}>
-                        <td>
-                          <div className="k-person">
-                            <Avatar name={op.user_name} size="sm" />
-                            <div>
-                              <span className="k-person-name">{op.user_name}</span>
-                              <span className="k-person-role">{roleLabel(op.role)}</span>
+                    {operators.slice(0, 8).map((op: InspectorStat) => {
+                      const isSelected = userId === String(op.user_id);
+                      return (
+                        <tr
+                          key={op.user_id}
+                          className={isSelected ? 'is-selected-row' : ''}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setUserId(isSelected ? '' : String(op.user_id))}
+                          title={isSelected ? 'Click to clear verifier filter' : `Filter dashboard by ${op.user_name}`}
+                        >
+                          <td>
+                            <div className="k-person">
+                              <Avatar name={op.user_name} size="sm" />
+                              <div>
+                                <span className="k-person-name">{op.user_name}</span>
+                                <span className="k-person-role">{roleLabel(op.role)}</span>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="num">{formatter.format(op.total_assigned)}</td>
-                        <td className="num">{formatter.format(op.pending)}</td>
-                        <td className="num">{formatter.format(op.completed)}</td>
-                        <td className="num is-muted">{formatter.format(op.marked ?? op.closed ?? 0)}</td>
-                        <td className="num is-green">{formatter.format(op.confirmed_construction ?? 0)}</td>
-                        <td className="num">{formatter.format(op.phones_obtained ?? 0)}</td>
-                        <td className="k-col-progress">
-                          <ProgressCell value={op.completion_rate} tone="orange" />
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="num">{formatter.format(op.total_assigned)}</td>
+                          <td className="num">{formatter.format(op.pending)}</td>
+                          <td className="num">{formatter.format(op.completed)}</td>
+                          <td className="num is-muted">{formatter.format(op.marked ?? op.closed ?? 0)}</td>
+                          <td className="num is-green">{formatter.format(op.confirmed_construction ?? 0)}</td>
+                          <td className="num">{formatter.format(op.phones_obtained ?? 0)}</td>
+                          <td className="k-col-progress">
+                            <ProgressCell value={op.completion_rate} tone="orange" />
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -800,6 +1036,26 @@ export default function Dashboard() {
                 <button type="button" className="btn btn-royal btn-sm" onClick={() => navigate('/telecaller/dashboard')}>
                   Open telecalling portal
                 </button>
+              </div>
+            </div>
+
+            <div className="k-section-filter-strip">
+              <div className="k-sec-filter-group">
+                <span className="k-sec-filter-label">Quick SET:</span>
+                {[
+                  { value: '', label: 'All Sets' },
+                  { value: 'CBE Corporation', label: 'CBE Corporation' },
+                  { value: 'CBE District', label: 'CBE District' },
+                ].map((s) => (
+                  <button
+                    key={s.value || 'all'}
+                    type="button"
+                    className={`k-sec-pill${setName === s.value ? ' is-active' : ''}`}
+                    onClick={() => setSetName(setName === s.value ? '' : s.value)}
+                  >
+                    {s.label}
+                  </button>
+                ))}
               </div>
             </div>
 

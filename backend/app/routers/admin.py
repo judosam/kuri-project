@@ -113,6 +113,8 @@ async def get_dashboard(
     custom_from: str | None = Query(None),
     custom_to: str | None = Query(None),
     district: str | None = Query(None),
+    user_id: int | None = Query(None),
+    set_name: str | None = Query(None),
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
@@ -126,6 +128,8 @@ async def get_dashboard(
         custom_from=custom_from,
         custom_to=custom_to,
         district=district,
+        user_id=user_id,
+        set_name=set_name,
     )
     return DashboardResponse(
         daily_activity=metrics["daily_activity"],

@@ -31,8 +31,8 @@ def record_filters(status: str | None = Query(None, pattern="^(COMPLETED|NOT_COM
                    search: str | None = Query(None, max_length=200), user_id: int | None = None,
                    date_from: datetime | None = None, date_to: datetime | None = None,
                    date_field: str = Query("assigned_at", pattern="^(created_at|assigned_at|captured_at|completed_at|qc_completed_at)$"),
-                   qc_status: str | None = Query(None, pattern="^(DONE|PENDING)$"),
-                   audit_status: str | None = Query(None, pattern="^(PENDING|APPROVAL|DISAPPROVAL|COMMERCIAL_PROPERTY|RE_AUDITED)$"),
+                   qc_status: str | None = Query(None, pattern="^(DONE|PENDING|NOT_APPLICABLE|Not Applicable)$"),
+                   audit_status: str | None = Query(None, pattern="^(PENDING|APPROVAL|DISAPPROVAL|COMMERCIAL_PROPERTY|RE_AUDITED|NOT_APPLICABLE)$"),
                    column_filters: str | None = Query(None, max_length=16000),
                    assigned_auditor_id: int | None = Query(None, ge=1),
                    unassigned_user: bool = False, unassigned_auditor: bool = False):
