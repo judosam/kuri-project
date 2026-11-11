@@ -77,3 +77,16 @@ def test_set_name_in_filter_fields_and_options(client, admin_token, test_admin, 
     option_values = [opt["value"] for opt in data["options"]]
     assert "CBE District" in option_values
 
+    # Test that /api/admin/records returns set_name in the record list
+    res_list = client.get(
+        "/api/admin/records",
+        headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert res_list.status_code == 200
+    list_data = res_list.json()
+    assert "records" in list_data
+    found = [r for r in list_data["records"] if r["id"] == rec.id]
+    assert len(found) == 1
+    assert found[0]["set_name"] == "CBE District"
+
+

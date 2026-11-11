@@ -4217,6 +4217,7 @@ def _record_to_detail(record, errors: Optional[List[str]] = None) -> RecordDetai
         field_captured_at=getattr(record, "field_captured_at", None),
         errors=errors,
         source=getattr(record, "source", "captured") or "captured",
+        set_name=getattr(record, "set_name", None),
         status=getattr(record, "status", "NOT_COMPLETED") or "NOT_COMPLETED",
         updated_by_id=getattr(record, "updated_by_id", None),
         updated_by_name=getattr(record, "updated_by_name", None),
