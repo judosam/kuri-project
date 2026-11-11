@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { CaptureRecord } from '../types';
 import { telecallerApi } from '../services/api';
-import { Icon, AuthThumbnail, formatDateTime } from './ui';
+import { Icon, AuthThumbnail, formatDateTime, formatCapturedDateOrTime } from './ui';
+import { capturedTime } from './RecordWorkflowFields';
 import { TelecallerHistoryTable } from './TelecallerHistoryTable';
 import { extractPhoneNumbers, extractContactLabel, formatPhoneNumber } from '../utils/phoneUtils';
 
@@ -671,6 +672,14 @@ export function TelecallerRecordModal({ record, onClose, onUpdated }: Telecaller
 
                 <span style={{ color: '#64748b' }}>Date of Visit:</span>
                 <span style={{ color: '#0f172a' }}>{record.date_of_visit || '—'}</span>
+
+                <span style={{ color: '#64748b' }}>Last Captured Date:</span>
+                <span style={{ color: '#0f172a', fontWeight: 600 }}>
+                  {(() => {
+                    const raw = capturedTime(record);
+                    return raw ? formatCapturedDateOrTime(raw) : (record.date_of_visit || '—');
+                  })()}
+                </span>
 
                 <span style={{ color: '#64748b' }}>Construction Happening:</span>
                 <span style={{ fontWeight: 700, color: record.construction_happening?.toLowerCase() === 'yes' ? '#059669' : '#475569' }}>

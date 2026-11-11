@@ -62,7 +62,9 @@ import {
   CustomSelect,
   AuthThumbnail,
   formatDate,
+  formatCapturedDateOrTime,
 } from '../components/ui';
+import { capturedTime } from '../components/RecordWorkflowFields';
 import { useTopHeader } from '../context/HeaderContext';
 import { TelecallerRecordModal, TELECALLER_STATUS_OPTIONS } from '../components/TelecallerRecordModal';
 import { ExpandableCellText } from '../components/ExpandableCellText';
@@ -346,10 +348,10 @@ export default function TelecallerRecords() {
                   <th style={{ width: 160, minWidth: 150, maxWidth: 180, textAlign: 'left' }}>QC Builder / Contact:</th>
                   <th style={{ width: 130, minWidth: 115, maxWidth: 140, textAlign: 'left' }}>Village / District</th>
                   <th style={{ width: 95, minWidth: 85, maxWidth: 105, textAlign: 'left' }}>Field Status</th>
+                  <th style={{ width: 145, minWidth: 130, maxWidth: 165, textAlign: 'left' }}>Last Captured Date</th>
                   <th style={{ width: 150, minWidth: 135, maxWidth: 175, textAlign: 'left' }}>Stage / Building</th>
                   <th style={{ width: 130, minWidth: 120, maxWidth: 145, textAlign: 'left' }}>Telecaller Status</th>
                   <th style={{ width: 180, minWidth: 160, maxWidth: 220, textAlign: 'left' }}>Telecaller Notes</th>
-                  <th style={{ width: 120, minWidth: 110, maxWidth: 140, textAlign: 'left' }}>Updated By</th>
                   <th style={{ width: 105, minWidth: 95, maxWidth: 115, textAlign: 'left' }}>Action</th>
                 </tr>
               </thead>
@@ -614,7 +616,21 @@ export default function TelecallerRecords() {
                         {renderFieldStatusBadge(r.status, r.revisit_status)}
                       </td>
 
-                      {/* 8. Stage / Building */}
+                      {/* 8. Last Captured Date */}
+                      <td style={{ whiteSpace: 'nowrap', textAlign: 'left' }}>
+                        {(() => {
+                          const raw = capturedTime(r);
+                          return raw ? (
+                            <span style={{ fontSize: 11.5, fontWeight: 600, color: '#0f172a' }}>
+                              {formatCapturedDateOrTime(raw)}
+                            </span>
+                          ) : (
+                            nil
+                          );
+                        })()}
+                      </td>
+
+                      {/* 9. Stage / Building */}
                       <td style={{ textAlign: 'left' }}>
                         {(r.stage_of_construction || r.no_of_floors || r.built_up_area || r.expected_completion) ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
