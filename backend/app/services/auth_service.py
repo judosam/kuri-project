@@ -168,33 +168,3 @@ class AuthService:
                 is_active=True,
             )
 
-        # Ensure core role-testing accounts exist with known credentials for QA / E2E
-        test_roles = [
-            ("auditor.test@system.local", "Auditor Test", UserRole.AUDITOR),
-            ("verifier.test@system.local", "Verifier Test", UserRole.FIELD_VERIFIER),
-            ("telecaller@system.local", "Telecaller", UserRole.TELECALLER),
-            ("telecaller.test@system.local", "Telecaller Test", UserRole.TELECALLER),
-        ]
-        for t_email, t_name, t_role in test_roles:
-            t_user = self.db.query(User).filter(User.email == t_email).first()
-            if t_user:
-                if not t_user.password_hash:
-                    t_user.password_hash = hash_password("admin123")
-                t_user.is_active = True
-                t_user.role = t_role
-                try:
-                    self.db.commit()
-                except Exception:
-                    self.db.rollback()
-            else:
-                try:
-                    self.create_user(
-                        email=t_email,
-                        password="admin123",
-                        full_name=t_name,
-                        role=t_role,
-                        is_active=True,
-                    )
-                except Exception:
-                    self.db.rollback()
-
