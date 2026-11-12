@@ -647,6 +647,53 @@ export default function ImportRecords() {
                 </div>
               </div>
 
+              {gisFile && !gisInspecting && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 18px',
+                    borderRadius: 10,
+                    background: '#f0fdf4',
+                    border: '1.5px solid #86efac',
+                    marginBottom: 16,
+                    flexWrap: 'wrap',
+                    gap: 10,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Icon name="check_circle" size={22} style={{ color: '#16a34a' }} />
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#15803d' }}>
+                        Selected: {gisFile.name}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#166534' }}>
+                        {(gisFile.size / 1024).toFixed(1)} KB · SET Name: <strong>{gisSetName || 'Not specified (Required)'}</strong>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => runGisDryRun(gisFile)}
+                    style={{
+                      height: 38,
+                      padding: '0 22px',
+                      fontWeight: 750,
+                      background: '#fc602b',
+                      borderColor: '#fc602b',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <Icon name="search" size={16} />
+                    Inspect & Validate File
+                  </button>
+                </div>
+              )}
+
               {gisInspecting && (
                 <div
                   style={{
@@ -707,9 +754,28 @@ export default function ImportRecords() {
                       <Icon name="block" size={22} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#991b1b' }}>
-                        Batch Validation Failed — All-or-Nothing Rule Enforced
-                      </h2>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 6 }}>
+                        <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#991b1b' }}>
+                          Batch Validation Failed — All-or-Nothing Rule Enforced
+                        </h2>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <button type="button" className="btn btn-secondary btn-sm" onClick={resetGis}>
+                            <Icon name="refresh" size={14} /> Upload Different File
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={() => {
+                              setActiveTab('legacy_dispatch');
+                              resetGis();
+                            }}
+                            style={{ background: '#0284c7', borderColor: '#0284c7', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                            title="If this file is a Task Dispatch Sheet rather than a 12-signal GIS sheet"
+                          >
+                            <Icon name="assignment_turned_in" size={14} /> Switch to Task Dispatch Sheet (Legacy) →
+                          </button>
+                        </div>
+                      </div>
                       <p style={{ margin: '4px 0 12px', fontSize: '0.86rem', color: '#b91c1c', lineHeight: 1.4 }}>
                         {gisValidation.reject_reason || 'Batch was rejected because one or more rows violated strict GIS upload rules.'}
                       </p>
@@ -722,7 +788,7 @@ export default function ImportRecords() {
                             borderRadius: 8,
                             border: '1px solid #fca5a5',
                             overflow: 'hidden',
-                            maxHeight: 280,
+                            maxHeight: 360,
                             overflowY: 'auto',
                           }}
                         >
@@ -753,9 +819,20 @@ export default function ImportRecords() {
                         </div>
                       )}
 
-                      <div style={{ marginTop: 14 }}>
+                      <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                         <button type="button" className="btn btn-secondary btn-sm" onClick={resetGis}>
                           <Icon name="refresh" size={14} /> Upload Corrected File
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={() => {
+                            setActiveTab('legacy_dispatch');
+                            resetGis();
+                          }}
+                          style={{ background: '#0284c7', borderColor: '#0284c7' }}
+                        >
+                          <Icon name="assignment_turned_in" size={14} /> Try as Task Dispatch Sheet (Legacy)
                         </button>
                       </div>
                     </div>
@@ -766,6 +843,65 @@ export default function ImportRecords() {
               {/* SUCCESSFUL INSPECTION SUMMARY */}
               {gisValidation.valid && (
                 <>
+                  {/* Sticky Top Action Bar for Immediate One-Click Import */}
+                  <div
+                    className="card"
+                    style={{
+                      padding: '12px 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      flexWrap: 'wrap',
+                      background: '#f8fafc',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: 12,
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 10,
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
+                        Ready to Ingest: {gisValidation.new_candidates.length} New, {gisValidation.merged_candidates.length} Merged
+                      </span>
+                      {gisSetName && (
+                        <span style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: 9999, fontSize: '0.75rem', fontWeight: 700 }}>
+                          SET: {gisSetName}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={resetGis} disabled={gisCommitting}>
+                        <Icon name="arrow_back" size={14} /> Choose Another File
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={commitGisBatch}
+                        disabled={gisCommitting}
+                        style={{
+                          minWidth: 200,
+                          height: 38,
+                          fontWeight: 750,
+                          background: '#fc602b',
+                          borderColor: '#fc602b',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          fontSize: '0.85rem',
+                        }}
+                      >
+                        <Icon name={gisCommitting ? 'refresh' : 'check_circle'} size={16} className={gisCommitting ? 'fos-spin' : undefined} />
+                        {gisCommitting
+                          ? 'Committing & Auto-Enriching...'
+                          : `Commit Import (${gisValidation.new_candidates.length + gisValidation.merged_candidates.length} records)`}
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Summary Metric Cards */}
                   <div
                     style={{
@@ -1303,6 +1439,53 @@ export default function ImportRecords() {
                   Dispatches inspection tasks to field operators via streaming NDJSON.
                 </div>
               </div>
+
+              {legacyFile && !legacyImporting && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 18px',
+                    borderRadius: 10,
+                    background: '#f0fdf4',
+                    border: '1.5px solid #86efac',
+                    marginBottom: 16,
+                    flexWrap: 'wrap',
+                    gap: 10,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Icon name="check_circle" size={22} style={{ color: '#16a34a' }} />
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#15803d' }}>
+                        Ready to Dispatch: {legacyFile.name}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#166534' }}>
+                        {(legacyFile.size / 1024).toFixed(1)} KB · SET Name: <strong>{legacySetName || 'Not specified (Required)'}</strong>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={runLegacyImport}
+                    style={{
+                      height: 38,
+                      padding: '0 22px',
+                      fontWeight: 750,
+                      background: '#fc602b',
+                      borderColor: '#fc602b',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <Icon name="upload" size={16} />
+                    Dispatch Tasks Now
+                  </button>
+                </div>
+              )}
 
               {legacyError && (
                 <div className="alert alert-error" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>

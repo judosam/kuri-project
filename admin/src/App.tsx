@@ -82,7 +82,9 @@ function AppShell() {
     return localStorage.getItem('sidebar_collapsed') === 'true';
   });
   const location = useLocation();
-  const isRecordDetail = location.pathname.startsWith('/records/') && location.pathname !== '/records';
+  const isRecordDetail =
+    (location.pathname.startsWith('/records/') || location.pathname.startsWith('/records/imported/')) &&
+    !location.pathname.startsWith('/records/import');
 
   useEffect(() => {
     const path = location.pathname;
