@@ -948,62 +948,91 @@ class RecordService:
         elif status:
             q_base = q_base.filter(CaptureRecord.status == status)
 
-        if eff_from or eff_to:
-            date_col = func.julianday(record_date_column('assigned_at' if status == 'NOT_COMPLETED' else 'captured_at'))
-            if eff_from:
-                q_base = q_base.filter(date_col >= func.julianday(eff_from))
-            if eff_to:
-                q_base = q_base.filter(date_col <= func.julianday(eff_to))
+        is_period_filtered = bool(eff_from and eff_to)
+
+        comp_col = record_date_column('completed_at')
+        qc_col = func.coalesce(CaptureRecord.qc_completed_at, CaptureRecord.qc_edited_at, CaptureRecord.audited_at)
+        has_phone = or_(
+            func.coalesce(func.trim(CaptureRecord.contact_number), "") != "",
+            func.coalesce(func.trim(CaptureRecord.site_contractor_architect_number), "") != "",
+            func.coalesce(func.trim(CaptureRecord.qc_builder_contact), "") != "",
+        )
 
         total_records = q_base.count()
-        commercial_records = q_base.filter(
+        alltime_commercial = q_base.filter(
             or_(
                 CaptureRecord.audit_status == "COMMERCIAL_PROPERTY",
                 CaptureRecord.property_type == "Commercial Property",
             )
         ).count()
-        eligible_for_field = max(0, total_records - commercial_records)
+        commercial_records = alltime_commercial
+        eligible_for_field = max(0, total_records - alltime_commercial)
 
         sent_to_field = q_base.filter(CaptureRecord.user_id.isnot(None)).count()
         unassigned_properties = q_base.filter(CaptureRecord.user_id.is_(None)).count()
-        completed_verifications = q_base.filter(
-            or_(
-                CaptureRecord.status.in_(("COMPLETED", "Updated Revisited", "UPDATED_REVISITED")),
-                func.coalesce(CaptureRecord.revisit_status, "") == "COMPLETED",
-            )
-        ).count()
-        closed_verifications = q_base.filter(is_closed).count()
-        disapproved_records = q_base.filter(CaptureRecord.audit_status == "DISAPPROVAL").count()
         pending_verifications = q_base.filter(
             not_(is_completed),
             not_(is_closed),
             or_(CaptureRecord.audit_status.is_(None), CaptureRecord.audit_status != "DISAPPROVAL"),
         ).count()
-        completion_rate = round(completed_verifications / total_records * 100, 1) if total_records else 0.0
 
-        confirmed_construction = q_base.filter(
-            func.lower(func.trim(CaptureRecord.construction_happening)) == "yes"
-        ).count()
-
-        phone_numbers_obtained = q_base.filter(
-            or_(
-                func.coalesce(func.trim(CaptureRecord.contact_number), "") != "",
-                func.coalesce(func.trim(CaptureRecord.site_contractor_architect_number), "") != "",
-                func.coalesce(func.trim(CaptureRecord.qc_builder_contact), "") != "",
+        if is_period_filtered:
+            q_period_comp = q_base.filter(
+                func.julianday(comp_col) >= func.julianday(eff_from),
+                func.julianday(comp_col) <= func.julianday(eff_to),
             )
-        ).count()
+            completed_verifications = q_period_comp.filter(is_completed).count()
+            closed_verifications = q_period_comp.filter(is_closed).count()
+            confirmed_construction = q_period_comp.filter(
+                func.lower(func.trim(CaptureRecord.construction_happening)) == "yes"
+            ).count()
+            phone_numbers_obtained = q_period_comp.filter(has_phone).count()
 
-        manually_added = q_base.filter(CaptureRecord.is_manually_added).count()
-        qa_new_records = q_base.filter(
-            or_(
-                CaptureRecord.unique_id.like("QANEW-%"),
-                CaptureRecord.source == "qa_portal",
+            q_period_created = q_base.filter(
+                func.julianday(CaptureRecord.created_at) >= func.julianday(eff_from),
+                func.julianday(CaptureRecord.created_at) <= func.julianday(eff_to),
             )
-        ).count()
+            manually_added = q_period_created.filter(CaptureRecord.is_manually_added).count()
+            qa_new_records = q_period_created.filter(
+                or_(
+                    CaptureRecord.unique_id.like("QANEW-%"),
+                    CaptureRecord.source == "qa_portal",
+                )
+            ).count()
+
+            q_period_qc = q_base.filter(
+                func.julianday(qc_col) >= func.julianday(eff_from),
+                func.julianday(qc_col) <= func.julianday(eff_to),
+            )
+            disapproved_records = q_period_qc.filter(CaptureRecord.audit_status == "DISAPPROVAL").count()
+            period_commercial = q_period_qc.filter(
+                or_(
+                    CaptureRecord.audit_status == "COMMERCIAL_PROPERTY",
+                    CaptureRecord.property_type == "Commercial Property",
+                )
+            ).count()
+        else:
+            completed_verifications = q_base.filter(is_completed).count()
+            closed_verifications = q_base.filter(is_closed).count()
+            disapproved_records = q_base.filter(CaptureRecord.audit_status == "DISAPPROVAL").count()
+            confirmed_construction = q_base.filter(
+                func.lower(func.trim(CaptureRecord.construction_happening)) == "yes"
+            ).count()
+            phone_numbers_obtained = q_base.filter(has_phone).count()
+            manually_added = q_base.filter(CaptureRecord.is_manually_added).count()
+            qa_new_records = q_base.filter(
+                or_(
+                    CaptureRecord.unique_id.like("QANEW-%"),
+                    CaptureRecord.source == "qa_portal",
+                )
+            ).count()
+            period_commercial = alltime_commercial
+
+        completion_rate = round(completed_verifications / eligible_for_field * 100, 1) if eligible_for_field else 0.0
 
         overview = {
             "total_records": total_records,
-            "total_commercial_properties": commercial_records,
+            "total_commercial_properties": alltime_commercial,
             "eligible_for_field": eligible_for_field,
             "sent_to_field": sent_to_field,
             "unassigned_properties": unassigned_properties,
@@ -1022,12 +1051,11 @@ class RecordService:
         }
 
         # 3. PPT Funnel & Summary Split (dynamic with active filter)
-        false_positives_qc = q_base.filter(CaptureRecord.audit_status == "DISAPPROVAL").count()
         funnel = {
             "identified_sites": total_records,
             "sent_for_verification": sent_to_field,
-            "false_positives_qc": false_positives_qc,
-            "commercial_property_qc": commercial_records,
+            "false_positives_qc": disapproved_records,
+            "commercial_property_qc": period_commercial,
             "field_verification_completed": completed_verifications,
             "pending_for_field_verification": pending_verifications,
             "confirmed_construction": confirmed_construction,
@@ -1044,15 +1072,32 @@ class RecordService:
             )
         )
         total_leads = q_tele.count()
-        calls_completed = q_tele.filter(
-            CaptureRecord.telecaller_status.isnot(None),
-            CaptureRecord.telecaller_status != "PENDING",
+        tele_col = func.coalesce(CaptureRecord.telecaller_called_at, CaptureRecord.updated_at, CaptureRecord.created_at)
+        if is_period_filtered:
+            q_tele_period = q_tele.filter(
+                func.julianday(tele_col) >= func.julianday(eff_from),
+                func.julianday(tele_col) <= func.julianday(eff_to),
+            )
+            calls_completed = q_tele_period.filter(
+                CaptureRecord.telecaller_status.isnot(None),
+                CaptureRecord.telecaller_status != "PENDING",
+            ).count()
+            const_confirmed_tele = q_tele_period.filter(CaptureRecord.telecaller_status == "CONSTRUCTION_CONFIRMED").count()
+            follow_up_tele = q_tele_period.filter(CaptureRecord.telecaller_status == "CONNECTED_FOLLOW_UP").count()
+            not_reachable_tele = q_tele_period.filter(CaptureRecord.telecaller_status == "NOT_REACHABLE").count()
+        else:
+            calls_completed = q_tele.filter(
+                CaptureRecord.telecaller_status.isnot(None),
+                CaptureRecord.telecaller_status != "PENDING",
+            ).count()
+            const_confirmed_tele = q_tele.filter(CaptureRecord.telecaller_status == "CONSTRUCTION_CONFIRMED").count()
+            follow_up_tele = q_tele.filter(CaptureRecord.telecaller_status == "CONNECTED_FOLLOW_UP").count()
+            not_reachable_tele = q_tele.filter(CaptureRecord.telecaller_status == "NOT_REACHABLE").count()
+
+        calls_pending = q_tele.filter(
+            or_(CaptureRecord.telecaller_status.is_(None), CaptureRecord.telecaller_status == "PENDING")
         ).count()
-        calls_pending = total_leads - calls_completed
-        const_confirmed_tele = q_tele.filter(CaptureRecord.telecaller_status == "CONSTRUCTION_CONFIRMED").count()
-        follow_up_tele = q_tele.filter(CaptureRecord.telecaller_status == "CONNECTED_FOLLOW_UP").count()
-        not_reachable_tele = q_tele.filter(CaptureRecord.telecaller_status == "NOT_REACHABLE").count()
-        other_tele = calls_completed - (const_confirmed_tele + follow_up_tele + not_reachable_tele)
+        other_tele = max(0, calls_completed - (const_confirmed_tele + follow_up_tele + not_reachable_tele))
 
         telecalling = {
             "total_leads": total_leads,
@@ -1166,35 +1211,46 @@ class RecordService:
                 continue
             if user_id and u.id != user_id:
                 continue
-            scoped = self.period_metrics(eff_from, eff_to, status, u.id, district=district, set_name=set_name)
-            assigned, completed, u_closed, u_pending, rate = (
-                scoped['total_records'],
-                scoped['total_completed_records'],
-                scoped.get('closed_records', 0),
-                scoped['pending_records'],
-                scoped['completion_rate'],
-            )
-            u_today_comp = scoped['today_completed_records']
-            u_base = self.db.query(CaptureRecord).filter(CaptureRecord.user_id == u.id)
-            if district:
-                u_base = u_base.filter(CaptureRecord.district == district)
-            if set_name:
-                u_base = u_base.filter(CaptureRecord.set_name == set_name)
-            if eff_from:
-                u_base = u_base.filter(func.coalesce(CaptureRecord.captured_at, CaptureRecord.created_at) >= eff_from)
-            if eff_to:
-                u_base = u_base.filter(func.coalesce(CaptureRecord.captured_at, CaptureRecord.created_at) <= eff_to)
 
-            u_const = u_base.filter(
-                func.lower(func.trim(CaptureRecord.construction_happening)) == "yes",
+            q_u = self.db.query(CaptureRecord).filter(CaptureRecord.user_id == u.id)
+            if district:
+                q_u = q_u.filter(CaptureRecord.district == district)
+            if set_name:
+                q_u = q_u.filter(CaptureRecord.set_name == set_name)
+
+            assigned = q_u.count()
+            u_pending = q_u.filter(
+                not_(is_completed),
+                not_(is_closed),
+                or_(CaptureRecord.audit_status.is_(None), CaptureRecord.audit_status != "DISAPPROVAL"),
             ).count()
-            u_phones = u_base.filter(
-                or_(
-                    func.coalesce(func.trim(CaptureRecord.contact_number), "") != "",
-                    func.coalesce(func.trim(CaptureRecord.site_contractor_architect_number), "") != "",
-                    func.coalesce(func.trim(CaptureRecord.qc_builder_contact), "") != "",
-                ),
+
+            if is_period_filtered:
+                q_u_period = q_u.filter(
+                    func.julianday(comp_col) >= func.julianday(eff_from),
+                    func.julianday(comp_col) <= func.julianday(eff_to),
+                )
+                completed = q_u_period.filter(is_completed).count()
+                u_closed = q_u_period.filter(is_closed).count()
+                u_const = q_u_period.filter(
+                    func.lower(func.trim(CaptureRecord.construction_happening)) == "yes",
+                ).count()
+                u_phones = q_u_period.filter(has_phone).count()
+            else:
+                completed = q_u.filter(is_completed).count()
+                u_closed = q_u.filter(is_closed).count()
+                u_const = q_u.filter(
+                    func.lower(func.trim(CaptureRecord.construction_happening)) == "yes",
+                ).count()
+                u_phones = q_u.filter(has_phone).count()
+
+            u_today_comp = q_u.filter(
+                func.julianday(comp_col) >= func.julianday(today_start),
+                func.julianday(comp_col) <= func.julianday(today_end),
+                is_completed,
             ).count()
+
+            rate = round(completed / assigned * 100, 1) if assigned else 0.0
 
             inspector_stats.append({
                 "user_id": u.id,
@@ -1212,7 +1268,7 @@ class RecordService:
                 "phones_obtained": u_phones,
             })
 
-                # 8. QA Users / Auditors Stats
+        # 8. QA Users / Auditors Stats
         qa_user_stats = []
         try:
             from app.models.user import UserRole
@@ -1222,7 +1278,6 @@ class RecordService:
                 .order_by(User.full_name)
                 .all()
             )
-            today_str = today_start.strftime("%Y-%m-%d")
             for aud in auditor_users:
                 if user_id and aud.id != user_id:
                     continue
@@ -1238,17 +1293,10 @@ class RecordService:
                     q_qc = q_qc.filter(CaptureRecord.set_name == set_name)
 
                 assigned = q_assigned.count()
-                qc_done = q_qc.count()
-                if assigned == 0 and qc_done == 0:
-                    continue
-
-                aud_approved = q_qc.filter(CaptureRecord.audit_status == "APPROVAL").count()
-                aud_disapproved = q_qc.filter(CaptureRecord.audit_status == "DISAPPROVAL").count()
-                aud_commercial = q_qc.filter(CaptureRecord.audit_status == "COMMERCIAL_PROPERTY").count()
                 aud_pending = q_assigned.filter(
                     or_(CaptureRecord.audit_status.is_(None), CaptureRecord.audit_status == "PENDING")
                 ).count()
-                
+
                 q_upload = self.db.query(CaptureRecord).filter(
                     CaptureRecord.uploaded_by_id == aud.id,
                     CaptureRecord.source == "qa_portal",
@@ -1257,10 +1305,43 @@ class RecordService:
                     q_upload = q_upload.filter(CaptureRecord.district == district)
                 if set_name:
                     q_upload = q_upload.filter(CaptureRecord.set_name == set_name)
-                aud_created = q_upload.count()
+
+                if is_period_filtered:
+                    q_qc_period = q_qc.filter(
+                        func.julianday(qc_col) >= func.julianday(eff_from),
+                        func.julianday(qc_col) <= func.julianday(eff_to),
+                    )
+                    qc_done = q_qc_period.count()
+                    aud_approved = q_qc_period.filter(CaptureRecord.audit_status == "APPROVAL").count()
+                    aud_disapproved = q_qc_period.filter(CaptureRecord.audit_status == "DISAPPROVAL").count()
+                    aud_commercial = q_qc_period.filter(
+                        or_(
+                            CaptureRecord.audit_status == "COMMERCIAL_PROPERTY",
+                            CaptureRecord.property_type == "Commercial Property",
+                        )
+                    ).count()
+                    aud_created = q_upload.filter(
+                        func.julianday(CaptureRecord.created_at) >= func.julianday(eff_from),
+                        func.julianday(CaptureRecord.created_at) <= func.julianday(eff_to),
+                    ).count()
+                else:
+                    qc_done = q_qc.count()
+                    aud_approved = q_qc.filter(CaptureRecord.audit_status == "APPROVAL").count()
+                    aud_disapproved = q_qc.filter(CaptureRecord.audit_status == "DISAPPROVAL").count()
+                    aud_commercial = q_qc.filter(
+                        or_(
+                            CaptureRecord.audit_status == "COMMERCIAL_PROPERTY",
+                            CaptureRecord.property_type == "Commercial Property",
+                        )
+                    ).count()
+                    aud_created = q_upload.count()
+
+                if assigned == 0 and qc_done == 0 and aud_created == 0:
+                    continue
 
                 aud_today = q_qc.filter(
-                    func.substr(cast(func.coalesce(CaptureRecord.qc_completed_at, CaptureRecord.audited_at), String), 1, 10) == today_str,
+                    func.julianday(qc_col) >= func.julianday(today_start),
+                    func.julianday(qc_col) <= func.julianday(today_end),
                 ).count()
                 rate = round((qc_done / assigned * 100), 1) if assigned else (100.0 if qc_done else 0.0)
 

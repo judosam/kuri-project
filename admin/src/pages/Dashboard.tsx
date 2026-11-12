@@ -159,6 +159,7 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [modalStat, setModalStat] = useState<StatDetailModalData | null>(null);
   const [activityFilter, setActivityFilter] = useState<'all' | 'qc' | 'field' | 'telecalling'>('all');
@@ -200,11 +201,13 @@ export default function Dashboard() {
       .then((result) => {
         if (seq !== reqSeq.current) return;
         setData(result);
+        setFetchError(null);
         setUpdatedAt(Date.now());
       })
       .catch((err) => {
         if (seq !== reqSeq.current) return;
         console.error('Failed to load analytics dashboard:', err);
+        setFetchError('Failed to load dashboard metrics. Check server or click retry.');
       })
       .finally(() => {
         if (seq === reqSeq.current) {
@@ -581,6 +584,36 @@ export default function Dashboard() {
               )}
             </div>
           </div>
+
+          {fetchError && (
+            <div
+              style={{
+                margin: '12px 0',
+                padding: '10px 16px',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                color: '#b91c1c',
+                fontSize: '0.85rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="error" size={18} />
+                <span>{fetchError}</span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={() => fetchData(true)}
+                style={{ height: 28, fontSize: '0.75rem' }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
           <div className="k-kpis">
             <button

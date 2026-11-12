@@ -100,5 +100,18 @@ def test_set_name_in_filter_fields_and_options(client, admin_token, test_admin, 
     assert dash_data["period_info"]["set_name"] == "CBE District"
     assert dash_data["period_info"]["user_id"] == test_admin.id
 
+    # Test presets: today, yesterday, allTime
+    for preset_val in ("today", "yesterday", "allTime"):
+        res_p = client.get(
+            f"/api/admin/dashboard?preset={preset_val}",
+            headers={"Authorization": f"Bearer {admin_token}"}
+        )
+        assert res_p.status_code == 200, f"Preset {preset_val} failed with {res_p.text}"
+        data_p = res_p.json()
+        assert "overview" in data_p
+        assert "inspector_stats" in data_p
+        assert "qa_user_stats" in data_p
+
+
 
 
