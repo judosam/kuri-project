@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Local checkout: repo/.env. Packaged backend: /app/.env.
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-ENV_FILE = (BACKEND_DIR.parent if BACKEND_DIR.name == 'backend' else BACKEND_DIR) / '.env'
+ENV_FILE = (BACKEND_DIR / '.env') if (BACKEND_DIR / '.env').exists() else ((BACKEND_DIR.parent / '.env') if (BACKEND_DIR.parent / '.env').exists() else (BACKEND_DIR / '.env'))
 
 class Settings(BaseSettings):
     # App

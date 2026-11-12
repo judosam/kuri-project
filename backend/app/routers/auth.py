@@ -27,20 +27,43 @@ _login_attempts: dict[str, list[float]] = defaultdict(list)
 _rate_limit_lock = Lock()
 
 
-def check_login_rate_limit(client_ip: str, max_attempts: int = 10, window_seconds: int = 60):
-    """Sliding-window in-memory rate limiter per IP to prevent brute-force attacks."""
-    import os
+def get_client_ip(request: Request) -> str:
+    """Resolve true client IP respecting reverse proxy headers."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    return request.client.host if request.client else "unknown"
+
+
+def check_login_rate_limit(client_ip: str, email: str = "", max_attempts: int = 15, window_seconds: int = 60):
+    """Sliding-window in-memory rate limiter per IP and per email to prevent brute-force attacks."""
     if client_ip in ("testclient", "localhost", "127.0.0.1", "::1"):
         max_attempts = 300
     now = time.time()
+    clean_email = email.strip().lower() if email else ""
     with _rate_limit_lock:
-        # Purge entries older than window
+        # Check IP threshold
         attempts = [t for t in _login_attempts[client_ip] if now - t < window_seconds]
         if len(attempts) >= max_attempts:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too many login attempts. Please wait 1 minute before trying again.",
             )
+        # Check Account threshold (stop targeting single user account)
+        if clean_email and client_ip not in ("testclient", "localhost", "127.0.0.1", "::1"):
+            acc_key = f"acc:{clean_email}"
+            acc_attempts = [t for t in _login_attempts[acc_key] if now - t < window_seconds]
+            if len(acc_attempts) >= 10:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Too many login attempts for this account. Please wait 1 minute before trying again.",
+                )
+            acc_attempts.append(now)
+            _login_attempts[acc_key] = acc_attempts
+
         attempts.append(now)
         _login_attempts[client_ip] = attempts
 
@@ -51,8 +74,8 @@ async def login(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    client_ip = request.client.host if request.client else "unknown"
-    check_login_rate_limit(client_ip)
+    client_ip = get_client_ip(request)
+    check_login_rate_limit(client_ip, login_req.email)
 
     auth_service = AuthService(db)
 
@@ -119,7 +142,7 @@ async def logout(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = get_client_ip(request)
     role_label = user.role.value.capitalize() if hasattr(user.role, "value") else str(user.role).capitalize()
 
     # Log sign-out
@@ -229,7 +252,7 @@ async def change_password(
     """User self-service change password workflow."""
     from app.core.security import hash_password, verify_password
 
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = get_client_ip(request)
 
     new_pwd = req.new_password.strip()
     if len(new_pwd) < 8 or len(new_pwd) > 128:
